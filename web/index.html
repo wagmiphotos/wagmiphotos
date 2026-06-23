@@ -14,8 +14,9 @@ img{max-width:100%;border-radius:8px;margin-top:12px}input[type=range]{width:100
 let saved=0;
 async function go(){
  const r=await fetch('/v1/images/generations',{method:'POST',
-  headers:{'Content-Type':'application/json','Authorization':'Bearer '+(localStorage.key||'dev-key')},
+  headers:{'Content-Type':'application/json','Authorization':'Bearer '+(localStorage.getItem('apiKey')||'dev-key')},
   body:JSON.stringify({prompt:prompt.value,cache_tolerance:parseFloat(tol.value)})});
+ if(!r.ok){out.innerHTML='<span class="badge miss">ERROR</span> '+await r.text();return;}
  const j=await r.json();const sc=j.shared_cache;
  saved+=sc.cost_saved_usd;document.getElementById('saved').textContent=saved.toFixed(2);
  out.innerHTML=`<span class="badge ${sc.result}">${sc.result.toUpperCase()}</span>
