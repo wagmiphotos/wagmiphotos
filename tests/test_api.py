@@ -30,3 +30,10 @@ def test_miss_then_hit_shape():
 
 def test_healthz():
     assert _client().get("/healthz").json() == {"status": "ok"}
+
+def test_n_greater_than_one_is_rejected():
+    c = _client()
+    r = c.post("/v1/images/generations",
+               json={"prompt": "a cat", "n": 2},
+               headers={"Authorization": "Bearer secret"})
+    assert r.status_code == 422

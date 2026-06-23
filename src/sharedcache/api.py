@@ -1,3 +1,4 @@
+import time
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -26,10 +27,12 @@ def build_app(service: CacheService, api_key: str | None) -> FastAPI:
     @app.post("/v1/images/generations")
     async def generate(body: GenRequest, authorization: str | None = Header(default=None)):
         _check(authorization)
+        if body.n != 1:
+            raise HTTPException(status_code=422, detail="only n=1 is supported")
         r = await service.generate(body.prompt, cache_tolerance=body.cache_tolerance,
                                    size=body.size, api_key="caller")
         return JSONResponse({
-            "created": 0,
+            "created": int(time.time()),
             "data": [{"url": r.record.url}],
             "shared_cache": {
                 "result": r.result,
