@@ -1,6 +1,7 @@
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
+@runtime_checkable
 class Storage(Protocol):
     def put(self, key: str, data: bytes, content_type: str) -> str: ...
     def get(self, key: str) -> bytes: ...
