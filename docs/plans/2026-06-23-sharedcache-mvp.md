@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - **Python:** `>=3.11` (Genblaze requires it). Manage with `uv`.
-- **Pin Genblaze (alpha, version churn):** `genblaze-core==0.3.2`, `genblaze-openai==0.3.0`, `genblaze-s3` (umbrella-compatible). Use the umbrella extra `genblaze[openai]` is acceptable but pin the resolved versions in `uv.lock`.
+- **Pin Genblaze (alpha, version churn):** depend on the umbrella `genblaze[openai]>=0.4,<0.5` (resolves to `genblaze==0.4.0`, which transitively pins `genblaze-core`/`genblaze-openai` to 0.3.x and bundles `genblaze-s3`); commit `uv.lock` so resolved versions are reproducible.
 - **Genblaze calls:** always pass `raise_on_failure=True`; default image model `gpt-image-1` (base64 → persisted by sink; never `dall-e-3`, whose URLs expire ~1h); set `Pipeline(preflight=False)` anywhere offline/tested.
 - **Auth/secrets:** per-provider + B2 keys via env only, NEVER in `step.params`: `OPENAI_API_KEY`, optional `GEMINI_API_KEY`, `B2_KEY_ID`, `B2_APP_KEY`, `B2_BUCKET`, `B2_REGION` (default `us-west-004`).
 - **`cache_tolerance`** ∈ [0.0, 1.0]: 0 = bespoke (always generate), 1 = max reuse. Default **0.15**. Maps to a cosine-similarity floor with `SIM_MAX=0.98`, `SIM_MIN=0.70`.
