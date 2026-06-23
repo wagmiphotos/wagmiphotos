@@ -15,3 +15,8 @@ def test_thumbnail_is_webp_and_bounded():
 
 def test_dimensions_reads_size():
     assert dimensions(_png(640, 480)) == (640, 480)
+
+def test_thumbnail_preserves_aspect_ratio():
+    out = make_thumbnail(_png(2000, 1000), max_px=512)
+    img = Image.open(io.BytesIO(out))
+    assert img.size == (512, 256)
