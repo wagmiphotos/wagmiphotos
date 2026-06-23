@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS assets (
     height INT NOT NULL,
     mime TEXT NOT NULL,
     manifest_url TEXT,
-    embedding vector(768) NOT NULL,
+    embedding vector(__EMBEDDING_DIMS__) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_assets_embedding

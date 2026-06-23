@@ -29,11 +29,19 @@ class GenblazeS3Storage:
     """Wraps Genblaze's S3 backend so the same B2 backend is used for the
     generation sink (Task 8) and for our thumbnail put/get."""
 
-    def __init__(self, bucket: str, key_id: str, app_key: str, region: str = "us-west-004"):
+    def __init__(
+        self,
+        bucket: str,
+        key_id: str,
+        app_key: str,
+        region: str = "us-west-004",
+        public_url_base: str | None = None,
+    ):
         from genblaze_s3 import S3StorageBackend  # lazy import — keeps module importable offline
 
         self.backend = S3StorageBackend.for_backblaze(
-            bucket, region=region, key_id=key_id, app_key=app_key
+            bucket, region=region, key_id=key_id, app_key=app_key,
+            public_url_base=public_url_base,
         )
 
     def put(self, key: str, data: bytes, content_type: str) -> str:

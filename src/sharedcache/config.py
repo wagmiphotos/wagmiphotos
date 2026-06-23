@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     b2_app_key: str | None = None
     b2_bucket: str | None = None
     b2_region: str = "us-west-004"
+    b2_public_url_base: str | None = None
     database_url: str | None = None
     embedding_dims: int = 768
     default_image_model: str = "gpt-image-1"

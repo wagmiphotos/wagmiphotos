@@ -44,7 +44,9 @@ Every HIT skips an OpenAI generation call entirely. With `gpt-image-1` at ~$0.04
 
 Generated assets (PNG bytes), thumbnails, and SHA-256 provenance manifests are stored in a Backblaze B2 bucket via the **genblaze-s3 sink**. Each asset lands at a path like `assets/<sha256>/image.png` with a companion `manifest.json` recording the model, prompt, timestamp, and content hash. Cache hits serve the B2-hosted URL directly — no re-generation needed.
 
-Required B2 env vars: `B2_KEY_ID`, `B2_APP_KEY`, `B2_BUCKET`.
+The playground `<img>` tags and the API `data[0].url` field must resolve publicly. This requires a **public-read B2 bucket** and `B2_PUBLIC_URL_BASE` set to the bucket's friendly-URL prefix (e.g. `https://f004.backblazeb2.com/file/<bucket-name>`). Without this, image URLs will 403 in the browser. Presigning is a planned future alternative.
+
+Required B2 env vars: `B2_KEY_ID`, `B2_APP_KEY`, `B2_BUCKET`, `B2_PUBLIC_URL_BASE`.
 
 ---
 
@@ -69,23 +71,25 @@ When no API keys are set, the system falls back to `StubGenerator` (returns a de
 ## Quickstart
 
 ```bash
-# 1. Clone & install
+# 1. Clone & install  (uv sync installs the package as editable — no separate pip install needed)
 git clone <repo>
 cd sharedcache
 uv sync
-uv pip install -e .
 
-# 2. (Optional) configure real providers in .env
-cp .env.example .env  # then fill in keys
+# 2. Configure providers in .env
+cp .env.example .env  # fill in keys; set B2_PUBLIC_URL_BASE for the playground to render images
 
-# 3. Start the API
+# 3. Apply the database migration (honors EMBEDDING_DIMS; pipe into psql)
+uv run python scripts/migrate.py | psql "$DATABASE_URL"
+
+# 4. Pre-seed the demo pool  (standalone; does NOT need the server running)
+uv run python scripts/seed.py
+
+# 5. Start the API
 uv run uvicorn sharedcache.api:app --reload
 
-# 4. Open the playground UI
+# 6. Open the playground UI
 open http://localhost:8000/
-
-# 5. Pre-seed the demo pool
-uv run python scripts/seed.py
 ```
 
 ---
@@ -100,9 +104,10 @@ uv run python scripts/seed.py
 | `B2_APP_KEY` | For B2 storage | Backblaze B2 application key |
 | `B2_BUCKET` | For B2 storage | Backblaze B2 bucket name |
 | `B2_REGION` | Optional | B2 region (default: `us-west-004`) |
-| `DATABASE_URL` | Recommended | PostgreSQL+pgvector for persistent cache (falls back to in-memory) |
+| `B2_PUBLIC_URL_BASE` | For image rendering | Public-read URL base (e.g. `https://f004.backblazeb2.com/file/<bucket>`). Required for the playground and API responses to serve accessible image URLs from a public-read bucket. |
+| `DATABASE_URL` | Recommended | PostgreSQL+pgvector for persistent cache (falls back to in-memory). **Note:** if set without B2 credentials, a warning is emitted and the in-memory index is used to avoid persisting unreachable URLs. |
 | `API_KEY` | Optional | Bearer token to protect the endpoint |
-| `EMBEDDING_DIMS` | Optional | Embedding dimensions (default: 768) |
+| `EMBEDDING_DIMS` | Optional | Embedding dimensions (default: 768). Must match the value used when running `migrate.py`. |
 
 Without any env vars set, SharedCache runs fully offline with stub components — useful for local development and CI.
 
@@ -126,9 +131,15 @@ uv run pytest -q
 
 ## Live smoke test (pending — requires real keys)
 
-Once `OPENAI_API_KEY`, `B2_KEY_ID`, `B2_APP_KEY`, and `B2_BUCKET` are set in `.env`:
+The demo requires a **public-read B2 bucket** so the playground `<img>` tags and `data[0].url` are accessible in the browser. Set `B2_PUBLIC_URL_BASE` to the bucket's friendly-URL prefix (e.g. `https://f004.backblazeb2.com/file/<bucket-name>`). Without this, all image URLs will 403. Presigning is a planned future alternative.
+
+Once `OPENAI_API_KEY`, `B2_KEY_ID`, `B2_APP_KEY`, `B2_BUCKET`, `B2_PUBLIC_URL_BASE`, and optionally `DATABASE_URL` are set in `.env`:
 
 ```bash
+# Apply migration (generates SQL with correct EMBEDDING_DIMS, pipe to psql)
+uv run python scripts/migrate.py | psql "$DATABASE_URL"
+
+# Seed the cache pool (runs standalone — no server needed)
 uv run python scripts/seed.py
 # First run: each prompt prints "miss" — real images generated and stored in B2
 # Second run: each prompt prints "hit" — served from cache, $0 generation cost

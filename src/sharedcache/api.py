@@ -66,10 +66,24 @@ def _build_from_settings():
     from datetime import datetime, timezone
 
     s = Settings()
-    storage = (GenblazeS3Storage(s.b2_bucket, s.b2_key_id, s.b2_app_key, s.b2_region)
+    storage = (GenblazeS3Storage(s.b2_bucket, s.b2_key_id, s.b2_app_key, s.b2_region,
+                                 public_url_base=s.b2_public_url_base)
                if s.b2_bucket and s.b2_key_id else InMemoryStorage())
     embedder = GeminiEmbedder(s.gemini_api_key, s.embedding_dims) if s.gemini_api_key else HashEmbedder(s.embedding_dims)
-    index = PgCacheIndex(s.database_url, s.embedding_dims) if s.database_url else InMemoryCacheIndex()
+    using_durable_storage = isinstance(storage, GenblazeS3Storage)
+    if s.database_url and using_durable_storage:
+        index = PgCacheIndex(s.database_url, s.embedding_dims)
+    else:
+        if s.database_url and not using_durable_storage:
+            import warnings
+            warnings.warn(
+                "DATABASE_URL is set but storage is not durable (no B2 credentials). "
+                "Using in-memory index to avoid persisting unreachable memory:// URLs. "
+                "Set B2_KEY_ID, B2_APP_KEY, and B2_BUCKET to enable PgCacheIndex.",
+                UserWarning,
+                stacklevel=2,
+            )
+        index = InMemoryCacheIndex()
     generator = (GenblazeGenerator(storage, s.openai_api_key)
                  if s.openai_api_key and s.b2_bucket else StubGenerator(storage))
     svc = CacheService(embedder, index, generator, storage, CostMeter(),
