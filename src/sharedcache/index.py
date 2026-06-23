@@ -1,5 +1,7 @@
 from typing import Protocol
 import numpy as np
+import psycopg
+from pgvector.psycopg import register_vector
 from sharedcache.models import AssetRecord
 
 class CacheIndex(Protocol):
@@ -25,10 +27,6 @@ class InMemoryCacheIndex:
         scored.sort(key=lambda t: t[1], reverse=True)
         return scored[:k]
 
-
-import json
-import psycopg
-from pgvector.psycopg import register_vector
 
 class PgCacheIndex:
     def __init__(self, dsn: str, dims: int = 768):
