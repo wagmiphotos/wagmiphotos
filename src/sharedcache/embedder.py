@@ -33,5 +33,10 @@ class GeminiEmbedder:
         self.dims = dims
 
     def embed(self, text: str) -> list[float]:
-        resp = self._client.models.embed_content(model=self._model, contents=text)
+        from google.genai import types
+        resp = self._client.models.embed_content(
+            model=self._model,
+            contents=text,
+            config=types.EmbedContentConfig(output_dimensionality=self.dims),
+        )
         return list(resp.embeddings[0].values)
