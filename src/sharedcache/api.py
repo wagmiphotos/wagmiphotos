@@ -20,6 +20,14 @@ def build_app(service: CacheService, api_key: str | None) -> FastAPI:
         if auth != f"Bearer {api_key}":
             raise HTTPException(status_code=401, detail="invalid api key")
 
+    from fastapi.responses import FileResponse
+    import os
+
+    @app.get("/")
+    def index():
+        path = os.path.join(os.path.dirname(__file__), "..", "..", "web", "index.html")
+        return FileResponse(os.path.abspath(path))
+
     @app.get("/healthz")
     def healthz():
         return {"status": "ok"}
@@ -44,6 +52,7 @@ def build_app(service: CacheService, api_key: str | None) -> FastAPI:
             },
         })
 
+    app.state.service = service
     return app
 
 

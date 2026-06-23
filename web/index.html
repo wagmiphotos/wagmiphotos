@@ -1,0 +1,25 @@
+<!doctype html><html><head><meta charset="utf-8"><title>SharedCache</title>
+<style>body{font-family:system-ui;max-width:680px;margin:40px auto}
+.badge{padding:2px 8px;border-radius:6px;color:#fff}.hit{background:#16a34a}.miss{background:#ea580c}
+img{max-width:100%;border-radius:8px;margin-top:12px}input[type=range]{width:100%}</style></head>
+<body><h1>SharedCache 💵</h1><p>Generate once. Serve forever.</p>
+<input id="prompt" placeholder="a cozy cafe interior" style="width:100%;padding:8px">
+<label>cache_tolerance: <span id="tv">0.15</span></label>
+<input id="tol" type="range" min="0" max="1" step="0.05" value="0.15"
+ oninput="tv.textContent=this.value">
+<button onclick="go()">Generate</button>
+<p>Total saved: $<span id="saved">0.00</span></p>
+<div id="out"></div>
+<script>
+let saved=0;
+async function go(){
+ const r=await fetch('/v1/images/generations',{method:'POST',
+  headers:{'Content-Type':'application/json','Authorization':'Bearer '+(localStorage.key||'dev-key')},
+  body:JSON.stringify({prompt:prompt.value,cache_tolerance:parseFloat(tol.value)})});
+ const j=await r.json();const sc=j.shared_cache;
+ saved+=sc.cost_saved_usd;document.getElementById('saved').textContent=saved.toFixed(2);
+ out.innerHTML=`<span class="badge ${sc.result}">${sc.result.toUpperCase()}</span>
+  similarity ${sc.similarity.toFixed(3)} · saved $${sc.cost_saved_usd.toFixed(2)}
+  <br><img src="${j.data[0].url}">`;
+}
+</script></body></html>
