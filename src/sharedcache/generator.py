@@ -82,11 +82,16 @@ class GenblazeGenerator:
             .arun(sink=sink, raise_on_failure=True, timeout=120)
         )
         asset = result.run.steps[0].assets[0]
+        if not asset.sha256:
+            raise ValueError(
+                f"Genblaze asset has no sha256 — cannot build a cache entry (url={asset.url!r}); "
+                "ensure the asset was persisted via the storage sink (provenance issue #77)."
+            )
         manifest_json = result.manifest.to_canonical_json()
         key = self._storage.key_from_url(asset.url)
         return Generated(
             url=asset.url,
-            content_hash=asset.sha256 or "",
+            content_hash=asset.sha256,
             width=asset.width or 0,
             height=asset.height or 0,
             mime=asset.media_type,
