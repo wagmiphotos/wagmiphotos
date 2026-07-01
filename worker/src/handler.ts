@@ -22,7 +22,9 @@ export async function handleGenerate(body: GenBody, s: Services, cfg: GenCfg): P
 
   // empty pool: nothing to serve
   if (!best || !asset) {
-    await s.queries.recordQuery({ normalized, original: prompt, assetId: null, similarity: 0, built: false });
+    try {
+      await s.queries.recordQuery({ normalized, original: prompt, assetId: null, similarity: 0, built: false });
+    } catch (e) { console.error("recordQuery failed", e); }
     return Response.json(
       { created: cfg.now(), data: [], shared_cache: { result: "pending", similarity: 0, cost_saved_usd: 0 } },
       { status: 202 }
@@ -31,9 +33,11 @@ export async function handleGenerate(body: GenBody, s: Services, cfg: GenCfg): P
 
   const isHit = best.score >= floor;
   const result = isHit ? "hit" : "approximate";
-  await s.queries.recordQuery({
-    normalized, original: prompt, assetId: asset.id, similarity: best.score, built: isHit,
-  });
+  try {
+    await s.queries.recordQuery({
+      normalized, original: prompt, assetId: asset.id, similarity: best.score, built: isHit,
+    });
+  } catch (e) { console.error("recordQuery failed", e); }
   return Response.json({
     created: cfg.now(),
     data: [{ url: asset.url }],
@@ -57,5 +61,5 @@ export async function handleKeygen(request: Request, s: Services, genKey: () => 
   if (!ok) return Response.json({ error: "Too many key requests" }, { status: 429 });
   const key = genKey();
   await s.keys.addKey(await sha256Hex(key));
-  return Response.json({ key, created_at: Date.now() });
+  return Response.json({ key, created_at: Math.floor(Date.now() / 1000) });
 }

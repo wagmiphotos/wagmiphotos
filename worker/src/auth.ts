@@ -13,7 +13,10 @@ function bearer(request: Request): string | null {
 }
 
 export async function checkAuth(request: Request, env: Env, keys: KeyStore): Promise<boolean> {
-  if (!env.MASTER_API_KEY) return true; // open in dev
+  if (!env.MASTER_API_KEY) {
+    console.warn("checkAuth: MASTER_API_KEY unset — auth is OPEN (dev mode)");
+    return true; // open in dev
+  }
   const token = bearer(request);
   if (!token) return false;
   if (token === env.MASTER_API_KEY) return true;

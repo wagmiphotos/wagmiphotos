@@ -37,3 +37,32 @@ it("generate: empty pool -> 202 (open dev, clip mocked)", async () => {
   );
   expect(res.status).toBe(202);
 });
+
+it("generate: null JSON body -> 400", async () => {
+  const res = await worker.fetch(
+    new Request("https://x/v1/images/generations", { method: "POST", body: "null" }),
+    fakeEnv()
+  );
+  expect(res.status).toBe(400);
+  const j: any = await res.json();
+  expect(j.error).toBe("body must be a JSON object");
+});
+
+it("healthz: GET ok, POST 404 (method-gated)", async () => {
+  const get = await worker.fetch(new Request("https://x/healthz"), fakeEnv());
+  expect(get.status).toBe(200);
+  const post = await worker.fetch(new Request("https://x/healthz", { method: "POST" }), fakeEnv());
+  expect(post.status).toBe(404);
+});
+
+it("generate: upstream throw (vectorize.query throws) -> structured 502", async () => {
+  vi.stubGlobal("fetch", async () => new Response(JSON.stringify([[0.1, 0.2]]), { status: 200 }));
+  const res = await worker.fetch(
+    new Request("https://x/v1/images/generations", { method: "POST", body: JSON.stringify({ prompt: "hi" }) }),
+    fakeEnv({ VECTORIZE: { query: async () => { throw new Error("boom"); } } })
+  );
+  expect(res.status).toBe(502);
+  const j: any = await res.json();
+  expect(j.error).toBe("upstream error");
+  expect(j.detail).toMatch(/boom/);
+});

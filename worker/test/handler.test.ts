@@ -58,6 +58,17 @@ it("approximate: score < floor -> result approximate + pending query", async () 
   expect((s as any)._recorded[0]).toMatchObject({ built: false, assetId: "a1" });
 });
 
+it("hit: recordQuery throws -> logging is best-effort, still 200 with asset url", async () => {
+  const s = fakeServices({ queries: { recordQuery: async () => { throw new Error("d1 write failed"); } } });
+  (s as any)._assets.set("a1", asset());
+  (s as any)._matches.push({ id: "a1", score: 0.40 });
+  const res = await handleGenerate({ prompt: "a fox", cache_tolerance: 0.15 }, s, cfg);
+  const j: any = await res.json();
+  expect(res.status).toBe(200);
+  expect(j.data[0].url).toBe("https://cdn/large.webp");
+  expect(j.shared_cache.result).toBe("hit");
+});
+
 it("empty pool -> 202 pending, query logged without asset", async () => {
   const s = fakeServices(); // no matches
   const res = await handleGenerate({ prompt: "nothing here" }, s, cfg);
