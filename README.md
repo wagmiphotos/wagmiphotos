@@ -119,6 +119,46 @@ Without any env vars set, SharedCache runs fully offline with stub components â€
 
 ---
 
+## Backfill worker
+
+The backfill worker is a long-running process that continuously re-ranks cached images in the Cloudflare D1 database, using CLIP embeddings to detect stale or unverified cache entries and re-check their similarity. It runs in the GMI Hermes agentbox.
+
+### Setup
+
+1. **Apply the D1 migration** (creates the asset table with CLIP-vector columns):
+   ```bash
+   wrangler d1 migrations apply sharedcache-prod
+   ```
+
+2. **Create the Vectorize index** (CLIP embeddings, 768 dimensions, cosine similarity):
+   ```bash
+   wrangler vectorize create sharedcache-clip --dimensions=768 --metric=cosine
+   ```
+
+3. **Seed the cache pool** (populates D1 with initial assets and embeddings):
+   ```bash
+   uv run python scripts/seed_pd12m.py
+   ```
+
+4. **Run the backfill**:
+   - **Locally** (runs once, re-ranks all assets):
+     ```bash
+     uv run python -m sharedcache.backfill --once
+     ```
+   - **In Hermes agentbox** (continuous, runs as a container):
+     ```bash
+     docker build -t sharedcache-backfill .
+     # Push image to registry and deploy to Hermes with agentbox runtime
+     ```
+
+### Requirements
+
+- **CLIP embedding endpoints**: Set `CLIP_TEXT_EMBED_URL` and `CLIP_IMAGE_EMBED_URL` (e.g., Hugging Face Inference API endpoints) â€” required for re-embedding and re-ranking.
+- **Cloudflare credentials**: `CF_ACCOUNT_ID`, `CF_API_TOKEN`, `D1_DATABASE_ID`, `VECTORIZE_INDEX_NAME`.
+- **Similarity floor**: Tune `FLOOR_SIM_MAX` and `FLOOR_SIM_MIN` against the seeded pool (default: 0.35 / 0.18).
+
+---
+
 ## Running tests
 
 ```bash
