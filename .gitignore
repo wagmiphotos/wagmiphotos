@@ -9,3 +9,8 @@ __pycache__/
 node_modules/
 projects/worker/node_modules/
 .wrangler/
+
+# Python build artifacts
+dist/
+*.egg-info/
+__pycache__/

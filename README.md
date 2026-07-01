@@ -244,7 +244,7 @@ Cloudflare/Backblaze/GMI/CLIP credentials:
 
 1. **Provision stores + seed** — follow **[Backfill worker → Setup](#setup)**: `wrangler d1 migrations apply`,
    `wrangler vectorize create sharedcache-clip --dimensions=768 --metric=cosine`, then
-   `uv run python scripts/seed_pd12m.py` (confirm PD12M's precomputed CLIP image vectors load, not zeros).
+   `uv run python -m sharedcache.backfill.seed_pd12m` (confirm PD12M's precomputed CLIP image vectors load, not zeros).
 2. **Tune the floor** — CLIP cross-modal cosine scores are low; tune `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN` against
    the seeded pool so hits land in the intended range.
 3. **Deploy the Worker** — follow **[Cloudflare Worker → Deploy runbook](#deploy-runbook)**; confirm

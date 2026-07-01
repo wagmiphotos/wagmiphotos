@@ -4,7 +4,7 @@
 Inserts PD12M rows and their precomputed embeddings into D1 and Vectorize.
 
 Usage:
-    uv run python scripts/seed_pd12m.py --limit 100
+    uv run python -m sharedcache.backfill.seed_pd12m --limit 100
 """
 import argparse
 import uuid
