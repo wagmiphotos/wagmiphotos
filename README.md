@@ -73,7 +73,7 @@ When no API keys are set, the system falls back to `StubGenerator` (returns a de
 SharedCache is two deployables over three shared stores (**Cloudflare D1** for the query log + asset
 metadata, **Cloudflare Vectorize** for CLIP vectors, **Backblaze B2** for image bytes):
 
-- **Cloudflare Worker** (`worker/`, TypeScript) — the edge request path. Authenticates, CLIP-embeds the
+- **Cloudflare Worker** (`projects/worker/`, TypeScript) — the edge request path. Authenticates, CLIP-embeds the
   prompt, queries Vectorize for the nearest cached image, logs the query to D1, and returns an image URL.
   It **never generates**. See **[Cloudflare Worker](#cloudflare-worker-edge-request-path)** below.
 - **Python backfill worker** (`src/sharedcache/`, `python -m sharedcache.backfill`) — demand-ranked
@@ -170,14 +170,14 @@ The Worker handles incoming image-generation requests at the edge, routing them 
 
 1. **Install dependencies**:
    ```bash
-   cd worker && npm install
+   cd projects/worker && npm install
    ```
 
 2. **Create the D1 database**:
    ```bash
    wrangler d1 create sharedcache
    ```
-   Copy the returned `database_id` and set it in `worker/wrangler.toml` (replace `REPLACE_WITH_D1_DATABASE_ID`).
+   Copy the returned `database_id` and set it in `projects/worker/wrangler.toml` (replace `REPLACE_WITH_D1_DATABASE_ID`).
 
 3. **Apply the D1 migration** (creates the asset table with CLIP-vector columns):
    ```bash
@@ -195,7 +195,7 @@ The Worker handles incoming image-generation requests at the edge, routing them 
    wrangler secret put CLIP_EMBED_TOKEN      # Token for the CLIP text-embedding endpoint
    ```
 
-6. **Set the CLIP text-embedding endpoint** in `worker/wrangler.toml`:
+6. **Set the CLIP text-embedding endpoint** in `projects/worker/wrangler.toml`:
    ```toml
    [vars]
    CLIP_TEXT_EMBED_URL = "https://your-clip-endpoint/embed"
@@ -222,7 +222,7 @@ The Worker is the request path for production image-generation calls. The Python
 uv run pytest -q          # 42 passed
 
 # Cloudflare Worker (offline, faked bindings — no Miniflare)
-cd worker && npm install && npm test   # 32 passed
+cd projects/worker && npm install && npm test   # 32 passed
 ```
 
 ---

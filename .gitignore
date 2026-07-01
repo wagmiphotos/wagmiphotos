@@ -7,5 +7,5 @@ __pycache__/
 
 # Node / Cloudflare Worker
 node_modules/
-worker/node_modules/
+projects/worker/node_modules/
 .wrangler/
