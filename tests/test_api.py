@@ -243,3 +243,23 @@ def test_dev_key_is_not_a_backdoor(monkeypatch):
     r = client.post("/v1/images/generations",
                     json={"prompt": "hi"}, headers={"Authorization": "Bearer dev-key"})
     assert r.status_code == 401
+
+
+def test_keygen_is_rate_limited():
+    from sharedcache.api import build_app
+    from sharedcache.cache_service import CacheService
+    from sharedcache.embedder import HashEmbedder
+    from sharedcache.index import InMemoryCacheIndex
+    from sharedcache.generator import StubGenerator
+    from sharedcache.storage import InMemoryStorage
+    from sharedcache.cost_meter import CostMeter
+    from fastapi.testclient import TestClient
+
+    storage = InMemoryStorage()
+    svc = CacheService(HashEmbedder(8), InMemoryCacheIndex(), StubGenerator(storage),
+                       storage, CostMeter(), created_at_fn=lambda: "t")
+    app = build_app(svc, None, keygen_rate_per_hour=3)
+    client = TestClient(app)
+    codes = [client.post("/v1/keys/generate").status_code for _ in range(4)]
+    assert codes[:3] == [200, 200, 200]
+    assert codes[3] == 429

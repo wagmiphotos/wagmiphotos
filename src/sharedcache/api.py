@@ -1,5 +1,5 @@
 import time
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sharedcache.cache_service import CacheService
@@ -11,8 +11,10 @@ class GenRequest(BaseModel):
     size: str = "1024x1024"
     cache_tolerance: float = 0.15
 
-def build_app(service: CacheService, api_key: str | None) -> FastAPI:
+def build_app(service: CacheService, api_key: str | None, *, keygen_rate_per_hour: int = 10) -> FastAPI:
+    from sharedcache.ratelimit import SlidingWindowLimiter
     app = FastAPI(title="WagmiPhotos")
+    _keygen_limiter = SlidingWindowLimiter(max_events=keygen_rate_per_hour, window_seconds=3600.0)
 
     def _check(auth: str | None, provider_name: str) -> str:
         if not auth or not auth.startswith("Bearer "):
@@ -67,13 +69,15 @@ def build_app(service: CacheService, api_key: str | None) -> FastAPI:
         return {"status": "ok"}
 
     @app.post("/v1/keys/generate")
-    def generate_api_key():
-        import secrets
+    def generate_api_key(request: Request):
+        client_ip = request.client.host if request.client else "unknown"
+        if not _keygen_limiter.allow(client_ip):
+            raise HTTPException(status_code=429, detail="Too many key requests; try again later")
+        import secrets, time as _t
         new_key = f"sc-{secrets.token_urlsafe(24)}"
         try:
             service._index.add_api_key(new_key)
-            import time
-            return {"key": new_key, "created_at": time.time()}
+            return {"key": new_key, "created_at": _t.time()}
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to generate API Key: {e}")
 
@@ -182,6 +186,7 @@ def _build_from_settings():
                  else StubGenerator(storage))
     svc = CacheService(embedder, index, generator, storage, CostMeter(),
                        created_at_fn=lambda: datetime.now(timezone.utc).isoformat())
-    return build_app(svc, s.api_key)
+    return build_app(svc, s.api_key,
+                      keygen_rate_per_hour=getattr(s, "keygen_rate_per_hour", 10))
 
 app = _build_from_settings()

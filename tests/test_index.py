@@ -16,3 +16,12 @@ def test_search_ranks_by_cosine_similarity():
     results = idx.search([0.9, 0.1], k=2)
     assert results[0][0].id == "near"
     assert results[0][1] > results[1][1]
+
+def test_api_keys_are_stored_hashed():
+    from sharedcache.index import InMemoryCacheIndex
+    idx = InMemoryCacheIndex()
+    idx.add_api_key("sc-secret")
+    # the raw key must not be stored; verification hashes the input
+    assert "sc-secret" not in idx._api_keys
+    assert idx.verify_api_key("sc-secret") is True
+    assert idx.verify_api_key("sc-wrong") is False

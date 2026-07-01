@@ -1,8 +1,12 @@
+import hashlib
 from typing import Protocol
 import numpy as np
 import psycopg
 from pgvector.psycopg import register_vector
 from sharedcache.models import AssetRecord
+
+def _hash_key(raw: str) -> str:
+    return hashlib.sha256(raw.encode()).hexdigest()
 
 class CacheIndex(Protocol):
     def search(self, embedding: list[float], k: int = 5) -> list[tuple[AssetRecord, float]]: ...
@@ -39,10 +43,10 @@ class InMemoryCacheIndex:
                 break
 
     def verify_api_key(self, key: str) -> bool:
-        return key in self._api_keys
+        return _hash_key(key) in self._api_keys
 
     def add_api_key(self, key: str) -> None:
-        self._api_keys.add(key)
+        self._api_keys.add(_hash_key(key))
 
 
 class PgCacheIndex:
@@ -100,12 +104,13 @@ class PgCacheIndex:
     def verify_api_key(self, key: str) -> bool:
         try:
             with self._conn() as conn, conn.cursor() as cur:
-                cur.execute("SELECT 1 FROM api_keys WHERE key = %s", (key,))
+                cur.execute("SELECT 1 FROM api_keys WHERE key = %s", (_hash_key(key),))
                 return cur.fetchone() is not None
         except Exception:
             return False
 
     def add_api_key(self, key: str) -> None:
         with self._conn() as conn, conn.cursor() as cur:
-            cur.execute("INSERT INTO api_keys (key) VALUES (%s) ON CONFLICT DO NOTHING", (key,))
+            cur.execute("INSERT INTO api_keys (key) VALUES (%s) ON CONFLICT DO NOTHING",
+                        (_hash_key(key),))
             conn.commit()
