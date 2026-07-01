@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { it, expect } from "vitest";
 import { handleGenerate, handleKeygen } from "../src/handler";
 import { fakeServices } from "./fakes";
+import { sha256Hex } from "../src/auth";
 import type { AssetRow } from "../src/types";
 
 const cfg = { floorSimMax: 0.35, floorSimMin: 0.18, imagePrice: 0.04, now: () => 1000 };
@@ -28,6 +29,9 @@ it("hit: score >= floor, cached -> result hit + cost saved", async () => {
   expect(j.shared_cache.result).toBe("hit");
   expect(j.shared_cache.cost_saved_usd).toBe(0.04);
   expect(j.shared_cache.sizes).toEqual({ thumb: "T", medium: "M", large: "https://cdn/large.webp" });
+  expect(j.shared_cache.model_used).toBe("clip-vit-l-14");
+  expect(j.shared_cache.source).toBe("pd12m");
+  expect(j.shared_cache.similarity).toBe(0.40);
   const rec = (s as any)._recorded[0];
   expect(rec).toMatchObject({ normalized: "a fox", assetId: "a1", built: true });
 });
@@ -63,12 +67,23 @@ it("empty pool -> 202 pending, query logged without asset", async () => {
   expect((s as any)._recorded[0]).toMatchObject({ built: false, assetId: null });
 });
 
+it("match found but asset row missing -> 202 pending", async () => {
+  const s = fakeServices();
+  (s as any)._matches.push({ id: "ghost", score: 0.9 }); // match exists but asset does not
+  const res = await handleGenerate({ prompt: "x" }, s, cfg);
+  expect(res.status).toBe(202);
+  const j: any = await res.json();
+  expect(j.shared_cache.result).toBe("pending");
+  expect((s as any)._recorded[0]).toMatchObject({ built: false, assetId: null });
+});
+
 it("keygen mints and stores a hashed key", async () => {
   const s = fakeServices();
   const res = await handleKeygen(new Request("https://x", { headers: { "CF-Connecting-IP": "1.2.3.4" } }), s, () => "sc-fixed");
   const j: any = await res.json();
   expect(j.key).toBe("sc-fixed");
   expect((s as any)._keyHashes.size).toBe(1);
+  expect((s as any)._keyHashes.has(await sha256Hex("sc-fixed"))).toBe(true);
 });
 
 it("keygen 429 when rate limited", async () => {
