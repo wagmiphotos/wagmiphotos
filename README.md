@@ -76,7 +76,7 @@ metadata, **Cloudflare Vectorize** for CLIP vectors, **Backblaze B2** for image 
 - **Cloudflare Worker** (`projects/worker/`, TypeScript) — the edge request path. Authenticates, CLIP-embeds the
   prompt, queries Vectorize for the nearest cached image, logs the query to D1, and returns an image URL.
   It **never generates**. See **[Cloudflare Worker](#cloudflare-worker-edge-request-path)** below.
-- **Python backfill worker** (`src/sharedcache/`, `python -m sharedcache.backfill`) — demand-ranked
+- **Python backfill worker** (`projects/backfill/`, `python -m sharedcache.backfill`) — demand-ranked
   generation for cache-misses (via Genblaze/GMI Cloud) plus PD12M→B2 rehosting. Runs locally or in a GMI
   Cloud Hermes agentbox. See **[Backfill worker](#backfill-worker)** below.
 
@@ -92,6 +92,16 @@ cp .env.example .env
 # 3. Provision the shared stores + seed the pool  → see "Backfill worker" below
 # 4. Deploy the edge request path                 → see "Cloudflare Worker" below
 ```
+
+---
+
+## Repo layout
+
+This is a uv monorepo with the following project structure:
+- **`projects/worker/`** — TypeScript Cloudflare Worker (edge request path)
+- **`projects/common/`** — Shared Python utilities (`sharedcache.common.*`)
+- **`projects/generation/`** — Image generation pipeline (`sharedcache.generation.*`)
+- **`projects/backfill/`** — Backfill service (`sharedcache.backfill.*`, includes Dockerfile)
 
 ---
 
@@ -140,7 +150,7 @@ The backfill worker is a long-running process that continuously re-ranks cached 
 
 3. **Seed the cache pool** (populates D1 with initial assets and embeddings):
    ```bash
-   uv run python scripts/seed_pd12m.py
+   uv run python -m sharedcache.backfill.seed_pd12m
    ```
 
 4. **Run the backfill**:
@@ -150,7 +160,7 @@ The backfill worker is a long-running process that continuously re-ranks cached 
      ```
    - **In Hermes agentbox** (continuous, runs as a container):
      ```bash
-     docker build -t sharedcache-backfill .
+     docker build -f projects/backfill/Dockerfile -t sharedcache-backfill .
      # Push image to registry and deploy to Hermes with agentbox runtime
      ```
 
@@ -222,7 +232,7 @@ The Worker is the request path for production image-generation calls. The Python
 uv run pytest -q          # 42 passed
 
 # Cloudflare Worker (offline, faked bindings — no Miniflare)
-cd projects/worker && npm install && npm test   # 32 passed
+cd projects/worker && npx vitest run   # 32 passed
 ```
 
 ---
