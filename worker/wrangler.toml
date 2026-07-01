@@ -1,0 +1,28 @@
+name = "sharedcache-worker"
+main = "src/index.ts"
+compatibility_date = "2026-06-01"
+
+# D1 — same database the backfill/seed write (set database_id after `wrangler d1 create`)
+[[d1_databases]]
+binding = "DB"
+database_name = "sharedcache"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# Vectorize — CLIP index (create: wrangler vectorize create sharedcache-clip --dimensions=768 --metric=cosine)
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "sharedcache-clip"
+
+# Per-IP rate limit for key generation
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }
+
+[vars]
+CLIP_TEXT_EMBED_URL = ""   # set to your CLIP ViT-L/14 text endpoint
+FLOOR_SIM_MAX = "0.35"
+FLOOR_SIM_MIN = "0.18"
+IMAGE_PRICE_USD = "0.04"
+# Secrets (set with `wrangler secret put`): MASTER_API_KEY, CLIP_EMBED_TOKEN
