@@ -78,3 +78,52 @@ class BackfillWorker:
 
     async def tick(self) -> dict:
         return {"generated": await self.generate_pass(), "rehosted": await self.rehost_pass()}
+
+    async def run(self, interval_seconds: int, *, once: bool = False) -> None:
+        import asyncio
+        while True:
+            try:
+                result = await self.tick()
+                print(f"backfill tick: {result}")
+            except Exception as e:
+                print(f"backfill tick failed: {e}", file=sys.stderr)
+            if once:
+                return
+            await asyncio.sleep(interval_seconds)
+
+
+def build_worker_from_settings(s) -> "BackfillWorker":
+    from sharedcache.clip import ClipEmbedder
+    from sharedcache.d1_client import D1Client
+    from sharedcache.vectorize_client import VectorizeClient
+    from sharedcache.generator import GenblazeGenerator, StubGenerator
+    from sharedcache.storage import GenblazeS3Storage, InMemoryStorage
+    storage = (GenblazeS3Storage(s.b2_bucket, s.b2_key_id, s.b2_app_key, s.b2_region,
+                                 public_url_base=s.b2_public_url_base)
+               if s.b2_bucket and s.b2_key_id else InMemoryStorage())
+    generator = (GenblazeGenerator(storage, openai_api_key=s.openai_api_key,
+                                   gemini_api_key=s.gemini_api_key, gmicloud_api_key=s.gmicloud_api_key)
+                 if (s.gmicloud_api_key or s.openai_api_key or s.gemini_api_key) and s.b2_bucket
+                 else StubGenerator(storage))
+    clip = ClipEmbedder(s.clip_text_embed_url, s.clip_image_embed_url, token=s.clip_embed_token)
+    d1 = D1Client(s.cf_account_id, s.d1_database_id, s.cf_api_token)
+    vec = VectorizeClient(s.cf_account_id, s.vectorize_index_name, s.cf_api_token)
+    return BackfillWorker(d1, vec, clip, generator, storage,
+                          floor_sim_max=s.floor_sim_max, floor_sim_min=s.floor_sim_min,
+                          batch_size=s.worker_batch_size, max_spend_usd=s.worker_max_spend_usd,
+                          price_usd=s.image_price_usd)
+
+
+def main() -> None:
+    import argparse, asyncio
+    from sharedcache.config import Settings
+    parser = argparse.ArgumentParser(description="SharedCache backfill worker")
+    parser.add_argument("--once", action="store_true", help="run a single tick and exit")
+    args = parser.parse_args()
+    s = Settings()
+    worker = build_worker_from_settings(s)
+    asyncio.run(worker.run(s.worker_interval_seconds, once=args.once))
+
+
+if __name__ == "__main__":
+    main()

@@ -77,3 +77,14 @@ async def test_rehost_pass_downloads_and_updates(monkeypatch):
     assert done == 1 and d1.rehost == []
     aid, kw = d1.url_updates[0]
     assert aid == "pd1" and kw["locally_cached"] is True and kw["url"].endswith("image.webp")
+
+@pytest.mark.asyncio
+async def test_run_once_calls_tick_once():
+    d1, vec = FakeD1(), FakeVectorize()
+    w = _worker(d1, vec)
+    calls = {"n": 0}
+    async def fake_tick():
+        calls["n"] += 1; return {"generated": 0, "rehosted": 0}
+    w.tick = fake_tick
+    await w.run(interval_seconds=0, once=True)
+    assert calls["n"] == 1
