@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { it, expect } from "vitest";
 import { makeD1Stores } from "../src/d1";
 
 function fakeDb(firstResult: any = null) {
@@ -46,6 +46,8 @@ it("recordQuery upserts with count increment and forward-only built", async () =
   // status param is 'built' when built=true, else 'pending'
   expect(calls[0].args).toContain("built");
   expect(calls[0].args).toContain("a fox");
+  // assert the forward-only clause: built rows never revert to pending
+  expect(calls[0].sql).toContain("CASE WHEN queries.status = 'built' THEN 'built' ELSE excluded.status END");
 });
 
 it("verifyKey and addKey hit api_keys", async () => {
