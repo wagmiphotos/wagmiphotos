@@ -19,7 +19,10 @@ class VectorizeClient:
                        timeout=self._timeout)
         if r.status_code != 200:
             raise RuntimeError(f"Vectorize query failed ({r.status_code}): {r.text}")
-        return r.json()["result"]["matches"]
+        body = r.json()
+        if not body.get("success", False):
+            raise RuntimeError(f"Vectorize query error: {body.get('errors')}")
+        return body["result"]["matches"]
 
     def _ndjson(self, path: str, vectors: list[dict]) -> None:
         body = "\n".join(json.dumps(v) for v in vectors).encode()
@@ -28,6 +31,9 @@ class VectorizeClient:
                        content=body, timeout=self._timeout)
         if r.status_code != 200:
             raise RuntimeError(f"Vectorize {path} failed ({r.status_code}): {r.text}")
+        body = r.json()
+        if not body.get("success", False):
+            raise RuntimeError(f"Vectorize {path} error: {body.get('errors')}")
 
     def upsert(self, id: str, values: list[float], metadata: dict) -> None:
         self._ndjson("upsert", [{"id": id, "values": values, "metadata": metadata}])

@@ -42,10 +42,41 @@ def seed_rows(rows, d1, vectorize, *, source="pd12m") -> int:
     return n
 
 
+def build_clients(settings: Settings) -> tuple:
+    """Build (D1Client, VectorizeClient, ClipEmbedder) from Settings.
+
+    Kept as a standalone helper (rather than inlined in main()) so tests can
+    catch attribute-name/kwarg drift between Settings and the client
+    constructors without needing to run the whole script.
+    """
+    from sharedcache.d1_client import D1Client
+    from sharedcache.vectorize_client import VectorizeClient
+    from sharedcache.clip import ClipEmbedder
+
+    d1 = D1Client(
+        account_id=settings.cf_account_id,
+        database_id=settings.d1_database_id,
+        api_token=settings.cf_api_token
+    )
+
+    vectorize = VectorizeClient(
+        account_id=settings.cf_account_id,
+        index_name=settings.vectorize_index_name,
+        api_token=settings.cf_api_token
+    )
+
+    clip = ClipEmbedder(
+        settings.clip_text_embed_url,
+        settings.clip_image_embed_url,
+        token=settings.clip_embed_token
+    )
+
+    return d1, vectorize, clip
+
+
 def main() -> None:
     """Fetch PD12M rows+embeddings from HF and seed into D1/Vectorize."""
     import httpx
-    from sharedcache.clip import ClipEmbedder
 
     parser = argparse.ArgumentParser(description="Seed PD12M rows into D1 and Vectorize.")
     parser.add_argument("--repo-id", default="jorissup/PD12M-bucket", help="HF Dataset Repository ID")
@@ -53,29 +84,7 @@ def main() -> None:
     args = parser.parse_args()
 
     settings = Settings()
-
-    # Build clients from settings
-    from sharedcache.d1_client import D1Client
-    from sharedcache.vectorize_client import VectorizeClient
-
-    d1 = D1Client(
-        account_id=settings.cf_account_id,
-        api_token=settings.cf_api_token,
-        db_id=settings.cf_d1_db_id
-    )
-
-    vectorize = VectorizeClient(
-        account_id=settings.cf_account_id,
-        api_token=settings.cf_api_token,
-        index_name=settings.cf_vectorize_index_name
-    )
-
-    # Build ClipEmbedder for computing embeddings
-    clip = ClipEmbedder(
-        text_url=settings.clip_text_embed_url,
-        image_url=settings.clip_image_embed_url,
-        token=settings.clip_embed_token
-    )
+    d1, vectorize, clip = build_clients(settings)
 
     # Fetch rows from HF Dataset Server
     rows = []
@@ -98,16 +107,27 @@ def main() -> None:
                 height = int(row_data.get("height", 1024))
 
                 if prompt and image_url:
-                    # Check if row has precomputed embedding
+                    # Check if row has precomputed embedding. PD12M ships CLIP IMAGE
+                    # vectors, so any fallback must also embed in image space — never
+                    # text-embed here, or we'd mix text-space vectors into an
+                    # image-space index and corrupt the similarity-floor calibration
+                    # (text<->text cosines ~0.6-0.9 vs image cross-modal ~0.25-0.35).
                     precomputed_embedding = row_data.get("embedding")
                     if precomputed_embedding and len(precomputed_embedding) > 0:
                         embedding = precomputed_embedding
-                    elif settings.clip_text_embed_url:
-                        embedding = clip.text_embed(prompt)
+                        print(f"[{row_data.get('id', len(rows))}] embedding: precomputed")
+                    elif settings.clip_image_embed_url:
+                        img_resp = httpx.get(image_url, follow_redirects=True, timeout=20.0)
+                        if img_resp.status_code != 200:
+                            raise RuntimeError(
+                                f"Failed to download image for embedding ({img_resp.status_code}): {image_url}")
+                        embedding = clip.image_embed(img_resp.content)
+                        print(f"[{row_data.get('id', len(rows))}] embedding: image-embedded via CLIP_IMAGE_EMBED_URL")
                     else:
                         raise RuntimeError(
-                            "Set CLIP_TEXT_EMBED_URL (or provide precomputed embeddings) to seed PD12M — "
-                            "refusing to seed zero vectors"
+                            "PD12M rows lack precomputed embeddings and CLIP_IMAGE_EMBED_URL is unset — "
+                            "set it to image-embed the source images (keeps the index in CLIP image space), "
+                            "or provide precomputed image vectors; refusing to seed a mixed/text-space index."
                         )
 
                     rows.append({

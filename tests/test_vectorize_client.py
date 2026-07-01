@@ -55,3 +55,12 @@ def test_query_non_200_raises_runtime_error(monkeypatch):
     import pytest
     with pytest.raises(RuntimeError):
         v.query([0.1] * 768)
+
+def test_query_success_false_raises_runtime_error(monkeypatch):
+    def fake_post(url, **kw):
+        return _Resp({"success": False, "errors": ["boom"]}, status=200)
+    monkeypatch.setattr(httpx, "Client", lambda *a, **k: type("C", (), {"post": staticmethod(fake_post), "__enter__": lambda s: s, "__exit__": lambda s,*a: False})())
+    v = VectorizeClient("acct", "idx", "tok")
+    import pytest
+    with pytest.raises(RuntimeError):
+        v.query([0.1] * 768)
