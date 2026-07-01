@@ -18,3 +18,10 @@ class Settings(BaseSettings):
     api_key: str | None = None
     hf_token: str | None = None
     embedder_type: str = "gemini"
+    default_provider: str = "gmicloud"
+    image_price_usd: float = 0.04
+    worker_enabled: bool = True
+    worker_interval_seconds: int = 300
+    worker_batch_size: int = 5
+    worker_max_spend_usd: float = 5.0
+    keygen_rate_per_hour: int = 10
