@@ -11,7 +11,8 @@ def _hash_key(raw: str) -> str:
 class CacheIndex(Protocol):
     def search(self, embedding: list[float], k: int = 5) -> list[tuple[AssetRecord, float]]: ...
     def insert(self, record: AssetRecord, embedding: list[float]) -> None: ...
-    def update_url(self, asset_id: str, url: str, locally_cached: bool) -> None: ...
+    def update_urls(self, asset_id: str, *, url: str, medium_url: str, thumb_url: str,
+                    width: int, height: int, mime: str, locally_cached: bool) -> None: ...
     def verify_api_key(self, key: str) -> bool: ...
     def add_api_key(self, key: str) -> None: ...
 
@@ -35,10 +36,11 @@ class InMemoryCacheIndex:
         scored.sort(key=lambda t: t[1], reverse=True)
         return scored[:k]
 
-    def update_url(self, asset_id: str, url: str, locally_cached: bool) -> None:
+    def update_urls(self, asset_id, *, url, medium_url, thumb_url, width, height, mime, locally_cached):
         for rec, _ in self._rows:
             if rec.id == asset_id:
-                rec.url = url
+                rec.url, rec.medium_url, rec.thumb_url = url, medium_url, thumb_url
+                rec.width, rec.height, rec.mime = width, height, mime
                 rec.locally_cached = locally_cached
                 break
 
@@ -95,12 +97,12 @@ class PgCacheIndex:
                 out.append((rec, float(row[16])))
             return out
 
-    def update_url(self, asset_id: str, url: str, locally_cached: bool) -> None:
+    def update_urls(self, asset_id, *, url, medium_url, thumb_url, width, height, mime, locally_cached):
         with self._conn() as conn, conn.cursor() as cur:
             cur.execute(
-                "UPDATE assets SET url = %s, locally_cached = %s WHERE id = %s",
-                (url, locally_cached, asset_id)
-            )
+                """UPDATE assets SET url=%s, medium_url=%s, thumb_url=%s, width=%s, height=%s,
+                       mime=%s, locally_cached=%s WHERE id=%s""",
+                (url, medium_url, thumb_url, width, height, mime, locally_cached, asset_id))
             conn.commit()
 
     def verify_api_key(self, key: str) -> bool:

@@ -20,3 +20,12 @@ def test_thumbnail_preserves_aspect_ratio():
     out = make_thumbnail(_png(2000, 1000), max_px=512)
     img = Image.open(io.BytesIO(out))
     assert img.size == (512, 256)
+
+def test_derive_sizes_produces_three_webp():
+    from sharedcache.processor import derive_sizes
+    out = derive_sizes(_png(2000, 1000))
+    assert set(out) == {"thumb", "medium", "large"}
+    for name, cap in (("thumb", 256), ("medium", 768), ("large", 2000)):
+        w, h = Image.open(io.BytesIO(out[name])).size
+        assert max(w, h) <= cap
+        assert Image.open(io.BytesIO(out[name])).format == "WEBP"

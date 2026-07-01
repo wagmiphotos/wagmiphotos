@@ -1,7 +1,7 @@
 import uuid
 from sharedcache.floor import similarity_floor
 from sharedcache.models import AssetRecord, GenerationResult
-from sharedcache.processor import make_thumbnail, dimensions, to_webp
+from sharedcache.processor import make_thumbnail, dimensions
 
 class CacheService:
     def __init__(self, embedder, index, generator, storage, cost_meter, *, created_at_fn):
@@ -16,6 +16,32 @@ class CacheService:
     def storage(self):
         return self._storage
 
+    async def ensure_local(self, record) -> None:
+        if record.locally_cached:
+            return
+        try:
+            import httpx
+            src = record.source_url or record.url
+            record.source_url = src
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(src, follow_redirects=True, timeout=20.0)
+                if resp.status_code != 200:
+                    raise RuntimeError(f"Download failed with status {resp.status_code}")
+                orig = resp.content
+            from sharedcache.processor import derive_sizes, dimensions
+            sizes = derive_sizes(orig)
+            w, h = dimensions(sizes["large"])
+            large_url = self._storage.put(f"assets/{record.id}/image.webp", sizes["large"], "image/webp")
+            med_url = self._storage.put(f"assets/{record.id}/medium.webp", sizes["medium"], "image/webp")
+            thumb_url = self._storage.put(f"assets/{record.id}/thumb.webp", sizes["thumb"], "image/webp")
+            self._index.update_urls(record.id, url=large_url, medium_url=med_url, thumb_url=thumb_url,
+                                    width=w, height=h, mime="image/webp", locally_cached=True)
+            record.url, record.medium_url, record.thumb_url = large_url, med_url, thumb_url
+            record.width, record.height, record.mime, record.locally_cached = w, h, "image/webp", True
+        except Exception as e:
+            import sys
+            print(f"Lazy caching failed for asset {record.id}: {e}", file=sys.stderr)
+
     async def generate(self, prompt: str, *, cache_tolerance: float = 0.15,
                        size: str = "1024x1024", api_key: str | None = None,
                        model: str = "gpt-image-1", provider_api_key: str | None = None) -> GenerationResult:
@@ -25,36 +51,7 @@ class CacheService:
         top = self._index.search(embedding, k=1)
         if top and top[0][1] >= floor:
             record, sim = top[0]
-            if not record.locally_cached:
-                try:
-                    import httpx
-                    
-                    # Save the external URL as the source_url if not already set
-                    if not record.source_url:
-                        record.source_url = record.url
-
-                    async with httpx.AsyncClient() as client:
-                        resp = await client.get(record.source_url, follow_redirects=True, timeout=20.0)
-                        if resp.status_code != 200:
-                            raise RuntimeError(f"Download failed with status {resp.status_code}")
-                        orig_bytes = resp.content
-
-                    webp_bytes = to_webp(orig_bytes)
-                    thumb_bytes = make_thumbnail(orig_bytes)
-                    w, h = dimensions(orig_bytes)
-
-                    b2_url = self._storage.put(f"assets/{record.id}/image.webp", webp_bytes, "image/webp")
-                    thumb_url = self._storage.put(f"assets/{record.id}/thumb.webp", thumb_bytes, "image/webp")
-
-                    self._index.update_url(record.id, b2_url, True)
-                    record.url = b2_url
-                    record.thumb_url = thumb_url
-                    record.locally_cached = True
-                    record.width = w
-                    record.height = h
-                except Exception as e:
-                    import sys
-                    print(f"Lazy caching failed for asset {record.id}: {e}", file=sys.stderr)
+            await self.ensure_local(record)
 
             saved = self._cost.record_hit(api_key, record.id)
             return GenerationResult(record=record, result="hit", similarity=sim, cost_saved_usd=saved)
