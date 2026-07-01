@@ -68,28 +68,29 @@ When no API keys are set, the system falls back to `StubGenerator` (returns a de
 
 ---
 
+## Architecture
+
+SharedCache is two deployables over three shared stores (**Cloudflare D1** for the query log + asset
+metadata, **Cloudflare Vectorize** for CLIP vectors, **Backblaze B2** for image bytes):
+
+- **Cloudflare Worker** (`worker/`, TypeScript) — the edge request path. Authenticates, CLIP-embeds the
+  prompt, queries Vectorize for the nearest cached image, logs the query to D1, and returns an image URL.
+  It **never generates**. See **[Cloudflare Worker](#cloudflare-worker-edge-request-path)** below.
+- **Python backfill worker** (`src/sharedcache/`, `python -m sharedcache.backfill`) — demand-ranked
+  generation for cache-misses (via Genblaze/GMI Cloud) plus PD12M→B2 rehosting. Runs locally or in a GMI
+  Cloud Hermes agentbox. See **[Backfill worker](#backfill-worker)** below.
+
 ## Quickstart
 
 ```bash
-# 1. Clone & install  (uv sync installs the package as editable — no separate pip install needed)
-git clone <repo>
-cd sharedcache
-uv sync
+# 1. Clone & install the Python backfill worker
+git clone <repo> && cd sharedcache && uv sync
 
-# 2. Configure providers in .env
-cp .env.example .env  # fill in keys; set B2_PUBLIC_URL_BASE for the playground to render images
+# 2. Configure .env  (full var lists are in the two runbooks below)
+cp .env.example .env
 
-# 3. Apply the database migration (honors EMBEDDING_DIMS; pipe into psql)
-uv run python scripts/migrate.py | psql "$DATABASE_URL"
-
-# 4. Pre-seed the demo pool  (standalone; does NOT need the server running)
-uv run python scripts/seed.py
-
-# 5. Start the API
-uv run uvicorn sharedcache.api:app --reload
-
-# 6. Open the playground UI
-open http://localhost:8000/
+# 3. Provision the shared stores + seed the pool  → see "Backfill worker" below
+# 4. Deploy the edge request path                 → see "Cloudflare Worker" below
 ```
 
 ---
@@ -105,9 +106,11 @@ open http://localhost:8000/
 | `B2_BUCKET` | For B2 storage | Backblaze B2 bucket name |
 | `B2_REGION` | Optional | B2 region (default: `us-west-004`) |
 | `B2_PUBLIC_URL_BASE` | For image rendering | Public-read URL base (e.g. `https://f004.backblazeb2.com/file/<bucket>`). Required for the playground and API responses to serve accessible image URLs from a public-read bucket. |
-| `DATABASE_URL` | Recommended | PostgreSQL+pgvector for persistent cache (falls back to in-memory). **Note:** if set without B2 credentials, a warning is emitted and the in-memory index is used to avoid persisting unreachable URLs. |
-| `API_KEY` | Optional | Bearer token to protect the endpoint |
-| `EMBEDDING_DIMS` | Optional | Embedding dimensions (default: 768). Must match the value used when running `migrate.py`. |
+| `MASTER_API_KEY` | Optional | Bearer token protecting the Worker's endpoints (unset = open dev mode). Set via `wrangler secret put`. |
+
+The persistent cache now lives in **Cloudflare D1 + Vectorize** (768-dim CLIP, fixed), not Postgres/pgvector.
+The full Cloudflare/CLIP variable list is in **[Backfill worker](#backfill-worker)** and
+**[Cloudflare Worker](#cloudflare-worker-edge-request-path)** below and in `.env.example`.
 
 Without any env vars set, SharedCache runs fully offline with stub components — useful for local development and CI.
 
@@ -215,27 +218,29 @@ The Worker is the request path for production image-generation calls. The Python
 ## Running tests
 
 ```bash
-uv run pytest -q
-```
+# Python backfill worker (offline, fakes for D1/Vectorize/CLIP/B2)
+uv run pytest -q          # 42 passed
 
-31 tests pass offline (1 skipped — requires a live PostgreSQL+pgvector instance).
+# Cloudflare Worker (offline, faked bindings — no Miniflare)
+cd worker && npm install && npm test   # 32 passed
+```
 
 ---
 
-## Live smoke test (pending — requires real keys)
+## Live verification (pending — requires real keys)
 
-The demo requires a **public-read B2 bucket** so the playground `<img>` tags and `data[0].url` are accessible in the browser. Set `B2_PUBLIC_URL_BASE` to the bucket's friendly-URL prefix (e.g. `https://f004.backblazeb2.com/file/<bucket-name>`). Without this, all image URLs will 403. Presigning is a planned future alternative.
+Everything above is verified offline with fakes. Before a real deploy, validate end-to-end with live
+Cloudflare/Backblaze/GMI/CLIP credentials:
 
-Once `OPENAI_API_KEY`, `B2_KEY_ID`, `B2_APP_KEY`, `B2_BUCKET`, `B2_PUBLIC_URL_BASE`, and optionally `DATABASE_URL` are set in `.env`:
+1. **Provision stores + seed** — follow **[Backfill worker → Setup](#setup)**: `wrangler d1 migrations apply`,
+   `wrangler vectorize create sharedcache-clip --dimensions=768 --metric=cosine`, then
+   `uv run python scripts/seed_pd12m.py` (confirm PD12M's precomputed CLIP image vectors load, not zeros).
+2. **Tune the floor** — CLIP cross-modal cosine scores are low; tune `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN` against
+   the seeded pool so hits land in the intended range.
+3. **Deploy the Worker** — follow **[Cloudflare Worker → Deploy runbook](#deploy-runbook)**; confirm
+   `wrangler deploy --dry-run` lists the `RATE_LIMITER` binding, then a first request returns a nearest
+   image and the backfill (`python -m sharedcache.backfill --once`) generates the top-ranked misses.
 
-```bash
-# Apply migration (generates SQL with correct EMBEDDING_DIMS, pipe to psql)
-uv run python scripts/migrate.py | psql "$DATABASE_URL"
-
-# Seed the cache pool (runs standalone — no server needed)
-uv run python scripts/seed.py
-# First run: each prompt prints "miss" — real images generated and stored in B2
-# Second run: each prompt prints "hit" — served from cache, $0 generation cost
-```
+A **public-read B2 bucket** (`B2_PUBLIC_URL_BASE`) is required so returned image URLs resolve in the browser.
 
 Verify in the Backblaze console that `assets/<sha256>/image.png` and `manifest.json` objects are present for each generated prompt.
