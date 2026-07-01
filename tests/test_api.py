@@ -223,3 +223,23 @@ def test_memory_route_serves_stored_bytes():
     r = client.get("/memory/sharedcache/assets/x/image.webp")
     assert r.status_code == 200
     assert r.content == b"PNGBYTES"
+
+
+def test_dev_key_is_not_a_backdoor(monkeypatch):
+    # With an API_KEY configured, the literal "dev-key" must NOT authenticate.
+    from sharedcache.api import build_app
+    from sharedcache.cache_service import CacheService
+    from sharedcache.embedder import HashEmbedder
+    from sharedcache.index import InMemoryCacheIndex
+    from sharedcache.generator import StubGenerator
+    from sharedcache.storage import InMemoryStorage
+    from sharedcache.cost_meter import CostMeter
+    from fastapi.testclient import TestClient
+
+    storage = InMemoryStorage()
+    svc = CacheService(HashEmbedder(8), InMemoryCacheIndex(), StubGenerator(storage),
+                       storage, CostMeter(), created_at_fn=lambda: "t")
+    client = TestClient(build_app(svc, api_key="real-secret"))
+    r = client.post("/v1/images/generations",
+                    json={"prompt": "hi"}, headers={"Authorization": "Bearer dev-key"})
+    assert r.status_code == 401

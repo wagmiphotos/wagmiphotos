@@ -20,7 +20,7 @@ def _cosine(a: np.ndarray, b: np.ndarray) -> float:
 class InMemoryCacheIndex:
     def __init__(self) -> None:
         self._rows: list[tuple[AssetRecord, np.ndarray]] = []
-        self._api_keys: set[str] = {"dev-key"}
+        self._api_keys: set[str] = set()
 
     def insert(self, record: AssetRecord, embedding: list[float]) -> None:
         self._rows.append((record, np.asarray(embedding, dtype=float)))

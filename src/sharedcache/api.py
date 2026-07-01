@@ -21,7 +21,7 @@ def build_app(service: CacheService, api_key: str | None) -> FastAPI:
             raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
         
         token = auth.split("Bearer ", 1)[1].strip()
-        if token == "dev-key" or (api_key is not None and token == api_key):
+        if api_key is not None and token == api_key:
             return ""
             
         # Check database registered keys
