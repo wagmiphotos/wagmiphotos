@@ -45,6 +45,7 @@ def seed_rows(rows, d1, vectorize, *, source="pd12m") -> int:
 def main() -> None:
     """Fetch PD12M rows+embeddings from HF and seed into D1/Vectorize."""
     import httpx
+    from sharedcache.clip import ClipEmbedder
 
     parser = argparse.ArgumentParser(description="Seed PD12M rows into D1 and Vectorize.")
     parser.add_argument("--repo-id", default="jorissup/PD12M-bucket", help="HF Dataset Repository ID")
@@ -69,6 +70,13 @@ def main() -> None:
         index_name=settings.cf_vectorize_index_name
     )
 
+    # Build ClipEmbedder for computing embeddings
+    clip = ClipEmbedder(
+        text_url=settings.clip_text_embed_url,
+        image_url=settings.clip_image_embed_url,
+        token=settings.clip_embed_token
+    )
+
     # Fetch rows from HF Dataset Server
     rows = []
     try:
@@ -90,6 +98,18 @@ def main() -> None:
                 height = int(row_data.get("height", 1024))
 
                 if prompt and image_url:
+                    # Check if row has precomputed embedding
+                    precomputed_embedding = row_data.get("embedding")
+                    if precomputed_embedding and len(precomputed_embedding) > 0:
+                        embedding = precomputed_embedding
+                    elif settings.clip_text_embed_url:
+                        embedding = clip.text_embed(prompt)
+                    else:
+                        raise RuntimeError(
+                            "Set CLIP_TEXT_EMBED_URL (or provide precomputed embeddings) to seed PD12M — "
+                            "refusing to seed zero vectors"
+                        )
+
                     rows.append({
                         "id": row_data.get("id", len(rows)),
                         "prompt": prompt,
@@ -97,7 +117,7 @@ def main() -> None:
                         "width": width,
                         "height": height,
                         "mime": "image/jpeg",
-                        "embedding": [0.0] * 768  # Placeholder; real embeddings come from HF
+                        "embedding": embedding
                     })
             print(f"Fetched {len(rows)} rows from Hugging Face.")
         else:
