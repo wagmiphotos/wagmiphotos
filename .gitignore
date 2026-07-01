@@ -4,3 +4,8 @@ __pycache__/
 .env
 .pytest_cache/
 .superpowers/
+
+# Node / Cloudflare Worker
+node_modules/
+worker/node_modules/
+.wrangler/
