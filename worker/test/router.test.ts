@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { it, expect, vi, afterEach } from "vitest";
 import worker from "../src/index";
 
 afterEach(() => vi.unstubAllGlobals());
