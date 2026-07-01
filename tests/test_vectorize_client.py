@@ -28,3 +28,30 @@ def test_upsert_posts_ndjson(monkeypatch):
     assert "upsert" in seen["url"]
     line = json.loads(seen["content"].decode().strip())
     assert line["id"] == "a1" and line["metadata"] == {"source": "generated"} and len(line["values"]) == 768
+
+def test_insert_many_multiline_ndjson(monkeypatch):
+    seen = {}
+    def fake_post(url, **kw):
+        seen["url"], seen["content"] = url, kw.get("content")
+        return _Resp({"success": True, "result": {}})
+    monkeypatch.setattr(httpx, "Client", lambda *a, **k: type("C", (), {"post": staticmethod(fake_post), "__enter__": lambda s: s, "__exit__": lambda s,*a: False})())
+    v = VectorizeClient("acct", "idx", "tok")
+    v.insert_many([
+        {"id": "v1", "values": [0.1] * 768, "metadata": {"source": "a"}},
+        {"id": "v2", "values": [0.2] * 768, "metadata": {"source": "b"}}
+    ])
+    assert "insert" in seen["url"]
+    lines = seen["content"].decode().splitlines()
+    assert len(lines) == 2
+    parsed = [json.loads(line) for line in lines]
+    assert {p["id"] for p in parsed} == {"v1", "v2"}
+    assert all(len(p["values"]) == 768 for p in parsed)
+
+def test_query_non_200_raises_runtime_error(monkeypatch):
+    def fake_post(url, **kw):
+        return _Resp({"error": "Internal Server Error"}, status=500)
+    monkeypatch.setattr(httpx, "Client", lambda *a, **k: type("C", (), {"post": staticmethod(fake_post), "__enter__": lambda s: s, "__exit__": lambda s,*a: False})())
+    v = VectorizeClient("acct", "idx", "tok")
+    import pytest
+    with pytest.raises(RuntimeError):
+        v.query([0.1] * 768)
