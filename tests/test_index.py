@@ -2,9 +2,9 @@ from sharedcache.index import InMemoryCacheIndex
 from sharedcache.models import AssetRecord
 
 def _rec(id):
-    return AssetRecord(id=id, prompt=id, url=f"u/{id}", thumb_url=None, provider="o",
-                       model="m", content_hash=id, width=1, height=1, mime="image/webp",
-                       manifest_url=None, created_at="t")
+    return AssetRecord(id=id, prompt=id, url=f"u/{id}", thumb_url=None, medium_url=None,
+                       model_used="m", source="generated", source_id=None, content_hash=id,
+                       width=1, height=1, mime="image/webp", manifest_url=None, created_at="t")
 
 def test_search_empty_returns_nothing():
     assert InMemoryCacheIndex().search([1.0, 0.0]) == []

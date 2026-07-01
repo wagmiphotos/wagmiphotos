@@ -8,8 +8,9 @@ pytestmark = pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="no DATABA
 
 def _rec():
     i = str(uuid.uuid4())
-    return AssetRecord(id=i, prompt="cozy cafe", url="u", thumb_url=None, provider="openai",
-                       model="gpt-image-1", content_hash="h", width=1024, height=1024,
+    return AssetRecord(id=i, prompt="cozy cafe", url="u", thumb_url=None, medium_url=None,
+                       model_used="gpt-image-1", source="generated", source_id=None,
+                       content_hash="h", width=1024, height=1024,
                        mime="image/webp", manifest_url=None, created_at="t")
 
 def test_pg_insert_and_search_roundtrip():

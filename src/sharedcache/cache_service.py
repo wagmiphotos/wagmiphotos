@@ -56,7 +56,7 @@ class CacheService:
                     import sys
                     print(f"Lazy caching failed for asset {record.id}: {e}", file=sys.stderr)
 
-            saved = self._cost.record_hit(api_key, record.id, record.provider, record.model)
+            saved = self._cost.record_hit(api_key, record.id)
             return GenerationResult(record=record, result="hit", similarity=sim, cost_saved_usd=saved)
 
         gen = await self._generator.generate(prompt, model=model, size=size, provider_api_key=provider_api_key)
@@ -68,7 +68,8 @@ class CacheService:
         manifest_url = self._storage.put(f"assets/{asset_id}/manifest.json",
                                          gen.manifest_json.encode(), "application/json")
         record = AssetRecord(id=asset_id, prompt=prompt, url=gen.url, thumb_url=thumb_url,
-                             provider=gen.provider, model=gen.model, content_hash=gen.content_hash,
+                             medium_url=None, model_used=gen.model_used, source=gen.source,
+                             source_id=None, content_hash=gen.content_hash,
                              width=w, height=h, mime=gen.mime, manifest_url=manifest_url,
                              created_at=self._now())
         self._index.insert(record, embedding)

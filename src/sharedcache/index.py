@@ -62,14 +62,14 @@ class PgCacheIndex:
     def insert(self, record: AssetRecord, embedding: list[float]) -> None:
         with self._conn() as conn, conn.cursor() as cur:
             cur.execute(
-                """INSERT INTO assets (id, prompt, url, thumb_url, provider, model,
-                       content_hash, width, height, mime, manifest_url, source_url,
-                       locally_cached, embedding)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                (record.id, record.prompt, record.url, record.thumb_url, record.provider,
-                 record.model, record.content_hash, record.width, record.height,
-                 record.mime, record.manifest_url, record.source_url, record.locally_cached,
-                 np.asarray(embedding, dtype=float)),
+                """INSERT INTO assets (id, prompt, url, thumb_url, medium_url, model_used,
+                       source, source_id, content_hash, width, height, mime, manifest_url,
+                       source_url, locally_cached, embedding)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                (record.id, record.prompt, record.url, record.thumb_url, record.medium_url,
+                 record.model_used, record.source, record.source_id, record.content_hash,
+                 record.width, record.height, record.mime, record.manifest_url,
+                 record.source_url, record.locally_cached, np.asarray(embedding, dtype=float)),
             )
             conn.commit()
 
@@ -77,20 +77,22 @@ class PgCacheIndex:
         q = np.asarray(embedding, dtype=float)
         with self._conn() as conn, conn.cursor() as cur:
             cur.execute(
-                """SELECT id, prompt, url, thumb_url, provider, model, content_hash,
-                          width, height, mime, manifest_url, created_at, source_url,
-                          locally_cached, 1 - (embedding <=> %s) AS similarity
+                """SELECT id, prompt, url, thumb_url, medium_url, model_used, source,
+                          source_id, content_hash, width, height, mime, manifest_url,
+                          created_at, source_url, locally_cached,
+                          1 - (embedding <=> %s) AS similarity
                    FROM assets ORDER BY embedding <=> %s LIMIT %s""",
                 (q, q, k),
             )
             out = []
             for row in cur.fetchall():
                 rec = AssetRecord(id=str(row[0]), prompt=row[1], url=row[2], thumb_url=row[3],
-                                  provider=row[4], model=row[5], content_hash=row[6],
-                                  width=row[7], height=row[8], mime=row[9], manifest_url=row[10],
-                                  created_at=row[11].isoformat(), source_url=row[12],
-                                  locally_cached=bool(row[13]))
-                out.append((rec, float(row[14])))
+                                  medium_url=row[4], model_used=row[5], source=row[6],
+                                  source_id=row[7], content_hash=row[8], width=row[9],
+                                  height=row[10], mime=row[11], manifest_url=row[12],
+                                  created_at=row[13].isoformat(), source_url=row[14],
+                                  locally_cached=bool(row[15]))
+                out.append((rec, float(row[16])))
             return out
 
     def update_url(self, asset_id: str, url: str, locally_cached: bool) -> None:

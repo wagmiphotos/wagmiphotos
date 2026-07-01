@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 from sharedcache.generator import StubGenerator
 from sharedcache.storage import InMemoryStorage
@@ -8,26 +9,24 @@ async def test_stub_generator_persists_bytes_and_returns_metadata():
     storage = InMemoryStorage()
     gen = StubGenerator(storage)
     out = await gen.generate("a red bicycle", model="gpt-image-1", size="1024x1024")
-    assert out.provider == "stub"
+    assert out.source == "stub"
     assert out.width == 1024 and out.height == 1024
     assert out.manifest_hash and out.content_hash
     assert storage.get(out.storage_key)  # bytes were persisted
 
 
-@pytest.mark.asyncio
-async def test_stub_generator_parses_model_prefix():
-    storage = InMemoryStorage()
-    gen = StubGenerator(storage)
-    out = await gen.generate("a red bicycle", model="shared-cache-google-imagen-3")
-    assert out.provider == "google"
-    assert out.model == "imagen-3"
+def test_stub_sets_model_used_and_source():
+    g = asyncio.run(StubGenerator(InMemoryStorage()).generate(
+        "p", model="shared-cache-gmicloud-flux", size="8x8"))
+    assert g.model_used == "flux"
+    assert g.source == "stub"
 
 
 @pytest.mark.asyncio
 async def test_genblaze_generator_requires_key_for_google(monkeypatch):
     import sys
     from types import ModuleType
-    
+
     mock_module = ModuleType("genblaze_google")
     class MockImagenProvider:
         def __init__(self, api_key):

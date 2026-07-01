@@ -32,15 +32,13 @@ class StubGenerator:
         content_hash = hashlib.sha256(data).hexdigest()
         key = f"assets/{content_hash}/original.png"
         url = self._storage.put(key, data, "image/png")
-        
-        provider_name = "stub"
+
         inner_model = model
         if model.startswith("shared-cache-"):
             parts = model.split("-")
             if len(parts) >= 4:
-                provider_name = parts[2]
                 inner_model = "-".join(parts[3:])
-                
+
         manifest = {
             "schema_version": "1.5",
             "prompt": prompt,
@@ -57,8 +55,8 @@ class StubGenerator:
             width=w,
             height=h,
             mime="image/png",
-            provider=provider_name,
-            model=inner_model,
+            model_used=inner_model,
+            source="stub",
             manifest_json=manifest_json,
             manifest_hash=manifest_hash,
             storage_key=key,
@@ -85,7 +83,7 @@ class GenblazeGenerator:
         # Parse provider and inner model from model ID
         # Format can be: shared-cache-<provider>-<inner-model>
         # e.g., shared-cache-openai-gpt-image-1 -> provider="openai", model="gpt-image-1"
-        provider_name = "openai"
+        provider_name = "gmicloud"
         inner_model = model
 
         if model.startswith("shared-cache-"):
@@ -149,8 +147,8 @@ class GenblazeGenerator:
             width=asset.width or 0,
             height=asset.height or 0,
             mime=asset.media_type,
-            provider=provider_name,
-            model=inner_model,
+            model_used=inner_model,
+            source="generated",
             manifest_json=manifest_json,
             manifest_hash=result.manifest.canonical_hash,
             storage_key=key,

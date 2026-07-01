@@ -4,10 +4,12 @@ from dataclasses import dataclass
 class AssetRecord:
     id: str
     prompt: str
-    url: str
+    url: str                 # large webp
     thumb_url: str | None
-    provider: str
-    model: str
+    medium_url: str | None
+    model_used: str
+    source: str              # "pd12m" | "generated" | "stub"
+    source_id: str | None
     content_hash: str
     width: int
     height: int
@@ -24,8 +26,8 @@ class Generated:
     width: int
     height: int
     mime: str
-    provider: str
-    model: str
+    model_used: str
+    source: str
     manifest_json: str
     manifest_hash: str
     storage_key: str

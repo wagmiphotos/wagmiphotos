@@ -136,9 +136,14 @@ def build_app(service: CacheService, api_key: str | None, *, keygen_rate_per_hou
                 "result": r.result,
                 "similarity": r.similarity,
                 "cost_saved_usd": r.cost_saved_usd,
-                "provider": r.record.provider,
-                "model": r.record.model,
+                "model_used": r.record.model_used,
+                "source": r.record.source,
                 "provenance_url": r.record.manifest_url,
+                "sizes": {
+                    "thumb": r.record.thumb_url,
+                    "medium": r.record.medium_url,
+                    "large": r.record.url,
+                },
             },
         })
 
@@ -184,7 +189,7 @@ def _build_from_settings():
                                    gmicloud_api_key=s.gmicloud_api_key)
                  if (s.openai_api_key or s.gemini_api_key or s.gmicloud_api_key) and s.b2_bucket
                  else StubGenerator(storage))
-    svc = CacheService(embedder, index, generator, storage, CostMeter(),
+    svc = CacheService(embedder, index, generator, storage, CostMeter(price_usd=s.image_price_usd),
                        created_at_fn=lambda: datetime.now(timezone.utc).isoformat())
     return build_app(svc, s.api_key,
                       keygen_rate_per_hour=getattr(s, "keygen_rate_per_hour", 10))
