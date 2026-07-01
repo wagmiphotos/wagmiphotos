@@ -14,6 +14,8 @@ class AssetRecord:
     mime: str
     manifest_url: str | None
     created_at: str
+    source_url: str | None = None
+    locally_cached: bool = True
 
 @dataclass
 class Generated:

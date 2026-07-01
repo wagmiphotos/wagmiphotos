@@ -40,6 +40,98 @@ def test_n_greater_than_one_is_rejected():
     assert r.status_code == 422
 
 
+def test_provider_api_key_header_forwarding():
+    storage = InMemoryStorage()
+    generator = StubGenerator(storage)
+    original_generate = generator.generate
+    
+    called_with_key = None
+    async def spy_generate(prompt, *, model, size="1024x1024", provider_api_key=None):
+        nonlocal called_with_key
+        called_with_key = provider_api_key
+        return await original_generate(prompt, model=model, size=size, provider_api_key=provider_api_key)
+        
+    generator.generate = spy_generate
+    
+    svc = CacheService(HashEmbedder(64), InMemoryCacheIndex(), generator,
+                       storage, CostMeter(), created_at_fn=lambda: "t")
+    client = TestClient(build_app(svc, api_key=None))
+    
+    r = client.post(
+        "/v1/images/generations",
+        json={"prompt": "xyz", "model": "shared-cache-openai-dall-e-3"},
+        headers={"X-OpenAI-API-Key": "my-openai-secret-key"}
+    )
+    assert r.status_code == 200
+    assert called_with_key == "my-openai-secret-key"
+
+
+def test_key_as_identity_authorization():
+    storage = InMemoryStorage()
+    generator = StubGenerator(storage)
+    original_generate = generator.generate
+    
+    called_with_key = None
+    async def spy_generate(prompt, *, model, size="1024x1024", provider_api_key=None):
+        nonlocal called_with_key
+        called_with_key = provider_api_key
+        return await original_generate(prompt, model=model, size=size, provider_api_key=provider_api_key)
+        
+    generator.generate = spy_generate
+    
+    # We configure a master API key "master-secret"
+    svc = CacheService(HashEmbedder(64), InMemoryCacheIndex(), generator,
+                       storage, CostMeter(), created_at_fn=lambda: "t")
+    client = TestClient(build_app(svc, api_key="master-secret"))
+    
+    # 1. Invalid provider key should fail
+    r1 = client.post(
+        "/v1/images/generations",
+        json={"prompt": "xyz", "model": "shared-cache-openai-dall-e-3"},
+        headers={"Authorization": "Bearer bad-key"}
+    )
+    assert r1.status_code == 401
+    
+    # 2. Valid provider key format in Authorization header should pass
+    r2 = client.post(
+        "/v1/images/generations",
+        json={"prompt": "xyz", "model": "shared-cache-openai-dall-e-3"},
+        headers={"Authorization": "Bearer sk-proj-1234"}
+    )
+    assert r2.status_code == 200
+    assert called_with_key == "sk-proj-1234"
+
+
+def test_custom_generated_keys():
+    storage = InMemoryStorage()
+    generator = StubGenerator(storage)
+    svc = CacheService(HashEmbedder(64), InMemoryCacheIndex(), generator,
+                       storage, CostMeter(), created_at_fn=lambda: "t")
+    client = TestClient(build_app(svc, api_key="master-secret"))
+    
+    # 1. Unregistered key should fail
+    r1 = client.post(
+        "/v1/images/generations",
+        json={"prompt": "xyz", "model": "shared-cache-openai-dall-e-3"},
+        headers={"Authorization": "Bearer sc-not-real"}
+    )
+    assert r1.status_code == 401
+    
+    # 2. Generate a key via the endpoint
+    r2 = client.post("/v1/keys/generate")
+    assert r2.status_code == 200
+    new_key = r2.json()["key"]
+    assert new_key.startswith("sc-")
+    
+    # 3. Presenting the new key in the header should pass
+    r3 = client.post(
+        "/v1/images/generations",
+        json={"prompt": "xyz", "model": "shared-cache-openai-dall-e-3"},
+        headers={"Authorization": f"Bearer {new_key}"}
+    )
+    assert r3.status_code == 200
+
+
 # --- Coherent factory tests (FIX 2) ---
 
 def test_empty_env_builds_in_memory_collaborators(monkeypatch):
@@ -111,3 +203,23 @@ def test_database_url_without_b2_uses_in_memory_index_and_warns(monkeypatch):
     assert any("DATABASE_URL" in m and "in-memory" in m for m in warning_messages), (
         f"expected a UserWarning about falling back to in-memory index; got: {warning_messages}"
     )
+
+
+def test_memory_route_serves_stored_bytes():
+    from sharedcache.api import build_app
+    from sharedcache.cache_service import CacheService
+    from sharedcache.embedder import HashEmbedder
+    from sharedcache.index import InMemoryCacheIndex
+    from sharedcache.generator import StubGenerator
+    from sharedcache.storage import InMemoryStorage
+    from sharedcache.cost_meter import CostMeter
+    from fastapi.testclient import TestClient
+
+    storage = InMemoryStorage()
+    storage.put("assets/x/image.webp", b"PNGBYTES", "image/webp")
+    svc = CacheService(HashEmbedder(8), InMemoryCacheIndex(), StubGenerator(storage),
+                       storage, CostMeter(), created_at_fn=lambda: "t")
+    client = TestClient(build_app(svc, None))
+    r = client.get("/memory/sharedcache/assets/x/image.webp")
+    assert r.status_code == 200
+    assert r.content == b"PNGBYTES"

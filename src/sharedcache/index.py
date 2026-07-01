@@ -7,6 +7,9 @@ from sharedcache.models import AssetRecord
 class CacheIndex(Protocol):
     def search(self, embedding: list[float], k: int = 5) -> list[tuple[AssetRecord, float]]: ...
     def insert(self, record: AssetRecord, embedding: list[float]) -> None: ...
+    def update_url(self, asset_id: str, url: str, locally_cached: bool) -> None: ...
+    def verify_api_key(self, key: str) -> bool: ...
+    def add_api_key(self, key: str) -> None: ...
 
 def _cosine(a: np.ndarray, b: np.ndarray) -> float:
     na, nb = np.linalg.norm(a), np.linalg.norm(b)
@@ -17,6 +20,7 @@ def _cosine(a: np.ndarray, b: np.ndarray) -> float:
 class InMemoryCacheIndex:
     def __init__(self) -> None:
         self._rows: list[tuple[AssetRecord, np.ndarray]] = []
+        self._api_keys: set[str] = {"dev-key"}
 
     def insert(self, record: AssetRecord, embedding: list[float]) -> None:
         self._rows.append((record, np.asarray(embedding, dtype=float)))
@@ -26,6 +30,19 @@ class InMemoryCacheIndex:
         scored = [(rec, _cosine(q, vec)) for rec, vec in self._rows]
         scored.sort(key=lambda t: t[1], reverse=True)
         return scored[:k]
+
+    def update_url(self, asset_id: str, url: str, locally_cached: bool) -> None:
+        for rec, _ in self._rows:
+            if rec.id == asset_id:
+                rec.url = url
+                rec.locally_cached = locally_cached
+                break
+
+    def verify_api_key(self, key: str) -> bool:
+        return key in self._api_keys
+
+    def add_api_key(self, key: str) -> None:
+        self._api_keys.add(key)
 
 
 class PgCacheIndex:
@@ -42,11 +59,13 @@ class PgCacheIndex:
         with self._conn() as conn, conn.cursor() as cur:
             cur.execute(
                 """INSERT INTO assets (id, prompt, url, thumb_url, provider, model,
-                       content_hash, width, height, mime, manifest_url, embedding)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                       content_hash, width, height, mime, manifest_url, source_url,
+                       locally_cached, embedding)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                 (record.id, record.prompt, record.url, record.thumb_url, record.provider,
                  record.model, record.content_hash, record.width, record.height,
-                 record.mime, record.manifest_url, np.asarray(embedding, dtype=float)),
+                 record.mime, record.manifest_url, record.source_url, record.locally_cached,
+                 np.asarray(embedding, dtype=float)),
             )
             conn.commit()
 
@@ -55,8 +74,8 @@ class PgCacheIndex:
         with self._conn() as conn, conn.cursor() as cur:
             cur.execute(
                 """SELECT id, prompt, url, thumb_url, provider, model, content_hash,
-                          width, height, mime, manifest_url, created_at,
-                          1 - (embedding <=> %s) AS similarity
+                          width, height, mime, manifest_url, created_at, source_url,
+                          locally_cached, 1 - (embedding <=> %s) AS similarity
                    FROM assets ORDER BY embedding <=> %s LIMIT %s""",
                 (q, q, k),
             )
@@ -65,6 +84,28 @@ class PgCacheIndex:
                 rec = AssetRecord(id=str(row[0]), prompt=row[1], url=row[2], thumb_url=row[3],
                                   provider=row[4], model=row[5], content_hash=row[6],
                                   width=row[7], height=row[8], mime=row[9], manifest_url=row[10],
-                                  created_at=row[11].isoformat())
-                out.append((rec, float(row[12])))
+                                  created_at=row[11].isoformat(), source_url=row[12],
+                                  locally_cached=bool(row[13]))
+                out.append((rec, float(row[14])))
             return out
+
+    def update_url(self, asset_id: str, url: str, locally_cached: bool) -> None:
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "UPDATE assets SET url = %s, locally_cached = %s WHERE id = %s",
+                (url, locally_cached, asset_id)
+            )
+            conn.commit()
+
+    def verify_api_key(self, key: str) -> bool:
+        try:
+            with self._conn() as conn, conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM api_keys WHERE key = %s", (key,))
+                return cur.fetchone() is not None
+        except Exception:
+            return False
+
+    def add_api_key(self, key: str) -> None:
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute("INSERT INTO api_keys (key) VALUES (%s) ON CONFLICT DO NOTHING", (key,))
+            conn.commit()

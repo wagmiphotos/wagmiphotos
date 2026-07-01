@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS assets (
     height INT NOT NULL,
     mime TEXT NOT NULL,
     manifest_url TEXT,
+    source_url TEXT,
+    locally_cached BOOLEAN NOT NULL DEFAULT TRUE,
     embedding vector(__EMBEDDING_DIMS__) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -23,5 +25,10 @@ CREATE TABLE IF NOT EXISTS savings_ledger (
     api_key TEXT,
     asset_id UUID REFERENCES assets(id),
     cost_saved_usd NUMERIC(10,5) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS api_keys (
+    key TEXT PRIMARY KEY,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

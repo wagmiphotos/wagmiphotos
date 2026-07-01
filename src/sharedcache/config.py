@@ -6,6 +6,7 @@ class Settings(BaseSettings):
 
     openai_api_key: str | None = None
     gemini_api_key: str | None = None
+    gmicloud_api_key: str | None = None
     b2_key_id: str | None = None
     b2_app_key: str | None = None
     b2_bucket: str | None = None
@@ -15,3 +16,5 @@ class Settings(BaseSettings):
     embedding_dims: int = 768
     default_image_model: str = "gpt-image-1"
     api_key: str | None = None
+    hf_token: str | None = None
+    embedder_type: str = "gemini"
