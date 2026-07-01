@@ -1,5 +1,5 @@
-from sharedcache.d1_client import D1Client, QueryRow
-from sharedcache.models import AssetRecord
+from sharedcache.common.d1_client import D1Client, QueryRow
+from sharedcache.common.models import AssetRecord
 
 def _client(monkeypatch, rows=None):
     calls = []

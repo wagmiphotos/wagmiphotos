@@ -1,4 +1,4 @@
-from sharedcache.floor import similarity_floor
+from sharedcache.common.floor import similarity_floor
 
 def test_floor_uses_clip_calibrated_defaults():
     assert similarity_floor(0.0) == 0.35     # strict -> sim_max

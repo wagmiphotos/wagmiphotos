@@ -1,4 +1,4 @@
-from sharedcache.d1_client import QueryRow
+from sharedcache.common.d1_client import QueryRow
 
 class FakeD1:
     def __init__(self):

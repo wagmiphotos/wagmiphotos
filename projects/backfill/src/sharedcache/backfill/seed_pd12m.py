@@ -8,8 +8,8 @@ Usage:
 """
 import argparse
 import uuid
-from sharedcache.config import Settings
-from sharedcache.models import AssetRecord
+from sharedcache.common.config import Settings
+from sharedcache.common.models import AssetRecord
 
 
 def seed_rows(rows, d1, vectorize, *, source="pd12m") -> int:
@@ -49,9 +49,9 @@ def build_clients(settings: Settings) -> tuple:
     catch attribute-name/kwarg drift between Settings and the client
     constructors without needing to run the whole script.
     """
-    from sharedcache.d1_client import D1Client
-    from sharedcache.vectorize_client import VectorizeClient
-    from sharedcache.clip import ClipEmbedder
+    from sharedcache.common.d1_client import D1Client
+    from sharedcache.common.vectorize_client import VectorizeClient
+    from sharedcache.common.clip import ClipEmbedder
 
     d1 = D1Client(
         account_id=settings.cf_account_id,

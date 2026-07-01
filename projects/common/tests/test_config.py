@@ -1,4 +1,4 @@
-from sharedcache.config import Settings
+from sharedcache.common.config import Settings
 
 def test_defaults_apply_when_env_absent():
     s = Settings(_env_file=None)
@@ -16,7 +16,7 @@ def test_new_defaults(monkeypatch):
               "WORKER_INTERVAL_SECONDS", "WORKER_BATCH_SIZE", "WORKER_MAX_SPEND_USD",
               "KEYGEN_RATE_PER_HOUR"):
         monkeypatch.delenv(k, raising=False)
-    from sharedcache.config import Settings
+    from sharedcache.common.config import Settings
     s = Settings(_env_file=None)
     assert s.default_provider == "gmicloud"
     assert s.image_price_usd == 0.04
@@ -31,7 +31,7 @@ def test_cf_and_floor_defaults(monkeypatch):
               "CLIP_TEXT_EMBED_URL","CLIP_IMAGE_EMBED_URL","CLIP_EMBED_TOKEN",
               "FLOOR_SIM_MAX","FLOOR_SIM_MIN"):
         monkeypatch.delenv(k, raising=False)
-    from sharedcache.config import Settings
+    from sharedcache.common.config import Settings
     s = Settings(_env_file=None)
     assert s.cf_account_id is None and s.d1_database_id is None
     assert s.vectorize_index_name is None and s.clip_text_embed_url is None

@@ -1,7 +1,7 @@
 import asyncio
 import pytest
-from sharedcache.generator import StubGenerator
-from sharedcache.storage import InMemoryStorage
+from sharedcache.generation.generator import StubGenerator
+from sharedcache.generation.storage import InMemoryStorage
 
 
 @pytest.mark.asyncio
@@ -34,7 +34,7 @@ async def test_genblaze_generator_requires_key_for_google(monkeypatch):
     mock_module.ImagenProvider = MockImagenProvider
     monkeypatch.setitem(sys.modules, "genblaze_google", mock_module)
 
-    from sharedcache.generator import GenblazeGenerator
+    from sharedcache.generation.generator import GenblazeGenerator
     gen = GenblazeGenerator(storage=None)
     with pytest.raises(ValueError) as exc:
         await gen.generate("test", model="shared-cache-google-imagen-3")

@@ -1,8 +1,8 @@
 import sys
 import uuid
-from sharedcache.floor import similarity_floor
-from sharedcache.models import AssetRecord
-from sharedcache.processor import derive_sizes, dimensions
+from sharedcache.common.floor import similarity_floor
+from sharedcache.common.models import AssetRecord
+from sharedcache.generation.processor import derive_sizes, dimensions
 
 def normalize_prompt(s: str) -> str:
     return " ".join(s.strip().lower().split())
@@ -93,11 +93,11 @@ class BackfillWorker:
 
 
 def build_worker_from_settings(s) -> "BackfillWorker":
-    from sharedcache.clip import ClipEmbedder
-    from sharedcache.d1_client import D1Client
-    from sharedcache.vectorize_client import VectorizeClient
-    from sharedcache.generator import GenblazeGenerator, StubGenerator
-    from sharedcache.storage import GenblazeS3Storage, InMemoryStorage
+    from sharedcache.common.clip import ClipEmbedder
+    from sharedcache.common.d1_client import D1Client
+    from sharedcache.common.vectorize_client import VectorizeClient
+    from sharedcache.generation.generator import GenblazeGenerator, StubGenerator
+    from sharedcache.generation.storage import GenblazeS3Storage, InMemoryStorage
     storage = (GenblazeS3Storage(s.b2_bucket, s.b2_key_id, s.b2_app_key, s.b2_region,
                                  public_url_base=s.b2_public_url_base)
                if s.b2_bucket and s.b2_key_id else InMemoryStorage())
@@ -112,18 +112,3 @@ def build_worker_from_settings(s) -> "BackfillWorker":
                           floor_sim_max=s.floor_sim_max, floor_sim_min=s.floor_sim_min,
                           batch_size=s.worker_batch_size, max_spend_usd=s.worker_max_spend_usd,
                           price_usd=s.image_price_usd)
-
-
-def main() -> None:
-    import argparse, asyncio
-    from sharedcache.config import Settings
-    parser = argparse.ArgumentParser(description="SharedCache backfill worker")
-    parser.add_argument("--once", action="store_true", help="run a single tick and exit")
-    args = parser.parse_args()
-    s = Settings()
-    worker = build_worker_from_settings(s)
-    asyncio.run(worker.run(s.worker_interval_seconds, once=args.once))
-
-
-if __name__ == "__main__":
-    main()

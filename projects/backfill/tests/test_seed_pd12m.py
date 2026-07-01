@@ -1,11 +1,7 @@
-import importlib.util, pathlib
-from sharedcache.config import Settings
-from sharedcache.models import AssetRecord
-from tests.fakes import FakeD1, FakeVectorize
-
-_spec = importlib.util.spec_from_file_location(
-    "seed_pd12m", pathlib.Path(__file__).parent.parent / "scripts" / "seed_pd12m.py")
-seed_pd12m = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(seed_pd12m)
+from sharedcache.common.config import Settings
+from sharedcache.common.models import AssetRecord
+from fakes import FakeD1, FakeVectorize
+from sharedcache.backfill import seed_pd12m
 
 def test_seed_rows_inserts_d1_and_vectorize():
     d1, vec = FakeD1(), FakeVectorize()
