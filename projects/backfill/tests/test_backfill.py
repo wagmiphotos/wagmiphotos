@@ -1,11 +1,11 @@
 import io, pytest
 from PIL import Image
-from sharedcache.backfill import BackfillWorker, normalize_prompt
-from sharedcache.d1_client import QueryRow
-from sharedcache.models import AssetRecord
-from sharedcache.storage import InMemoryStorage
-from sharedcache.generator import StubGenerator
-from tests.fakes import FakeD1, FakeVectorize
+from sharedcache.backfill.worker import BackfillWorker, normalize_prompt
+from sharedcache.common.d1_client import QueryRow
+from sharedcache.common.models import AssetRecord
+from sharedcache.generation.storage import InMemoryStorage
+from sharedcache.generation.generator import StubGenerator
+from fakes import FakeD1, FakeVectorize
 
 class FakeClip:
     def text_embed(self, text): return [float(len(text) % 7)] * 8

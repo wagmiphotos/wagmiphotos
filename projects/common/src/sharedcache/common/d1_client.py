@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import httpx
-from sharedcache.models import AssetRecord
+from sharedcache.common.models import AssetRecord
 
 @dataclass
 class QueryRow:

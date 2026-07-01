@@ -73,10 +73,10 @@ When no API keys are set, the system falls back to `StubGenerator` (returns a de
 SharedCache is two deployables over three shared stores (**Cloudflare D1** for the query log + asset
 metadata, **Cloudflare Vectorize** for CLIP vectors, **Backblaze B2** for image bytes):
 
-- **Cloudflare Worker** (`worker/`, TypeScript) — the edge request path. Authenticates, CLIP-embeds the
+- **Cloudflare Worker** (`projects/worker/`, TypeScript) — the edge request path. Authenticates, CLIP-embeds the
   prompt, queries Vectorize for the nearest cached image, logs the query to D1, and returns an image URL.
   It **never generates**. See **[Cloudflare Worker](#cloudflare-worker-edge-request-path)** below.
-- **Python backfill worker** (`src/sharedcache/`, `python -m sharedcache.backfill`) — demand-ranked
+- **Python backfill worker** (`projects/backfill/`, `python -m sharedcache.backfill`) — demand-ranked
   generation for cache-misses (via Genblaze/GMI Cloud) plus PD12M→B2 rehosting. Runs locally or in a GMI
   Cloud Hermes agentbox. See **[Backfill worker](#backfill-worker)** below.
 
@@ -92,6 +92,16 @@ cp .env.example .env
 # 3. Provision the shared stores + seed the pool  → see "Backfill worker" below
 # 4. Deploy the edge request path                 → see "Cloudflare Worker" below
 ```
+
+---
+
+## Repo layout
+
+This is a uv monorepo with the following project structure:
+- **`projects/worker/`** — TypeScript Cloudflare Worker (edge request path)
+- **`projects/common/`** — Shared Python utilities (`sharedcache.common.*`)
+- **`projects/generation/`** — Image generation pipeline (`sharedcache.generation.*`)
+- **`projects/backfill/`** — Backfill service (`sharedcache.backfill.*`, includes Dockerfile)
 
 ---
 
@@ -140,7 +150,7 @@ The backfill worker is a long-running process that continuously re-ranks cached 
 
 3. **Seed the cache pool** (populates D1 with initial assets and embeddings):
    ```bash
-   uv run python scripts/seed_pd12m.py
+   uv run python -m sharedcache.backfill.seed_pd12m
    ```
 
 4. **Run the backfill**:
@@ -150,7 +160,7 @@ The backfill worker is a long-running process that continuously re-ranks cached 
      ```
    - **In Hermes agentbox** (continuous, runs as a container):
      ```bash
-     docker build -t sharedcache-backfill .
+     docker build -f projects/backfill/Dockerfile -t sharedcache-backfill .
      # Push image to registry and deploy to Hermes with agentbox runtime
      ```
 
@@ -170,14 +180,14 @@ The Worker handles incoming image-generation requests at the edge, routing them 
 
 1. **Install dependencies**:
    ```bash
-   cd worker && npm install
+   cd projects/worker && npm install
    ```
 
 2. **Create the D1 database**:
    ```bash
    wrangler d1 create sharedcache
    ```
-   Copy the returned `database_id` and set it in `worker/wrangler.toml` (replace `REPLACE_WITH_D1_DATABASE_ID`).
+   Copy the returned `database_id` and set it in `projects/worker/wrangler.toml` (replace `REPLACE_WITH_D1_DATABASE_ID`).
 
 3. **Apply the D1 migration** (creates the asset table with CLIP-vector columns):
    ```bash
@@ -195,7 +205,7 @@ The Worker handles incoming image-generation requests at the edge, routing them 
    wrangler secret put CLIP_EMBED_TOKEN      # Token for the CLIP text-embedding endpoint
    ```
 
-6. **Set the CLIP text-embedding endpoint** in `worker/wrangler.toml`:
+6. **Set the CLIP text-embedding endpoint** in `projects/worker/wrangler.toml`:
    ```toml
    [vars]
    CLIP_TEXT_EMBED_URL = "https://your-clip-endpoint/embed"
@@ -222,7 +232,7 @@ The Worker is the request path for production image-generation calls. The Python
 uv run pytest -q          # 42 passed
 
 # Cloudflare Worker (offline, faked bindings — no Miniflare)
-cd worker && npm install && npm test   # 32 passed
+cd projects/worker && npx vitest run   # 32 passed
 ```
 
 ---
@@ -234,7 +244,7 @@ Cloudflare/Backblaze/GMI/CLIP credentials:
 
 1. **Provision stores + seed** — follow **[Backfill worker → Setup](#setup)**: `wrangler d1 migrations apply`,
    `wrangler vectorize create sharedcache-clip --dimensions=768 --metric=cosine`, then
-   `uv run python scripts/seed_pd12m.py` (confirm PD12M's precomputed CLIP image vectors load, not zeros).
+   `uv run python -m sharedcache.backfill.seed_pd12m` (confirm PD12M's precomputed CLIP image vectors load, not zeros).
 2. **Tune the floor** — CLIP cross-modal cosine scores are low; tune `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN` against
    the seeded pool so hits land in the intended range.
 3. **Deploy the Worker** — follow **[Cloudflare Worker → Deploy runbook](#deploy-runbook)**; confirm

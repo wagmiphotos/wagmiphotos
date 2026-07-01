@@ -1,4 +1,4 @@
-from sharedcache.models import AssetRecord, Generated, GenerationResult
+from sharedcache.common.models import AssetRecord, Generated, GenerationResult
 
 def test_asset_record_fields():
     r = AssetRecord(id="1", prompt="p", url="u", thumb_url=None, medium_url=None,

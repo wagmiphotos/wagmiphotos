@@ -1,5 +1,5 @@
 import pathlib, sqlite3
-SQL = (pathlib.Path(__file__).parent.parent / "worker" / "migrations" / "0001_init.sql").read_text()
+SQL = (pathlib.Path(__file__).resolve().parents[3] / "projects" / "worker" / "migrations" / "0001_init.sql").read_text()
 
 def test_migration_creates_tables_and_columns():
     conn = sqlite3.connect(":memory:")

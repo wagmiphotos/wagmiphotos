@@ -1,5 +1,5 @@
 import httpx
-from sharedcache.clip import ClipEmbedder
+from sharedcache.common.clip import ClipEmbedder
 
 class _Resp:
     def __init__(self, data, status=200):

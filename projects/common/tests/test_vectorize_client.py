@@ -1,5 +1,5 @@
 import json, httpx
-from sharedcache.vectorize_client import VectorizeClient
+from sharedcache.common.vectorize_client import VectorizeClient
 
 class _Resp:
     def __init__(self, data, status=200):

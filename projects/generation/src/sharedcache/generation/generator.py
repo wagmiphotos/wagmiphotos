@@ -5,7 +5,7 @@ from typing import Protocol
 
 from PIL import Image
 
-from sharedcache.models import Generated
+from sharedcache.common.models import Generated
 
 
 class Generator(Protocol):

@@ -6,6 +6,19 @@ resolution-markers = [
     "python_full_version < '3.12'",
 ]
 
+[manifest]
+members = [
+    "sharedcache-backfill",
+    "sharedcache-common",
+    "sharedcache-generation",
+]
+
+[manifest.dependency-groups]
+dev = [
+    { name = "pytest", specifier = ">=8" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+]
+
 [[package]]
 name = "annotated-types"
 version = "0.7.0"
@@ -621,34 +634,52 @@ wheels = [
 ]
 
 [[package]]
-name = "sharedcache"
+name = "sharedcache-backfill"
 version = "0.1.0"
-source = { editable = "." }
+source = { editable = "projects/backfill" }
 dependencies = [
-    { name = "genblaze", extra = ["openai"] },
     { name = "httpx" },
-    { name = "pillow" },
+    { name = "sharedcache-common" },
+    { name = "sharedcache-generation" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "sharedcache-common", editable = "projects/common" },
+    { name = "sharedcache-generation", editable = "projects/generation" },
+]
+
+[[package]]
+name = "sharedcache-common"
+version = "0.1.0"
+source = { editable = "projects/common" }
+dependencies = [
+    { name = "httpx" },
     { name = "pydantic-settings" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "pydantic-settings", specifier = ">=2.5" },
+]
+
+[[package]]
+name = "sharedcache-generation"
+version = "0.1.0"
+source = { editable = "projects/generation" }
+dependencies = [
+    { name = "genblaze", extra = ["openai"] },
+    { name = "pillow" },
+    { name = "sharedcache-common" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "genblaze", extras = ["openai"], specifier = ">=0.4,<0.5" },
-    { name = "httpx", specifier = ">=0.27" },
     { name = "pillow", specifier = ">=10" },
-    { name = "pydantic-settings", specifier = ">=2.5" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8" },
-    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "sharedcache-common", editable = "projects/common" },
 ]
 
 [[package]]
