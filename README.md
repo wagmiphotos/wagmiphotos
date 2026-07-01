@@ -159,6 +159,59 @@ The backfill worker is a long-running process that continuously re-ranks cached 
 
 ---
 
+## Cloudflare Worker (edge request path)
+
+The Worker handles incoming image-generation requests at the edge, routing them to the cache-hit or generation paths. It shares the same D1 database and Vectorize index that the Python backfill (Plan 1) populates.
+
+### Deploy runbook
+
+1. **Install dependencies**:
+   ```bash
+   cd worker && npm install
+   ```
+
+2. **Create the D1 database**:
+   ```bash
+   wrangler d1 create sharedcache
+   ```
+   Copy the returned `database_id` and set it in `worker/wrangler.toml` (replace `REPLACE_WITH_D1_DATABASE_ID`).
+
+3. **Apply the D1 migration** (creates the asset table with CLIP-vector columns):
+   ```bash
+   wrangler d1 migrations apply sharedcache
+   ```
+
+4. **Create the Vectorize index** (CLIP embeddings, 768 dimensions, cosine similarity):
+   ```bash
+   wrangler vectorize create sharedcache-clip --dimensions=768 --metric=cosine
+   ```
+
+5. **Set secrets** (one-time; Cloudflare stores these securely):
+   ```bash
+   wrangler secret put MASTER_API_KEY       # Your API key for request validation
+   wrangler secret put CLIP_EMBED_TOKEN      # Token for the CLIP text-embedding endpoint
+   ```
+
+6. **Set the CLIP text-embedding endpoint** in `worker/wrangler.toml`:
+   ```toml
+   [vars]
+   CLIP_TEXT_EMBED_URL = "https://your-clip-endpoint/embed"
+   ```
+
+7. **Run tests**:
+   ```bash
+   npm test
+   ```
+
+8. **Deploy to Cloudflare**:
+   ```bash
+   npm run deploy
+   ```
+
+The Worker is the request path for production image-generation calls. The Python backfill service (described earlier) runs continuously in the background, populating the same D1 + Vectorize with embeddings and keeping cache scores fresh.
+
+---
+
 ## Running tests
 
 ```bash
