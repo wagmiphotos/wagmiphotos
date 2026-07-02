@@ -60,7 +60,10 @@ export default {
         return await handleGenerate(body, services, cfg);
       }
 
-      return new Response("Not found", { status: 404 });
+      if (url.pathname.startsWith("/v1/")) {
+        return new Response("Not found", { status: 404 });
+      }
+      return env.ASSETS.fetch(request);
     } catch (err) {
       console.error(err);
       return Response.json({ error: "upstream error", detail: String(err) }, { status: 502 });

@@ -8,7 +8,13 @@ function fakeEnv(over: any = {}) {
   const db: any = {
     prepare: () => ({ bind: () => ({ first: async () => null, run: async () => ({ success: true }), all: async () => ({ results: [] }) }) }),
   };
-  return { DB: db, VECTORIZE: { query: async () => ({ matches: [] }) }, CLIP_TEXT_EMBED_URL: "https://clip", ...over };
+  return {
+    DB: db,
+    VECTORIZE: { query: async () => ({ matches: [] }) },
+    CLIP_TEXT_EMBED_URL: "https://clip",
+    ASSETS: { fetch: async () => new Response("<!doctype html><title>SPA</title>", { status: 200, headers: { "content-type": "text/html" } }) },
+    ...over,
+  };
 }
 
 it("healthz ok", async () => {
@@ -16,8 +22,19 @@ it("healthz ok", async () => {
   expect(res.status).toBe(200);
 });
 
-it("unknown route 404", async () => {
-  const res = await worker.fetch(new Request("https://x/nope"), fakeEnv());
+it("unknown non-API path is served by ASSETS (the SPA)", async () => {
+  const res = await worker.fetch(new Request("https://x/playground"), fakeEnv());
+  expect(res.status).toBe(200);
+  expect(res.headers.get("content-type")).toContain("text/html");
+});
+
+it("root path is served by ASSETS", async () => {
+  const res = await worker.fetch(new Request("https://x/"), fakeEnv());
+  expect(res.status).toBe(200);
+});
+
+it("unmatched /v1/* still returns 404 (API semantics)", async () => {
+  const res = await worker.fetch(new Request("https://x/v1/does-not-exist"), fakeEnv());
   expect(res.status).toBe(404);
 });
 
