@@ -506,6 +506,9 @@
       box-shadow: 0 0 12px var(--warning-glow);
     }
 
+    .badge-approximate { background: #fbbf24; color: #1f2937; }
+    .badge-pending { background: #6b7280; color: #fff; }
+
     /* History & Presets */
     .presets-container {
       display: flex;
@@ -1180,6 +1183,7 @@
               <span class="state-placeholder-icon">🖼️</span>
               <p style="font-size: 0.9375rem; font-weight: 500; color: var(--text-main);">No Image Rendered</p>
               <p style="font-size: 0.8125rem; max-width: 280px; margin-top: -6px;">Enter a prompt and click generate to query the cache and generate images.</p>
+              <p id="placeholder-msg" style="font-size: 0.8125rem; max-width: 280px; color: var(--text-main);"></p>
             </div>
             
             <div id="state-loader" class="state-loader">
@@ -1207,11 +1211,11 @@
                   <span class="details-val mono" id="val-similarity">-</span>
                 </div>
                 <div class="details-item">
-                  <span class="details-label">Provider</span>
+                  <span class="details-label">Model</span>
                   <span class="details-val" id="val-provider">-</span>
                 </div>
                 <div class="details-item">
-                  <span class="details-label">Model</span>
+                  <span class="details-label">Source</span>
                   <span class="details-val" id="val-model">-</span>
                 </div>
                 <div class="details-item">
@@ -1559,11 +1563,13 @@
         
         // Reset viewport
         const placeholder = document.getElementById('state-placeholder');
+        const placeholderMsg = document.getElementById('placeholder-msg');
         const imgWrapper = document.getElementById('img-wrapper');
         const resultDetails = document.getElementById('result-details');
         const viewport = document.getElementById('viewport');
-        
+
         placeholder.style.display = 'flex';
+        placeholderMsg.textContent = '';
         imgWrapper.style.display = 'none';
         resultDetails.style.display = 'none';
         viewport.classList.remove('has-content');
@@ -1589,6 +1595,7 @@
       const submitBtn = document.getElementById('btn-submit');
       
       const placeholder = document.getElementById('state-placeholder');
+      const placeholderMsg = document.getElementById('placeholder-msg');
       const loader = document.getElementById('state-loader');
       const imgWrapper = document.getElementById('img-wrapper');
       const outImg = document.getElementById('out-img');
@@ -1599,6 +1606,7 @@
       submitBtn.disabled = true;
       submitBtn.innerHTML = `<span>⏳ Processing Match...</span>`;
       placeholder.style.display = 'none';
+      placeholderMsg.textContent = '';
       imgWrapper.style.display = 'none';
       resultDetails.style.display = 'none';
       loader.style.display = 'flex';
@@ -1636,16 +1644,37 @@
         const data = await response.json();
         const sc = data.shared_cache;
 
-        let rawUrl = data.data[0].url;
-        let finalUrl = rawUrl;
-        
-        if (rawUrl.startsWith('memory://sharedcache/')) {
-          finalUrl = rawUrl.replace('memory://sharedcache/', '/memory/sharedcache/');
+        const rawUrl = (data.data && data.data[0]) ? data.data[0].url : null;
+        if (sc.result === 'pending' || !rawUrl) {
+          // No image yet — the backfill will build it.
+          outImg.removeAttribute('src');
+          placeholderMsg.textContent = 'Generating — the backfill is building this image. Check back shortly.';
+          placeholder.style.display = 'flex';
+          loader.style.display = 'none';
+          imgWrapper.style.display = 'none';
+          viewport.classList.remove('has-content');
+          resultDetails.style.display = 'block';
+        } else {
+          let finalUrl = rawUrl;
+
+          if (rawUrl.startsWith('memory://sharedcache/')) {
+            finalUrl = rawUrl.replace('memory://sharedcache/', '/memory/sharedcache/');
+          }
+
+          placeholderMsg.textContent = '';
+          outImg.src = finalUrl;
+
+          loader.style.display = 'none';
+          imgWrapper.style.display = 'block';
+          viewport.classList.add('has-content');
+
+          outImg.onload = () => {
+            outImg.classList.add('loaded');
+            resultDetails.style.display = 'block';
+          };
         }
 
-        outImg.src = finalUrl;
-        
-        saved += sc.cost_saved_usd;
+        saved += (sc.cost_saved_usd || 0);
         if (sc.result === 'hit') {
           hits++;
         } else {
@@ -1654,13 +1683,13 @@
         updateStats();
 
         const badge = document.getElementById('result-badge');
-        badge.className = `result-badge ${sc.result === 'hit' ? 'badge-hit' : 'badge-miss'}`;
+        badge.className = `result-badge badge-${sc.result}`;
         badge.textContent = sc.result;
 
         document.getElementById('saved-ticker').textContent = `Saved $${sc.cost_saved_usd.toFixed(2)}`;
         document.getElementById('val-similarity').textContent = sc.similarity.toFixed(4);
-        document.getElementById('val-provider').textContent = sc.provider;
-        document.getElementById('val-model').textContent = sc.model;
+        document.getElementById('val-provider').textContent = sc.model_used ?? '—';
+        document.getElementById('val-model').textContent = sc.source ?? '—';
         document.getElementById('val-latency').textContent = `${latency}ms`;
 
         currentManifest = {
@@ -1677,15 +1706,6 @@
         });
         localStorage.setItem('sharedcache_history', JSON.stringify(history));
         renderHistory();
-
-        loader.style.display = 'none';
-        imgWrapper.style.display = 'block';
-        viewport.classList.add('has-content');
-        
-        outImg.onload = () => {
-          outImg.classList.add('loaded');
-          resultDetails.style.display = 'block';
-        };
 
       } catch (err) {
         console.error(err);

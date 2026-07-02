@@ -18,6 +18,7 @@ export interface Services {
 }
 export interface Env {
   DB: any; VECTORIZE: any; RATE_LIMITER?: any;
+  ASSETS: { fetch(request: Request): Promise<Response> };
   MASTER_API_KEY?: string; CLIP_TEXT_EMBED_URL: string; CLIP_EMBED_TOKEN?: string;
   IMAGE_PRICE_USD?: string; FLOOR_SIM_MAX?: string; FLOOR_SIM_MIN?: string;
 }
