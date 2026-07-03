@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WagmiPhotos — Semantic Image Cache Proxy</title>
-  <meta name="description" content="WagmiPhotos sits in front of your image-generation API. Prompts are matched semantically against every image already generated — near matches return instantly from edge storage.">
+  <title>wagmi.photos — Semantic Image Cache Proxy</title>
+  <meta name="description" content="wagmi.photos sits in front of your image-generation API. Prompts are matched semantically against every image already generated — near matches return instantly from edge storage.">
   <link rel="icon" type="image/png" sizes="64x64" href="/assets/favicon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
   <link rel="preload" as="image" href="/assets/handshake.webp">
@@ -120,21 +120,43 @@
 
     .logo-tld { color: var(--red); }
 
+    .nav-menu {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 4px;
-      flex-wrap: wrap;
+      gap: 2px;
+      margin-left: auto;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .nav-link {
       color: var(--muted);
       text-decoration: none;
+      font-family: var(--font-inter);
       font-size: 0.875rem;
       font-weight: 500;
       padding: 8px 14px;
       border-radius: 99px;
       transition: color 0.2s ease, background-color 0.2s ease;
+      background: none;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
     }
 
     .nav-link:hover {
@@ -148,6 +170,140 @@
       font-weight: 600;
     }
 
+    .nav-link .caret { transition: transform 0.2s ease; opacity: 0.6; }
+
+    /* ---- Dropdowns ---- */
+    .nav-item { position: relative; }
+
+    .nav-dropdown {
+      position: absolute;
+      top: calc(100% + 12px);
+      left: 0;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: 0 24px 60px rgba(28, 28, 27, 0.16);
+      padding: 18px;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(6px);
+      transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+      z-index: 200;
+    }
+
+    /* small hover bridge so the pointer can cross the gap without closing */
+    .nav-item::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      height: 14px;
+    }
+
+    .nav-item.open > .nav-dropdown { opacity: 1; visibility: visible; transform: translateY(0); }
+    .nav-item.open > .nav-link .caret { transform: rotate(180deg); }
+
+    @media (hover: hover) and (pointer: fine) {
+      .nav-item:hover > .nav-dropdown { opacity: 1; visibility: visible; transform: translateY(0); }
+      .nav-item:hover > .nav-link .caret { transform: rotate(180deg); }
+    }
+
+    .nav-mega {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 28px;
+      width: 580px;
+      max-width: calc(100vw - 32px);
+    }
+
+    .nav-col-head {
+      font-family: var(--font-display);
+      font-size: 0.6875rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 4px 12px 10px;
+    }
+
+    .nav-drop-item {
+      display: flex;
+      gap: 13px;
+      align-items: flex-start;
+      padding: 10px 12px;
+      border-radius: 13px;
+      text-decoration: none;
+      transition: background-color 0.15s ease;
+    }
+
+    .nav-drop-item:hover { background: var(--paper); }
+
+    .nav-drop-ic {
+      width: 38px;
+      height: 38px;
+      border-radius: 11px;
+      background: var(--red-tint);
+      color: var(--red);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .nav-drop-item.explore .nav-drop-ic { background: rgba(28, 28, 27, 0.05); color: var(--ink); }
+
+    .nav-drop-title {
+      display: block;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.9375rem;
+      color: var(--ink);
+      line-height: 1.25;
+    }
+
+    .nav-drop-sub { display: block; font-size: 0.8125rem; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+
+    .nav-dropdown.nav-list {
+      width: 296px;
+      max-width: calc(100vw - 32px);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 12px;
+    }
+
+    /* ---- Social icons ---- */
+    .nav-social {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .nav-social:hover { color: var(--ink); background: rgba(28, 28, 27, 0.05); }
+
+    .nav-github {
+      width: auto;
+      height: 34px;
+      gap: 7px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 99px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--ink-soft);
+    }
+
+    .nav-github:hover { border-color: var(--ink); background: transparent; color: var(--ink); }
+    .nav-github .star-count { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+    .nav-github .star-ic { color: #f5b301; }
+
     .nav-cta {
       background: var(--ink);
       color: #fff;
@@ -157,7 +313,8 @@
       padding: 9px 18px;
       border-radius: 99px;
       text-decoration: none;
-      margin-left: 8px;
+      margin-left: 6px;
+      white-space: nowrap;
       transition: background-color 0.2s ease, transform 0.2s ease;
     }
 
@@ -168,6 +325,64 @@
 
     .nav-cta.active { background: var(--red); }
     .nav-cta.active:hover { background: var(--red-deep); }
+
+    /* ---- Hamburger + mobile ---- */
+    .nav-toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      border-radius: 10px;
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    @media (max-width: 900px) {
+      .nav-toggle { display: inline-flex; }
+
+      .nav-menu {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+        background: var(--card);
+        border-bottom: 1px solid var(--line);
+        box-shadow: 0 24px 40px rgba(28, 28, 27, 0.1);
+        padding: 14px 16px 20px;
+        display: none;
+        max-height: calc(100vh - 64px);
+        overflow-y: auto;
+      }
+
+      .navbar.open .nav-menu { display: flex; }
+
+      .nav-links { flex-direction: column; align-items: stretch; gap: 2px; margin-left: 0; }
+      .nav-link { justify-content: space-between; font-size: 1rem; padding: 12px 14px; }
+      .nav-actions { margin-left: 0; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--line); }
+
+      .nav-item { position: static; }
+      .nav-dropdown {
+        position: static;
+        opacity: 1;
+        visibility: visible;
+        transform: none;
+        box-shadow: none;
+        border: none;
+        border-radius: 0;
+        padding: 2px 0 8px 8px;
+      }
+      .nav-mega { width: auto; grid-template-columns: 1fr; gap: 0; }
+      .nav-dropdown.nav-list { width: auto; }
+      .nav-item .caret { display: none; }
+      .nav-col-head { padding: 12px 12px 6px; }
+      .nav-cta { margin-left: 0; text-align: center; padding: 12px 18px; flex: 1; }
+    }
 
     /* ============ Views ============ */
     .spa-view {
@@ -182,6 +397,9 @@
     }
 
     .view-pad { padding: 40px 0 64px; }
+
+    /* anchored sections/docs clear the sticky navbar when deep-linked */
+    section[id], .docs-content [id] { scroll-margin-top: 84px; }
 
     /* ============ Shared: eyebrow with the double tick (red + black arms) ============ */
     .eyebrow {
@@ -410,6 +628,226 @@
       html { scroll-behavior: auto; }
     }
 
+    /* ============ Closest match (expectation setting) ============ */
+    .match-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 40px;
+      align-items: center;
+    }
+
+    @media (min-width: 960px) {
+      .match-grid { grid-template-columns: 1.25fr 0.75fr; gap: 48px; align-items: stretch; }
+    }
+
+    .section-title em { font-style: normal; color: var(--red); }
+
+    .match-copy > p {
+      color: var(--muted);
+      margin: 14px 0 26px;
+      max-width: 36em;
+    }
+
+    /* Shared column tracks so arrows and thumbs align across rows */
+    .match-rows {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      row-gap: 14px;
+    }
+
+    .match-row {
+      grid-column: 1 / -1;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px 18px;
+      display: grid;
+      grid-template-columns: subgrid;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .match-row-copy { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+
+    .match-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+
+    .match-label .n {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 0.75rem;
+      color: var(--red);
+      background: var(--red-tint);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .match-row .flow-bubble { white-space: normal; }
+    .match-row .flow-meta { margin-top: 0; }
+
+    .match-arrow { display: flex; color: var(--red); }
+
+    .match-result {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .match-thumb {
+      width: 96px;
+      height: 96px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      display: block;
+    }
+
+    .match-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 99px;
+      white-space: nowrap;
+    }
+
+    .match-badge.good { background: var(--success-tint); color: var(--success); }
+    .match-badge.close { background: var(--warning-tint); color: var(--warning); }
+
+    @media (max-width: 559px) {
+      .match-rows { display: flex; flex-direction: column; gap: 14px; }
+      .match-row { grid-template-columns: 1fr; gap: 12px; }
+      .match-arrow { display: none; }
+      .match-result { flex-direction: row; justify-content: flex-start; }
+      .match-thumb { width: 72px; height: 72px; }
+    }
+
+    .match-figure {
+      position: relative;
+      margin: 0 auto;
+      width: 100%;
+      max-width: 460px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      overflow: hidden;
+    }
+
+    .match-figure img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+    @media (min-width: 960px) {
+      .match-figure { max-width: none; }
+    }
+
+    .match-chip {
+      position: absolute;
+      left: 14px;
+      top: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border: 1px solid var(--line);
+      border-radius: 99px;
+      padding: 7px 13px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--ink-soft);
+      box-shadow: 0 8px 20px rgba(28, 28, 27, 0.08);
+    }
+
+    .match-chip svg { color: var(--red); flex-shrink: 0; }
+
+    /* ---- Retrieval vs fresh generation ---- */
+    .vs-head { text-align: center; margin: 44px auto 24px; }
+
+    .vs-head h3 {
+      font-family: var(--font-display);
+      font-size: 1.375rem;
+      font-weight: 800;
+      letter-spacing: -0.015em;
+      color: var(--ink);
+    }
+
+    .vs-head p { font-size: 0.875rem; color: var(--muted); margin-top: 4px; }
+
+    .vs-grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+
+    @media (min-width: 800px) { .vs-grid { grid-template-columns: 1fr 1fr; } }
+
+    .flow-head-icon.ink { background: rgba(28, 28, 27, 0.06); color: var(--ink); }
+
+    .vs-cols { display: grid; grid-template-columns: 1fr; gap: 12px; }
+
+    @media (min-width: 560px) { .vs-cols { grid-template-columns: 1fr 1fr; } }
+
+    .vs-list { border-radius: 12px; padding: 13px 15px; }
+    .vs-list.pros { background: var(--success-tint); }
+    .vs-list.cons { background: var(--warning-tint); }
+
+    .vs-list h5 {
+      font-family: var(--font-display);
+      font-size: 0.6875rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 9px;
+    }
+
+    .vs-list.pros h5 { color: var(--success); }
+    .vs-list.cons h5 { color: var(--warning); }
+
+    .vs-list ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .vs-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.8125rem;
+      color: var(--ink-soft);
+      line-height: 1.45;
+    }
+
+    .vs-list li svg { flex-shrink: 0; margin-top: 3px; }
+    .vs-list.pros li svg { color: var(--success); }
+    .vs-list.cons li svg { color: var(--warning); }
+
+    .vs-foot {
+      margin: 22px auto 0;
+      max-width: 640px;
+      text-align: center;
+      font-size: 0.9375rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .vs-foot b { color: var(--ink); font-family: var(--font-display); font-weight: 700; }
+
     /* ============ How it works (vertical flow) ============ */
     .flow {
       max-width: 780px;
@@ -477,7 +915,7 @@
     .flow-duo { display: grid; grid-template-columns: 1fr; column-gap: 18px; }
     @media (min-width: 640px) { .flow-duo { grid-template-columns: 1fr 1fr; } }
 
-    .flow-lane { display: flex; flex-direction: column; }
+    .flow-lane { display: flex; flex-direction: column; min-width: 0; }
     .flow-lane .flow-card { flex-grow: 1; }
 
     .flow-arrow {
@@ -991,7 +1429,7 @@
     .footer-brand img { width: 22px; height: 22px; }
     .footer-brand b { font-family: var(--font-display); font-weight: 800; color: var(--ink); }
 
-    .footer-links { display: flex; gap: 18px; }
+    .footer-links { display: flex; flex-wrap: wrap; gap: 12px 18px; }
     .footer-links a { color: var(--muted); text-decoration: none; }
     .footer-links a:hover { color: var(--red); }
 
@@ -1461,7 +1899,7 @@
     }
 
     /* ============ Legal ============ */
-    .legal-content {
+    .legal-content, .docs-content {
       max-width: 800px;
       margin: 0 auto;
       font-size: 0.9375rem;
@@ -1469,7 +1907,7 @@
       line-height: 1.7;
     }
 
-    .legal-content h2 {
+    .legal-content h2, .docs-content h2 {
       font-family: var(--font-display);
       color: var(--ink);
       font-size: 1.5rem;
@@ -1480,34 +1918,331 @@
       padding-bottom: 8px;
     }
 
-    .legal-content p { margin-bottom: 16px; }
-    .legal-content ul { margin-left: 24px; margin-bottom: 16px; }
-    .legal-content li { margin-bottom: 8px; }
-    .legal-content code {
+    .legal-content p, .docs-content p { margin-bottom: 16px; }
+    .legal-content ul, .docs-content ul, .docs-content ol { margin-left: 24px; margin-bottom: 16px; }
+    .legal-content li, .docs-content li { margin-bottom: 8px; }
+    .docs-content ol li { padding-left: 4px; }
+    .legal-content code, .docs-content code {
       font-family: var(--font-mono);
       font-size: 0.85em;
       background: rgba(28, 28, 27, 0.05);
       border-radius: 4px;
       padding: 1px 5px;
     }
+
+    /* ---- Docs extras ---- */
+    .docs-content > h2:first-child { margin-top: 0; }
+
+    .docs-content h3 {
+      font-family: var(--font-display);
+      color: var(--ink);
+      font-size: 1.0625rem;
+      font-weight: 700;
+      margin: 26px 0 10px;
+    }
+
+    .docs-endpoint {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      background: rgba(28, 28, 27, 0.04);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 12px;
+      margin-bottom: 14px;
+      color: var(--ink);
+    }
+
+    .docs-endpoint .method {
+      font-weight: 700;
+      color: var(--red);
+    }
+
+    .docs-table-wrap { overflow-x: auto; margin-bottom: 16px; }
+
+    .docs-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    .docs-table th {
+      text-align: left;
+      font-family: var(--font-display);
+      font-size: 0.6875rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
+    }
+
+    .docs-table td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      min-width: 90px;
+    }
+
+    .docs-table td:first-child {
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      color: var(--red-deep);
+      white-space: nowrap;
+    }
+
+    .docs-pre {
+      background: var(--ink);
+      color: rgba(255, 255, 255, 0.88);
+      border-radius: 12px;
+      padding: 16px 18px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.65;
+      overflow-x: auto;
+      margin-bottom: 16px;
+    }
+
+    .docs-pre .tk-cmd { color: #ffffff; }
+    .docs-pre .tk-flag { color: rgba(255, 255, 255, 0.55); }
+    .docs-pre .tk-str { color: #ff9da2; }
+    .docs-pre .tk-key { color: #f0eeeb; }
+    .docs-pre .tk-num { color: #f5c518; }
+    .docs-pre .tk-hit { color: #6fdc9c; font-weight: 500; }
+
+    .docs-note {
+      background: var(--red-tint);
+      border-left: 3px solid var(--red);
+      border-radius: 0 10px 10px 0;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+    }
+
+    .docs-note b { color: var(--ink); }
+
+    /* ---- Developer page extras (OpenAI / CLIP / Agents) ---- */
+    .dev-lead {
+      max-width: 720px;
+      margin: 0 auto 8px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 1.0625rem;
+    }
+
+    .compare-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 8px; }
+    @media (min-width: 720px) { .compare-grid { grid-template-columns: 1fr 1fr; } }
+
+    .compare-card { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+    .compare-card.was { background: var(--paper); }
+    .compare-card.now { background: var(--red-tint); border-color: rgba(237, 20, 30, 0.25); }
+    .compare-tag {
+      font-family: var(--font-display);
+      font-size: 0.6875rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .compare-card.now .compare-tag { color: var(--red); }
+    .compare-card code { font-family: var(--font-mono); font-size: 0.8125rem; word-break: break-all; }
+
+    .dev-cols { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 8px; }
+    @media (min-width: 640px) { .dev-cols { grid-template-columns: 1fr 1fr; } }
+
+    .dev-list { border: 1px solid var(--line); border-radius: 14px; padding: 15px 17px; }
+    .dev-list h4 {
+      font-family: var(--font-display);
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dev-list ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .dev-list li { display: flex; align-items: flex-start; gap: 9px; font-size: 0.875rem; color: var(--ink-soft); line-height: 1.5; }
+    .dev-list li svg { flex-shrink: 0; margin-top: 3px; color: var(--red); }
+
+    /* copy-to-clipboard code block */
+    .copy-wrap { position: relative; }
+    .copy-wrap .docs-pre, .copy-wrap .skill-pre { margin-bottom: 16px; }
+    .copy-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-inter);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.85);
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 6px 11px;
+      cursor: pointer;
+      transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+    .copy-btn:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
+    .copy-btn.copied { color: #6fdc9c; border-color: rgba(111, 220, 156, 0.5); }
+
+    .skill-pre {
+      background: var(--ink);
+      color: rgba(255, 255, 255, 0.9);
+      border-radius: 14px;
+      padding: 20px 22px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      line-height: 1.7;
+      overflow: auto;
+      max-height: 520px;
+      white-space: pre;
+      tab-size: 2;
+    }
+
+    /* CLIP similarity illustration */
+    .sim-row { display: grid; grid-template-columns: 1fr; gap: 4px; margin-bottom: 16px; }
+    @media (min-width: 620px) { .sim-row { grid-template-columns: 260px 1fr 130px; align-items: center; gap: 14px; } }
+    .sim-prompt { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--ink-soft); }
+    .sim-track { height: 22px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+    .sim-fill { height: 100%; background: var(--muted); border-radius: 0 6px 6px 0; }
+    .sim-fill.hit { background: var(--success); }
+    .sim-fill.approx { background: var(--warning); }
+    .sim-verdict { font-size: 0.8125rem; font-weight: 600; }
+    .sim-verdict .n { font-family: var(--font-mono); color: var(--ink); }
+
+    .clip-scale-wrap { margin: 14px 0 6px; }
+    .clip-scale {
+      height: 16px;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--red) 0%, #d98c00 52%, var(--muted) 100%);
+    }
+    .clip-scale-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .clip-scale-labels b { color: var(--ink); font-family: var(--font-display); }
   </style>
 </head>
 <body>
 
   <!-- Navigation Bar -->
-  <nav class="navbar">
+  <nav class="navbar" id="navbar">
     <div class="navbar-inner">
       <a href="#/" class="logo-container">
         <img src="/assets/logo.webp" alt="wagmi.photos logo" width="34" height="34">
         <span class="logo-text">wagmi<span class="logo-tld">.photos</span></span>
       </a>
 
-      <div class="nav-links">
-        <a href="#/" id="nav-home" class="nav-link active">Home</a>
-        <a href="#/pricing" id="nav-pricing" class="nav-link">Pricing</a>
-        <a href="#/account" id="nav-account" class="nav-link">Account</a>
-        <a href="#/legal" id="nav-legal" class="nav-link">Legal</a>
-        <a href="#/playground" id="nav-playground" class="nav-cta">Launch playground</a>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+
+      <div class="nav-menu" id="nav-menu">
+        <div class="nav-links">
+          <a href="#/pricing" id="nav-pricing" class="nav-link">Pricing</a>
+
+          <!-- Resources mega-dropdown -->
+          <div class="nav-item">
+            <button type="button" class="nav-link nav-trigger" aria-expanded="false">
+              Resources
+              <svg class="caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div class="nav-dropdown nav-mega" role="menu">
+              <div class="nav-col">
+                <div class="nav-col-head">On this page</div>
+                <a href="#how-it-works" class="nav-drop-item" role="menuitem">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg></span>
+                  <span><span class="nav-drop-title">How it works</span><span class="nav-drop-sub">Request in, image out.</span></span>
+                </a>
+                <a href="#closest-match" class="nav-drop-item" role="menuitem">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg></span>
+                  <span><span class="nav-drop-title">Closest match</span><span class="nav-drop-sub">Fast, cheap, not exact.</span></span>
+                </a>
+                <a href="#why-it-wins" class="nav-drop-item" role="menuitem">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16h2M13 12h2M17 8h2"/></svg></span>
+                  <span><span class="nav-drop-title">Why it wins</span><span class="nav-drop-sub">Price &amp; speed, charted.</span></span>
+                </a>
+                <a href="#the-api" class="nav-drop-item" role="menuitem">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg></span>
+                  <span><span class="nav-drop-title">The API</span><span class="nav-drop-sub">One endpoint, cache included.</span></span>
+                </a>
+              </div>
+              <div class="nav-col">
+                <div class="nav-col-head">Explore</div>
+                <a href="#/pricing" class="nav-drop-item explore" role="menuitem">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg></span>
+                  <span><span class="nav-drop-title">Pricing</span><span class="nav-drop-sub">Plans from $0/mo.</span></span>
+                </a>
+                <a href="#/playground" class="nav-drop-item explore" role="menuitem">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span>
+                  <span><span class="nav-drop-title">Playground</span><span class="nav-drop-sub">Try a live prompt.</span></span>
+                </a>
+                <a href="#/account" class="nav-drop-item explore" role="menuitem">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                  <span><span class="nav-drop-title">Account</span><span class="nav-drop-sub">Keys &amp; usage stats.</span></span>
+                </a>
+                <a href="#/legal" class="nav-drop-item explore" role="menuitem">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 7h14"/><path d="m5 7-2 6a4 4 0 0 0 8 0z"/><path d="m19 7-2 6a4 4 0 0 0 8 0z"/><path d="M8 21h8"/></svg></span>
+                  <span><span class="nav-drop-title">Legal</span><span class="nav-drop-sub">Privacy &amp; licensing.</span></span>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Developers dropdown -->
+          <div class="nav-item">
+            <button type="button" class="nav-link nav-trigger" aria-expanded="false">
+              Developers
+              <svg class="caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div class="nav-dropdown nav-list" role="menu">
+              <a href="#/docs" id="nav-docs" class="nav-drop-item" role="menuitem">
+                <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg></span>
+                <span><span class="nav-drop-title">API reference</span><span class="nav-drop-sub">Endpoints, params, responses.</span></span>
+              </a>
+              <a href="#/openai" id="nav-openai" class="nav-drop-item" role="menuitem">
+                <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m0 8v3a2 2 0 0 0 2 2h3m8-18h3a2 2 0 0 1 2 2v3m0 8v3a2 2 0 0 1-2 2h-3"/><path d="m9 15 6-6"/><path d="M15 15V9h-6"/></svg></span>
+                <span><span class="nav-drop-title">OpenAI drop-in</span><span class="nav-drop-sub">Swap the base URL, nothing else.</span></span>
+              </a>
+              <a href="#/clip" id="nav-clip" class="nav-drop-item" role="menuitem">
+                <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="1.5"/><circle cx="17" cy="6" r="1.5"/><circle cx="10" cy="15" r="1.5"/><circle cx="18" cy="16" r="1.5"/><circle cx="5" cy="17" r="1.5"/></svg></span>
+                <span><span class="nav-drop-title">CLIP embeddings</span><span class="nav-drop-sub">How semantic matching works.</span></span>
+              </a>
+              <a href="#/agents" id="nav-agents" class="nav-drop-item" role="menuitem">
+                <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M12 4v4M8 2v2M16 2v2"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/></svg></span>
+                <span><span class="nav-drop-title">Agents</span><span class="nav-drop-sub">Copy-paste skill file.</span></span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-actions">
+          <a href="#" class="nav-social" target="_blank" rel="noopener" aria-label="wagmi.photos on X" title="X (set your handle)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          </a>
+          <a href="#" class="nav-social" target="_blank" rel="noopener" aria-label="wagmi.photos on Discord" title="Discord (set your invite)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.891.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.331c-1.183 0-2.157-1.086-2.157-2.42 0-1.332.955-2.418 2.157-2.418 1.21 0 2.176 1.096 2.157 2.418 0 1.334-.956 2.42-2.157 2.42zm7.975 0c-1.183 0-2.157-1.086-2.157-2.42 0-1.332.955-2.418 2.157-2.418 1.21 0 2.176 1.096 2.157 2.418 0 1.334-.946 2.42-2.157 2.42z"/></svg>
+          </a>
+          <a href="https://github.com/sharedcache/sharedcache" class="nav-social nav-github" target="_blank" rel="noopener" aria-label="Star sharedcache on GitHub">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.523 2 12 2z"/></svg>
+            <span class="star-count">
+              <svg class="star-ic" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+              <span id="gh-stars">Star</span>
+            </span>
+          </a>
+          <a href="#/playground" id="nav-playground" class="nav-cta">Launch playground</a>
+        </div>
       </div>
     </div>
   </nav>
@@ -1526,7 +2261,7 @@
           </div>
           <h1 class="hero-title rise rise-2">Generated by one.<br>Shared with <em>everyone.</em></h1>
           <p class="hero-subtitle rise rise-3">
-            WagmiPhotos sits in front of your image-generation API. Every prompt is matched
+            wagmi.photos sits in front of your image-generation API. Every prompt is matched
             semantically against every image already generated — near matches return instantly
             from edge storage, and only truly new prompts queue a GPU.
           </p>
@@ -1584,8 +2319,132 @@
         </div>
       </section>
 
+      <!-- Closest match, not always exact -->
+      <section class="section" id="closest-match">
+        <div class="match-grid">
+          <div class="match-copy">
+            <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>What you get back</div>
+            <h2 class="section-title">Closest match, <em>not always exact.</em></h2>
+            <p>
+              wagmi.photos searches the shared library before anything else. Everyday prompts
+              almost always land a strong match. Hyper-specific prompts return the closest image
+              that already exists — close, but maybe not every detail.
+            </p>
+
+            <div class="match-rows">
+              <div class="match-row">
+                <div class="match-row-copy">
+                  <div class="match-label"><span class="n">1</span>Generic prompt</div>
+                  <div class="flow-bubble">"a dog and a cat"</div>
+                  <div class="flow-meta">"result": "hit" · strong match · 0.1 s</div>
+                </div>
+                <div class="match-arrow" aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </div>
+                <div class="match-result">
+                  <img class="match-thumb" src="/assets/match-cat-dog.webp" width="320" height="320" loading="lazy"
+                       alt="A golden retriever and a grey cat sitting side by side — the library's match">
+                  <span class="match-badge good">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                    High match
+                  </span>
+                </div>
+              </div>
+
+              <div class="match-row">
+                <div class="match-row-copy">
+                  <div class="match-label"><span class="n">2</span>Very specific prompt</div>
+                  <div class="flow-bubble">"a flamingo in a top hat doing my taxes"</div>
+                  <div class="flow-meta">"result": "hit" · flamingo ✓ · top hat ✗ · taxes ✗</div>
+                </div>
+                <div class="match-arrow" aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </div>
+                <div class="match-result">
+                  <img class="match-thumb" src="/assets/match-flamingo.webp" width="320" height="320" loading="lazy"
+                       alt="A flamingo on a tropical beach — no top hat, taxes not filed">
+                  <span class="match-badge close">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                    Closest match · may differ
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <figure class="match-figure">
+            <img src="/assets/grandpa-thumbs-up.webp" width="880" height="880" loading="lazy"
+                 alt="A smiling man at his laptop giving a thumbs up, happy with the closest match">
+            <figcaption class="match-chip">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
+              Closest match from library
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="vs-head">
+          <h3>Retrieval vs fresh generation</h3>
+          <p>Same endpoint either way — dial <code style="font-family: var(--font-mono); font-size: 0.85em;">cache_tolerance</code> down when only exact will do.</p>
+        </div>
+
+        <div class="vs-grid">
+          <div class="flow-card">
+            <div class="flow-card-head">
+              <span class="flow-head-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg></span>
+              Using the media cache
+            </div>
+            <div class="vs-cols">
+              <div class="vs-list pros">
+                <h5>Pros</h5>
+                <ul>
+                  <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Instant — ~0.1 s from the edge</li>
+                  <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>$0 per image</li>
+                  <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>No GPU queue, no wait</li>
+                  <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Consistent — same prompt, same image</li>
+                </ul>
+              </div>
+              <div class="vs-list cons">
+                <h5>Cons</h5>
+                <ul>
+                  <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>May not be exact</li>
+                  <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>Limited to what already exists</li>
+                  <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>Hyper-specific details can differ</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="flow-card">
+            <div class="flow-card-head">
+              <span class="flow-head-icon ink"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg></span>
+              Fresh AI generation
+            </div>
+            <div class="vs-cols">
+              <div class="vs-list pros">
+                <h5>Pros</h5>
+                <ul>
+                  <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Exactly your prompt</li>
+                  <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Brand-new, never-seen images</li>
+                  <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Made for hyper-specific prompts</li>
+                </ul>
+              </div>
+              <div class="vs-list cons">
+                <h5>Cons</h5>
+                <ul>
+                  <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>Slower — seconds, not milliseconds</li>
+                  <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>Costs the model's fee</li>
+                  <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>Less predictable</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p class="vs-foot"><b>Rule of thumb:</b> fast and cheap beats pixel-perfect? Let the cache answer. Need every detail exact? Generate fresh with an image model — and your image joins the library for everyone after.</p>
+      </section>
+
       <!-- How it works -->
-      <section class="section">
+      <section class="section" id="how-it-works">
         <div class="section-head">
           <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>How it works</div>
           <h2 class="section-title">An image library that grows as more people use it</h2>
@@ -1678,7 +2537,7 @@
       </section>
 
       <!-- Features -->
-      <section class="section">
+      <section class="section" id="why-it-wins">
         <div class="section-head">
           <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>Why it wins</div>
           <h2 class="section-title">Built for speed and price.</h2>
@@ -1751,7 +2610,7 @@
       </section>
 
       <!-- API sample -->
-      <section class="section">
+      <section class="section" id="the-api">
         <div class="api-grid">
           <div class="api-copy">
             <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>The API</div>
@@ -1901,7 +2760,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
       <section class="cta-band">
         <div>
           <h2>Stop paying for the same image twice.</h2>
-          <p>Plug in WagmiPhotos and let every generation pull its weight.</p>
+          <p>Plug in wagmi.photos and let every generation pull its weight.</p>
         </div>
         <div class="actions">
           <a href="#/playground" class="btn-solid red">Launch playground →</a>
@@ -2125,9 +2984,9 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
       <div class="glass-card">
         <h2 class="card-title">Credentials &amp; authentication</h2>
 
-        <!-- WagmiPhotos API Key Manager -->
+        <!-- wagmi.photos API Key Manager -->
         <div class="form-group">
-          <label for="api-key">WagmiPhotos API key</label>
+          <label for="api-key">wagmi.photos API key</label>
           <div style="display: flex; gap: 10px;">
             <input id="api-key" type="password" class="api-key-input" placeholder="No API key active (default is dev-key)..." oninput="saveApiKey()">
             <button class="btn btn-primary" style="height: 42px; width: auto; padding: 0 16px; font-size: 0.875rem; flex-shrink: 0; white-space: nowrap;" onclick="generateWagmiPhotosKey()">Generate key</button>
@@ -2162,6 +3021,443 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
     </div>
 
     <!-- VIEW 4: LEGAL & POLICY -->
+    <!-- VIEW: DOCS -->
+    <div id="view-docs" class="spa-view">
+      <div class="view-pad">
+        <div class="page-head">
+          <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>Docs</div>
+          <h1 class="section-title">API reference</h1>
+          <p class="section-sub">One OpenAI-compatible endpoint, a shared image library in front of it. Everything below is the whole API.</p>
+        </div>
+
+        <div class="glass-card">
+          <div class="docs-content">
+
+            <h2 id="docs-auth">Authentication</h2>
+            <p>
+              All generation requests need a Bearer key. Mint one — no signup, rate-limited to
+              10 keys per minute per IP:
+            </p>
+            <div class="docs-endpoint"><span class="method">POST</span> /v1/keys/generate</div>
+            <pre class="docs-pre"><span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://wagmiphotos.dev/v1/keys/generate
+
+{ <span class="tk-key">"key"</span>: <span class="tk-str">"sc-nA93…"</span>, <span class="tk-key">"created_at"</span>: <span class="tk-num">1783468800</span> }</pre>
+            <p>
+              Store the key yourself — it is hashed (SHA-256) before it touches our database, so
+              it cannot be shown again. Send it on every request as
+              <code>Authorization: Bearer sc-your-key</code>.
+            </p>
+
+            <h2 id="docs-generations">Generate or fetch an image</h2>
+            <div class="docs-endpoint"><span class="method">POST</span> /v1/images/generations</div>
+            <p>
+              The request shape matches the OpenAI Images API, so the official SDKs work by
+              pointing <code>base_url</code> at <code>https://wagmiphotos.dev/v1</code>.
+              Your prompt is CLIP-embedded and matched against every image in the shared library;
+              the closest match above your tolerance floor is served instantly.
+            </p>
+
+            <h3>Request body</h3>
+            <div class="docs-table-wrap">
+              <table class="docs-table">
+                <thead>
+                  <tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>prompt</td><td>string</td><td>required</td>
+                    <td>What you want. Prompts are normalized (trimmed, lowercased, whitespace collapsed) before matching and queueing.</td>
+                  </tr>
+                  <tr>
+                    <td>cache_tolerance</td><td>number 0–1</td><td>0.15</td>
+                    <td>How far a match may drift from your prompt. 0 accepts only the closest matches, 1 accepts the loosest. See <a href="#docs-matching" style="color: var(--red);">how matching works</a>.</td>
+                  </tr>
+                  <tr>
+                    <td>generate_on_miss</td><td>boolean</td><td>true</td>
+                    <td>Whether a miss queues background GPU generation for this prompt. Set <code>false</code> for cache-only behaviour. See <a href="#docs-generate-on-miss" style="color: var(--red);">semantics</a>.</td>
+                  </tr>
+                  <tr>
+                    <td>n</td><td>integer</td><td>1</td>
+                    <td>Only <code>1</code> is supported; anything else returns <code>422</code>.</td>
+                  </tr>
+                  <tr>
+                    <td>size</td><td>string</td><td>—</td>
+                    <td>Accepted for OpenAI compatibility. Every response already includes <code>thumb</code>, <code>medium</code> and <code>large</code> URLs.</td>
+                  </tr>
+                  <tr>
+                    <td>model</td><td>string</td><td>—</td>
+                    <td>Accepted for OpenAI compatibility. Matching is model-agnostic; <code>shared_cache.model_used</code> reports the model that created the served image.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Example</h3>
+            <pre class="docs-pre"><span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://wagmiphotos.dev/v1/images/generations <span class="tk-flag">\</span>
+  <span class="tk-flag">-H</span> <span class="tk-str">"Authorization: Bearer $WAGMI_KEY"</span> <span class="tk-flag">-H</span> <span class="tk-str">"Content-Type: application/json"</span> <span class="tk-flag">\</span>
+  <span class="tk-flag">-d</span> <span class="tk-str">'{
+    "prompt": "a lighthouse in a storm",
+    "cache_tolerance": 0.15,
+    "generate_on_miss": false
+  }'</span></pre>
+
+            <h3>Response — served from the library (200)</h3>
+            <pre class="docs-pre">{
+  <span class="tk-key">"created"</span>: <span class="tk-num">1783468800</span>,
+  <span class="tk-key">"data"</span>: [{ <span class="tk-key">"url"</span>: <span class="tk-str">"https://cdn.wagmiphotos.dev/img/pd12m-8f31…"</span> }],
+  <span class="tk-key">"shared_cache"</span>: {
+    <span class="tk-key">"result"</span>: <span class="tk-hit">"hit"</span>,
+    <span class="tk-key">"similarity"</span>: <span class="tk-num">0.41</span>,
+    <span class="tk-key">"cost_saved_usd"</span>: <span class="tk-num">0.04</span>,
+    <span class="tk-key">"model_used"</span>: <span class="tk-str">"flux-schnell"</span>,
+    <span class="tk-key">"source"</span>: <span class="tk-str">"cache"</span>,
+    <span class="tk-key">"sizes"</span>: { <span class="tk-key">"thumb"</span>: <span class="tk-str">"…"</span>, <span class="tk-key">"medium"</span>: <span class="tk-str">"…"</span>, <span class="tk-key">"large"</span>: <span class="tk-str">"…"</span> }
+  }
+}</pre>
+
+            <h3>Response — nothing close enough yet (202)</h3>
+            <pre class="docs-pre">{
+  <span class="tk-key">"created"</span>: <span class="tk-num">1783468800</span>,
+  <span class="tk-key">"data"</span>: [],
+  <span class="tk-key">"shared_cache"</span>: {
+    <span class="tk-key">"result"</span>: <span class="tk-str">"pending"</span>,
+    <span class="tk-key">"similarity"</span>: <span class="tk-num">0</span>,
+    <span class="tk-key">"cost_saved_usd"</span>: <span class="tk-num">0</span>,
+    <span class="tk-key">"generation_queued"</span>: <span class="tk-num">true</span>
+  }
+}</pre>
+
+            <h3>Result values</h3>
+            <div class="docs-table-wrap">
+              <table class="docs-table">
+                <thead>
+                  <tr><th>result</th><th>Status</th><th>Meaning</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>hit</td><td>200</td>
+                    <td>Similarity is at or above your tolerance floor. The image is served; nothing is queued.</td>
+                  </tr>
+                  <tr>
+                    <td>approximate</td><td>200</td>
+                    <td>The best image falls below your floor. It is served anyway so you have something to show, and the prompt is queued for generation (unless opted out). <code>generation_queued</code> is included.</td>
+                  </tr>
+                  <tr>
+                    <td>pending</td><td>202</td>
+                    <td>The library has nothing to serve. <code>data</code> is empty and the prompt is queued for generation (unless opted out). Retry the same prompt later — once built, it is a hit for everyone.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h2 id="docs-matching">How matching works</h2>
+            <p>
+              Your <code>cache_tolerance</code> maps linearly to a CLIP cosine-similarity floor:
+              tolerance 0 → floor 0.35, tolerance 1 → floor 0.18. The single nearest
+              library image is compared against that floor — at or above it you get a
+              <code>hit</code>, below it an <code>approximate</code>.
+            </p>
+
+            <h2 id="docs-generate-on-miss">generate_on_miss semantics</h2>
+            <p>
+              Generation costs GPU time, so it is opt-out per request — but the queue is shared,
+              and one prompt can be requested by many callers with different flags. The rules:
+            </p>
+            <ul>
+              <li><b>Default is generate.</b> A miss with the field unset (or <code>true</code>) queues the prompt for background generation.</li>
+              <li><b>Opting out is per prompt, not per library.</b> <code>generate_on_miss: false</code> still records the prompt and its demand count — it just tells the backfill to skip it.</li>
+              <li><b>Generation wins.</b> If the prompt is already queued for generation, a later request with <code>false</code> does not un-queue it. And if the prompt was stored opted-out, the first request that arrives with the field unset or <code>true</code> upgrades it, so it gets generated. Once a prompt wants generation, it stays wanted.</li>
+              <li><b>The response tells you the effective state.</b> <code>shared_cache.generation_queued</code> on <code>pending</code> and <code>approximate</code> responses reflects the merged result, not just your request — send <code>false</code> for a prompt someone else queued and you will get <code>generation_queued: true</code> back.</li>
+            </ul>
+            <div class="docs-note">
+              <b>When to opt out:</b> use <code>generate_on_miss: false</code> when you only want
+              instant, $0 answers — placeholder art, previews, high-volume UI fills — and a miss
+              should stay a miss instead of spending GPU time.
+            </div>
+
+            <h2 id="docs-errors">Errors</h2>
+            <div class="docs-table-wrap">
+              <table class="docs-table">
+                <thead>
+                  <tr><th>Status</th><th>When</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>400</td><td>Body is not valid JSON, or not a JSON object.</td></tr>
+                  <tr><td>401</td><td>Missing or invalid API key.</td></tr>
+                  <tr><td>422</td><td><code>n</code> is set to anything but 1, or <code>generate_on_miss</code> is not a boolean.</td></tr>
+                  <tr><td>429</td><td>Key-generation rate limit exceeded (10 per minute per IP).</td></tr>
+                  <tr><td>502</td><td>An upstream dependency failed; the body includes a <code>detail</code> string.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h2 id="docs-health">Health</h2>
+            <div class="docs-endpoint"><span class="method">GET</span> /healthz</div>
+            <p>Returns <code>{"status":"ok"}</code>. No authentication.</p>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW: OPENAI DROP-IN -->
+    <div id="view-openai" class="spa-view">
+      <div class="view-pad">
+        <div class="page-head">
+          <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>Developers</div>
+          <h1 class="section-title">A drop-in for the OpenAI Images API</h1>
+          <p class="section-sub">Keep the official OpenAI SDK. Change one line — the base URL — and every request is answered cache-first, with a <code style="font-family: var(--font-mono); font-size: 0.9em;">shared_cache</code> block riding along in the response.</p>
+        </div>
+
+        <div class="glass-card">
+          <div class="docs-content">
+            <h2>The only change</h2>
+            <div class="compare-grid">
+              <div class="compare-card was">
+                <div class="compare-tag">Before — OpenAI</div>
+                <code>base_url = "https://api.openai.com/v1"</code>
+              </div>
+              <div class="compare-card now">
+                <div class="compare-tag">After — wagmi.photos</div>
+                <code>base_url = "https://wagmiphotos.dev/v1"</code>
+              </div>
+            </div>
+            <p>Swap your key for a wagmi.photos key (<code>sc-…</code>). Method names, the prompt field, and the way you read <code>data[0].url</code> stay exactly the same.</p>
+
+            <h2>Python</h2>
+            <div class="copy-wrap">
+              <button class="copy-btn" type="button" onclick="copyCode(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span class="copy-label">Copy</span></button>
+              <pre class="docs-pre"><span class="tk-flag">from</span> openai <span class="tk-flag">import</span> OpenAI
+
+client = OpenAI(
+    base_url=<span class="tk-str">"https://wagmiphotos.dev/v1"</span>,
+    api_key=<span class="tk-str">"sc-your-key"</span>,
+)
+
+img = client.images.generate(
+    prompt=<span class="tk-str">"a lighthouse in a storm"</span>,
+    extra_body={
+        <span class="tk-str">"cache_tolerance"</span>: <span class="tk-num">0.15</span>,
+        <span class="tk-str">"generate_on_miss"</span>: <span class="tk-num">True</span>,
+    },
+)
+
+<span class="tk-cmd">print</span>(img.data[<span class="tk-num">0</span>].url)
+<span class="tk-flag"># raw response also carries a shared_cache block</span></pre>
+            </div>
+
+            <h2>JavaScript</h2>
+            <div class="copy-wrap">
+              <button class="copy-btn" type="button" onclick="copyCode(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span class="copy-label">Copy</span></button>
+              <pre class="docs-pre"><span class="tk-flag">import</span> OpenAI <span class="tk-flag">from</span> <span class="tk-str">"openai"</span>;
+
+<span class="tk-flag">const</span> client = <span class="tk-flag">new</span> OpenAI({
+  baseURL: <span class="tk-str">"https://wagmiphotos.dev/v1"</span>,
+  apiKey: <span class="tk-str">"sc-your-key"</span>,
+});
+
+<span class="tk-flag">const</span> img = <span class="tk-flag">await</span> client.images.generate({
+  prompt: <span class="tk-str">"a lighthouse in a storm"</span>,
+  cache_tolerance: <span class="tk-num">0.15</span>,
+  generate_on_miss: <span class="tk-num">true</span>,
+});
+
+console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].url);</pre>
+            </div>
+
+            <h2>cURL</h2>
+            <div class="copy-wrap">
+              <button class="copy-btn" type="button" onclick="copyCode(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span class="copy-label">Copy</span></button>
+              <pre class="docs-pre"><span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://wagmiphotos.dev/v1/images/generations <span class="tk-flag">\</span>
+  <span class="tk-flag">-H</span> <span class="tk-str">"Authorization: Bearer $WAGMI_KEY"</span> <span class="tk-flag">\</span>
+  <span class="tk-flag">-H</span> <span class="tk-str">"Content-Type: application/json"</span> <span class="tk-flag">\</span>
+  <span class="tk-flag">-d</span> <span class="tk-str">'{ "prompt": "a lighthouse in a storm" }'</span></pre>
+            </div>
+
+            <h2>What stays the same, what you gain</h2>
+            <div class="dev-cols">
+              <div class="dev-list">
+                <h4>Unchanged</h4>
+                <ul>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>The official OpenAI SDKs and method names</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>The <code>prompt</code> field and request flow</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Reading the image from <code>data[0].url</code></li>
+                </ul>
+              </div>
+              <div class="dev-list">
+                <h4>Added by wagmi.photos</h4>
+                <ul>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>A <code>shared_cache</code> block: result, similarity, cost saved</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>~0.1&nbsp;s cache hits at $0 per image</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><code>cache_tolerance</code> and <code>generate_on_miss</code> controls</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="docs-note"><b>Response note:</b> a <code>202</code> means nothing close was cached yet — <code>data</code> is empty and (unless you opted out) the prompt was queued to generate. Handle it like a soft miss: proceed without an image or retry later. Full details in the <a href="#/docs">API reference</a>.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW: CLIP -->
+    <div id="view-clip" class="spa-view">
+      <div class="view-pad">
+        <div class="page-head">
+          <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>Developers</div>
+          <h1 class="section-title">How semantic matching works</h1>
+          <p class="section-sub">Every prompt and every image becomes a CLIP vector. A match is just the nearest image vector to your prompt vector — no keywords, no tags.</p>
+        </div>
+
+        <div class="glass-card">
+          <div class="docs-content">
+            <h2>One space for words and pictures</h2>
+            <p>
+              wagmi.photos embeds text prompts and images into the same 768-dimensional space
+              with a CLIP ViT-L/14 model. Because the seeded library images and your prompt are
+              embedded by the <em style="font-style: normal; color: var(--red); font-weight: 600;">same model</em>, a prompt vector lands near the image vectors
+              that depict it — so "a golden retriever" sits close to actual photos of one.
+            </p>
+
+            <h2>From prompt to match</h2>
+            <ol>
+              <li>Your prompt is normalized (trimmed, lowercased, whitespace collapsed).</li>
+              <li>CLIP turns it into a 768-dim vector at the edge.</li>
+              <li>Vectorize finds the single nearest image vector by cosine similarity.</li>
+              <li>That similarity is compared to your tolerance floor — at or above it is a <b>hit</b>; below it is <b>approximate</b>.</li>
+            </ol>
+
+            <h2>Similarity, illustrated</h2>
+            <div class="sim-row">
+              <div class="sim-prompt">"a dog and a cat"</div>
+              <div class="sim-track"><div class="sim-fill hit" style="width: 82%;"></div></div>
+              <div class="sim-verdict">hit · <span class="n">0.41</span></div>
+            </div>
+            <div class="sim-row">
+              <div class="sim-prompt">"a flamingo in a top hat doing my taxes"</div>
+              <div class="sim-track"><div class="sim-fill approx" style="width: 46%;"></div></div>
+              <div class="sim-verdict">approximate · <span class="n">0.24</span></div>
+            </div>
+            <p style="font-size: 0.8125rem; color: var(--muted);">Illustrative cosine-similarity scores. The generic prompt lands squarely on an existing image; the very specific one only finds a distant cousin.</p>
+
+            <h2>Tolerance sets the floor</h2>
+            <p>Your <code>cache_tolerance</code> maps linearly to the cosine-similarity floor a match must clear:</p>
+            <div class="clip-scale-wrap">
+              <div class="clip-scale"></div>
+              <div class="clip-scale-labels">
+                <span><b>tolerance 0</b> → floor 0.35 · strict, near-exact only</span>
+                <span>floor 0.18 · loose, more hits <b>← tolerance 1</b></span>
+              </div>
+            </div>
+            <p>At or above the floor you get a <code>hit</code>. Below it, the closest image is still served as <code>approximate</code> and the prompt is queued to generate (unless you opted out).</p>
+
+            <div class="docs-note">Same model, same space — that is why a generic prompt reliably hits while a hyper-specific one returns the closest existing image. See the <a href="#docs-matching">matching details</a> in the API reference, or the <a href="#closest-match">walkthrough on the home page</a>.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW: AGENTS -->
+    <div id="view-agents" class="spa-view">
+      <div class="view-pad">
+        <div class="page-head">
+          <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>Developers</div>
+          <h1 class="section-title">Give your agent cheap images</h1>
+          <p class="section-sub">Paste this skill file into your coding agent — a Claude Code <code style="font-family: var(--font-mono); font-size: 0.9em;">SKILL.md</code>, a Cursor rule, or a system-prompt block — so it reaches for the shared cache before paying to generate.</p>
+        </div>
+
+        <div class="glass-card">
+          <div class="docs-content">
+            <h2>The skill file</h2>
+            <p>Save it as <code>SKILL.md</code> or drop it straight into your agent's instructions. It hands the agent the endpoint, the request shape, and — the part that matters — how to act on <code>hit</code> / <code>approximate</code> / <code>pending</code>.</p>
+
+            <div class="copy-wrap">
+              <button class="copy-btn" type="button" onclick="copyCode(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span class="copy-label">Copy</span></button>
+              <pre class="skill-pre" id="skill-file">---
+name: wagmi-photos-images
+description: Fetch images cheaply and instantly from the wagmi.photos shared cache before paying to generate. Use whenever a task needs an image and "close enough" beats pixel-perfect.
+---
+
+# wagmi.photos — cache-first images
+
+Get an image in ~100 ms for $0 by matching the shared library first. Only pay a
+generator when the prompt is genuinely new or must be exact.
+
+## When to use this
+- You need a stock-style or illustrative image and an approximate match is fine.
+- You want to avoid generation cost and latency by default.
+
+Do NOT rely on the cache when the image must match a hyper-specific prompt
+exactly (brand assets, precise composition). Use a dedicated image model there.
+
+## Endpoint
+POST https://wagmiphotos.dev/v1/images/generations
+  Authorization: Bearer sc-your-key
+  Content-Type: application/json
+
+Body fields:
+- prompt            (string, required)
+- cache_tolerance   (0..1, default 0.15)  lower = stricter match
+- generate_on_miss  (bool, default true)  false = never spend GPU on a miss
+
+## Call it
+curl -X POST https://wagmiphotos.dev/v1/images/generations \
+  -H "Authorization: Bearer $WAGMI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "a vintage bicycle against a brick wall",
+       "cache_tolerance": 0.15,
+       "generate_on_miss": true}'
+
+## Act on shared_cache.result
+- "hit"          (HTTP 200): use data[0].url. Free and instant, you are done.
+- "approximate"  (HTTP 200): a close image is in data[0].url. Use it only if it
+                  fits the task; the exact prompt was queued for next time.
+- "pending"      (HTTP 202): nothing close yet, data is empty. Generate with
+                  your own model if you need an image now. The prompt was queued
+                  (unless you opted out), so retrying later will hit for $0.
+
+## Rules for the agent
+1. Default to the cache. Send generate_on_miss=false when you only want free,
+   instant results and a miss is acceptable.
+2. Never treat "approximate" as exact — verify it matches the request.
+3. On 202, do not block waiting. Proceed without an image or fall back to a real
+   generator, then retry the same prompt later for a cheap hit.
+4. Reuse one wagmi.photos key. It is hashed server-side; keep it secret.</pre>
+            </div>
+
+            <h2>How the agent should behave</h2>
+            <div class="dev-cols">
+              <div class="dev-list">
+                <h4>Default path — cheap &amp; fast</h4>
+                <ul>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>Ask the cache first for anything illustrative.</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>Accept <code>approximate</code> when it fits the task.</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>Set <code>generate_on_miss=false</code> for throwaway previews.</li>
+                </ul>
+              </div>
+              <div class="dev-list">
+                <h4>When exact matters</h4>
+                <ul>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Lower <code>cache_tolerance</code> toward 0 for near-exact only.</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Leave <code>generate_on_miss=true</code> so misses get built.</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>On <code>pending</code>, fall back to a dedicated model.</li>
+                </ul>
+              </div>
+            </div>
+
+            <h2>Wire up a key</h2>
+            <p>Mint one with a single unauthenticated call, then export it as <code>WAGMI_KEY</code>:</p>
+            <div class="copy-wrap">
+              <button class="copy-btn" type="button" onclick="copyCode(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span class="copy-label">Copy</span></button>
+              <pre class="docs-pre"><span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://wagmiphotos.dev/v1/keys/generate
+<span class="tk-flag"># -> { "key": "sc-…" }  then:  export WAGMI_KEY=sc-…</span></pre>
+            </div>
+            <p>The full field reference lives in the <a href="#/docs">API docs</a>.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="view-legal" class="spa-view">
       <div class="view-pad">
       <div class="glass-card">
@@ -2174,7 +3470,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
 
           <h2>1. Privacy Policy</h2>
           <p>
-            WagmiPhotos is designed from the ground up to respect developer and user privacy:
+            wagmi.photos is designed from the ground up to respect developer and user privacy:
           </p>
           <ul>
             <li><strong>Local-Only Key Storage:</strong> All API keys you input (OpenAI, Gemini, GMICloud, and Hugging Face tokens) are saved strictly inside your browser's local <code>localStorage</code>. They never touch our database servers in raw form.</li>
@@ -2184,10 +3480,10 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
 
           <h2>2. Terms of Use &amp; Data Licensing</h2>
           <p>
-            By using WagmiPhotos, you agree to comply with the terms of our backend caching logic and the licenses of our creative catalogs:
+            By using wagmi.photos, you agree to comply with the terms of our backend caching logic and the licenses of our creative catalogs:
           </p>
           <ul>
-            <li><strong>Public Domain Data:</strong> WagmiPhotos leverages the <strong>PD12M</strong> dataset from Spawning. This dataset is licensed under the <a href="https://spdx.org/licenses/CDLA-Permissive-2.0" target="_blank" style="color: var(--red); text-decoration: none; font-weight: 600;">CDLA-Permissive-2.0</a> agreement. You are permitted to copy, distribute, modify, and utilize all pre-seeded images for commercial or personal purposes without attribution.</li>
+            <li><strong>Public Domain Data:</strong> wagmi.photos leverages the <strong>PD12M</strong> dataset from Spawning. This dataset is licensed under the <a href="https://spdx.org/licenses/CDLA-Permissive-2.0" target="_blank" style="color: var(--red); text-decoration: none; font-weight: 600;">CDLA-Permissive-2.0</a> agreement. You are permitted to copy, distribute, modify, and utilize all pre-seeded images for commercial or personal purposes without attribution.</li>
             <li><strong>Proxy Fair Use:</strong> You agree not to abuse the cache endpoints through coordinated denial-of-service, scraping, or cache pollution. Misses are generated on demand and subject to your own provider token limits.</li>
           </ul>
         </div>
@@ -2207,6 +3503,10 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
       <span>Seeded with PD12M · CDLA-Permissive-2.0</span>
       <div class="footer-links">
         <a href="#/playground">Playground</a>
+        <a href="#/docs">API</a>
+        <a href="#/openai">OpenAI drop-in</a>
+        <a href="#/clip">CLIP</a>
+        <a href="#/agents">Agents</a>
         <a href="#/pricing">Pricing</a>
         <a href="#/legal">Legal</a>
       </div>
@@ -2245,56 +3545,154 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
     renderHistory();
 
     // Client-side Router
-    function navigateTo(hash) {
+    const ROUTES = {
+      '#/':           { view: 'view-home' },
+      '#/pricing':    { view: 'view-pricing', link: 'nav-pricing' },
+      '#/playground': { view: 'view-playground', link: 'nav-playground' },
+      '#/account':    { view: 'view-account', onShow: updateStats },
+      '#/legal':      { view: 'view-legal' },
+      '#/docs':       { view: 'view-docs', link: 'nav-docs' },
+      '#/openai':     { view: 'view-openai', link: 'nav-openai' },
+      '#/clip':       { view: 'view-clip', link: 'nav-clip' },
+      '#/agents':     { view: 'view-agents', link: 'nav-agents' },
+    };
+    const PATH_TO_HASH = {
+      '/playground': '#/playground', '/docs': '#/docs', '/pricing': '#/pricing',
+      '/account': '#/account', '/legal': '#/legal', '/openai': '#/openai',
+      '/clip': '#/clip', '/agents': '#/agents',
+    };
+
+    function closeDropdowns() {
+      document.querySelectorAll('.nav-item.open').forEach(i => {
+        i.classList.remove('open');
+        const t = i.querySelector('.nav-trigger');
+        if (t) t.setAttribute('aria-expanded', 'false');
+      });
+    }
+    function closeMobile() {
+      const nav = document.getElementById('navbar');
+      if (nav) nav.classList.remove('open');
+      const tog = document.getElementById('nav-toggle');
+      if (tog) tog.setAttribute('aria-expanded', 'false');
+    }
+    function closeMenus() { closeDropdowns(); closeMobile(); }
+
+    function showRoute(route) {
       document.querySelectorAll('.spa-view').forEach(v => {
         v.classList.remove('active');
         v.style.display = 'none';
       });
-      document.querySelectorAll('.nav-link, .nav-cta').forEach(l => l.classList.remove('active'));
+      document.querySelectorAll('.nav-link, .nav-cta, .nav-drop-item').forEach(l => l.classList.remove('active'));
 
-      let route = hash || '#/';
-      if (!hash) {
-        const path = window.location.pathname;
-        if (path === '/playground') route = '#/playground';
-        else if (path === '/pricing') route = '#/pricing';
-        else if (path === '/account') route = '#/account';
-        else if (path === '/legal') route = '#/legal';
-      }
-
-      let viewId = 'view-home';
-      let linkId = 'nav-home';
-
-      if (route === '#/playground') {
-        viewId = 'view-playground';
-        linkId = 'nav-playground';
-      } else if (route === '#/pricing') {
-        viewId = 'view-pricing';
-        linkId = 'nav-pricing';
-      } else if (route === '#/account') {
-        viewId = 'view-account';
-        linkId = 'nav-account';
-        updateStats(); // Force stats update when view changes
-      } else if (route === '#/legal') {
-        viewId = 'view-legal';
-        linkId = 'nav-legal';
-      }
-
-      const view = document.getElementById(viewId);
-      const link = document.getElementById(linkId);
-
+      const r = ROUTES[route] || ROUTES['#/'];
+      const view = document.getElementById(r.view);
       if (view) {
         view.style.display = 'block';
-        view.offsetHeight; // force reflow
+        view.offsetHeight; // force reflow for the fade-in
         view.classList.add('active');
       }
-      if (link) {
-        link.classList.add('active');
+      if (r.link) {
+        const link = document.getElementById(r.link);
+        if (link) {
+          link.classList.add('active');
+          const item = link.closest('.nav-item'); // light up the parent dropdown trigger too
+          if (item) { const trg = item.querySelector('.nav-trigger'); if (trg) trg.classList.add('active'); }
+        }
       }
+      if (r.onShow) r.onShow();
+    }
+
+    function navigateTo(hash) {
+      // In-page anchor (e.g. #how-it-works): switch to its containing view, then scroll to it
+      if (hash && hash.charAt(0) === '#' && hash.slice(0, 2) !== '#/') {
+        const el = document.getElementById(hash.slice(1));
+        const host = el && el.closest('.spa-view');
+        const slug = host ? host.id.slice(5) : ''; // 'view-docs' -> 'docs'
+        showRoute(slug && slug !== 'home' ? '#/' + slug : '#/');
+        closeMenus();
+        if (el) requestAnimationFrame(() => el.scrollIntoView());
+        return;
+      }
+      let route = hash || '#/';
+      if (!hash) { const p = window.location.pathname; if (PATH_TO_HASH[p]) route = PATH_TO_HASH[p]; }
+      showRoute(route);
+      closeMenus();
       window.scrollTo(0, 0);
     }
 
     window.addEventListener('hashchange', () => navigateTo(window.location.hash));
     window.addEventListener('DOMContentLoaded', () => navigateTo(window.location.hash));
+
+    // ---- Header interactions ----
+    (function initNav() {
+      document.querySelectorAll('.nav-trigger').forEach(trg => {
+        trg.addEventListener('click', e => {
+          e.preventDefault();
+          e.stopPropagation();
+          const item = trg.closest('.nav-item');
+          const isOpen = item.classList.contains('open');
+          closeDropdowns();
+          if (!isOpen) { item.classList.add('open'); trg.setAttribute('aria-expanded', 'true'); }
+        });
+      });
+      document.addEventListener('click', e => { if (!e.target.closest('.nav-item')) closeDropdowns(); });
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenus(); });
+
+      const tog = document.getElementById('nav-toggle');
+      if (tog) tog.addEventListener('click', () => {
+        const nav = document.getElementById('navbar');
+        const open = nav.classList.toggle('open');
+        tog.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+
+      // any navigation from within the menu collapses it
+      document.querySelectorAll('.nav-menu a, .logo-container').forEach(a => {
+        a.addEventListener('click', () => closeMenus());
+      });
+
+      // live GitHub star count (worker route caches + falls back)
+      const starEl = document.getElementById('gh-stars');
+      if (starEl) {
+        fetch('/v1/meta/stars')
+          .then(r => r.ok ? r.json() : null)
+          .then(d => { if (d && typeof d.stars === 'number') starEl.textContent = formatStars(d.stars); })
+          .catch(() => {});
+      }
+    })();
+
+    function formatStars(n) {
+      if (n >= 1000) return (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k';
+      return String(n);
+    }
+
+    // Copy the code/skill block inside the button's .copy-wrap
+    function copyCode(btn) {
+      const wrap = btn.closest('.copy-wrap');
+      const pre = wrap && wrap.querySelector('pre');
+      if (!pre) return;
+      const text = pre.innerText;
+      const done = () => {
+        btn.classList.add('copied');
+        const label = btn.querySelector('.copy-label');
+        const prev = label ? label.textContent : null;
+        if (label) label.textContent = 'Copied';
+        setTimeout(() => { btn.classList.remove('copied'); if (label) label.textContent = prev; }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(pre, done));
+      } else {
+        fallbackCopy(pre, done);
+      }
+    }
+    function fallbackCopy(pre, done) {
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(pre);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      try { document.execCommand('copy'); done(); } catch (e) { /* no-op */ }
+      sel.removeAllRanges();
+    }
 
     // API section: request-example language tabs
     function showCodeTab(lang, btn) {
