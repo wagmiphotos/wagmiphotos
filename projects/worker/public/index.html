@@ -431,7 +431,7 @@
     .library-download:hover { background: var(--red); }
     .library-status { text-align: center; color: var(--muted); padding: 40px 0; font-size: 0.9375rem; }
     .library-status a { color: var(--red); }
-    .library-more { display: block; margin: 28px auto 0; background: var(--paper); border: 1px solid var(--line); color: var(--ink); padding: 0 24px; height: 40px; }
+    .library-more { display: block; width: auto; margin: 28px auto 0; background: var(--paper); border: 1px solid var(--line); color: var(--ink); padding: 0 24px; height: 40px; }
 
     /* anchored sections/docs clear the sticky navbar when deep-linked */
     section[id], .docs-content [id] { scroll-margin-top: 84px; }
@@ -1628,6 +1628,24 @@
     }
 
     select.input-field:focus { border-color: var(--red); }
+
+    input.input-field {
+      width: 100%;
+      height: 42px;
+      background-color: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0 12px;
+      color: var(--ink);
+      font-family: var(--font-inter);
+      font-size: 0.9375rem;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    input.input-field:focus { border-color: var(--red); }
 
     /* ============ Buttons (app) ============ */
     .btn {
@@ -2990,6 +3008,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
 
         <div class="library-bar">
           <input id="library-search" class="input-field" type="search" placeholder="Search prompts, e.g. flamingo sunset…"
+                 aria-label="Search prompts"
                  oninput="onLibraryInput(this.value)" onkeydown="onLibraryKeydown(event)">
         </div>
 
