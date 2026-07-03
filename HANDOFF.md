@@ -82,6 +82,10 @@ This is the biggest open item: everything is verified offline with fakes; nothin
   falls back to CLIP-embedding captions (it refuses to seed zero vectors).
 - Seed: `uv run python -m sharedcache.backfill.seed_pd12m --limit 100`.
 - **Tune `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN`** against the seeded pool (CLIP cross-modal cosines are low, ~0.2–0.35).
+- **Deploy order dependency:** this branch requires `cd projects/worker && npx wrangler d1 migrations apply
+  sharedcache` (remote) to run **before** `npm run deploy` — migrations `0002` (`queries.generate`, backfill
+  demand tracking) and `0003` (assets browse index) must be live first. Deploying the Worker ahead of these
+  migrations breaks demand tracking and hard-errors the Python backfill.
 - Deploy the Worker: `cd projects/worker && npm run deploy`; **confirm `wrangler deploy --dry-run` lists the
   `RATE_LIMITER` binding**; then check a request returns a nearest image and the SPA loads at `/`.
 - Verify the Vectorize v2 upsert/insert ndjson framing against one live call.
