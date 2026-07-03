@@ -1,5 +1,7 @@
+import pytest
 from fastapi.testclient import TestClient
 
+from sharedcache.embedder.__main__ import require_token
 from sharedcache.embedder.app import create_app
 
 
@@ -64,3 +66,21 @@ def test_image_input_validation():
     c = client()
     assert c.post("/embed/image", content=b"").status_code == 422
     assert c.post("/embed/image", content=b"not-an-image").status_code == 422
+
+
+def test_require_token_returns_configured_value():
+    assert require_token({"EMBED_TOKEN": "abc"}) == "abc"
+
+
+def test_require_token_exits_when_missing_or_blank():
+    import pytest
+    with pytest.raises(SystemExit):
+        require_token({})
+    with pytest.raises(SystemExit):
+        require_token({"EMBED_TOKEN": "   "})
+
+
+def test_image_body_over_cap_returns_413():
+    oversize = b"x" * (10 * 1024 * 1024 + 1)
+    r = client().post("/embed/image", content=oversize)
+    assert r.status_code == 413
