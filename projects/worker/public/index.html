@@ -398,6 +398,41 @@
 
     .view-pad { padding: 40px 0 64px; }
 
+    /* ============ Library ============ */
+    .library-bar { max-width: 560px; margin: 0 auto 28px; }
+    .library-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    @media (max-width: 1000px) { .library-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 640px) { .library-grid { grid-template-columns: repeat(2, 1fr); } }
+    .library-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .library-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--paper); }
+    .library-meta { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    .library-prompt {
+      font-size: 0.8125rem; color: var(--ink); line-height: 1.35; margin: 0;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+      min-height: calc(2 * 1.35em);
+    }
+    .library-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .library-tag {
+      font-size: 0.6875rem; color: var(--muted); background: var(--paper);
+      border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px;
+    }
+    .library-download {
+      margin-top: auto; height: 34px; font-size: 0.8125rem; text-decoration: none;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--ink); color: #fff; border-radius: 8px;
+    }
+    .library-download:hover { background: var(--red); }
+    .library-status { text-align: center; color: var(--muted); padding: 40px 0; font-size: 0.9375rem; }
+    .library-status a { color: var(--red); }
+    .library-more { display: block; margin: 28px auto 0; background: var(--paper); border: 1px solid var(--line); color: var(--ink); padding: 0 24px; height: 40px; }
+
     /* anchored sections/docs clear the sticky navbar when deep-linked */
     section[id], .docs-content [id] { scroll-margin-top: 84px; }
 
@@ -2151,6 +2186,7 @@
       <div class="nav-menu" id="nav-menu">
         <div class="nav-links">
           <a href="#/pricing" id="nav-pricing" class="nav-link">Pricing</a>
+          <a href="#/library" id="nav-library" class="nav-link">Library</a>
 
           <!-- Resources mega-dropdown -->
           <div class="nav-item">
@@ -2943,6 +2979,26 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
       </div>
     </div>
 
+    <!-- VIEW: LIBRARY -->
+    <div id="view-library" class="spa-view" style="display: none;">
+      <div class="view-pad">
+        <div class="page-head">
+          <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>Library</div>
+          <h1 class="section-title">Browse the shared library</h1>
+          <p class="section-sub">Every image the cache has ever served, searchable by prompt. Download anything — it's all public-domain PD12M or cache-generated.</p>
+        </div>
+
+        <div class="library-bar">
+          <input id="library-search" class="input-field" type="search" placeholder="Search prompts, e.g. flamingo sunset…"
+                 oninput="onLibraryInput(this.value)" onkeydown="onLibraryKeydown(event)">
+        </div>
+
+        <div id="library-grid" class="library-grid"></div>
+        <div id="library-status" class="library-status" style="display: none;"></div>
+        <button id="library-more" class="btn library-more" style="display: none;" onclick="loadMoreLibrary()">Load more</button>
+      </div>
+    </div>
+
     <!-- VIEW 3: ACCOUNT & SETTINGS -->
     <div id="view-account" class="spa-view">
       <div class="view-pad">
@@ -3503,6 +3559,7 @@ curl -X POST https://wagmiphotos.dev/v1/images/generations \
       <span>Seeded with PD12M · CDLA-Permissive-2.0</span>
       <div class="footer-links">
         <a href="#/playground">Playground</a>
+        <a href="#/library">Library</a>
         <a href="#/docs">API</a>
         <a href="#/openai">OpenAI drop-in</a>
         <a href="#/clip">CLIP</a>
@@ -3548,6 +3605,7 @@ curl -X POST https://wagmiphotos.dev/v1/images/generations \
     const ROUTES = {
       '#/':           { view: 'view-home' },
       '#/pricing':    { view: 'view-pricing', link: 'nav-pricing' },
+      '#/library':    { view: 'view-library', link: 'nav-library', onShow: initLibrary },
       '#/playground': { view: 'view-playground', link: 'nav-playground' },
       '#/account':    { view: 'view-account', onShow: updateStats },
       '#/legal':      { view: 'view-legal' },
@@ -3559,7 +3617,7 @@ curl -X POST https://wagmiphotos.dev/v1/images/generations \
     const PATH_TO_HASH = {
       '/playground': '#/playground', '/docs': '#/docs', '/pricing': '#/pricing',
       '/account': '#/account', '/legal': '#/legal', '/openai': '#/openai',
-      '/clip': '#/clip', '/agents': '#/agents',
+      '/clip': '#/clip', '/agents': '#/agents', '/library': '#/library',
     };
 
     function closeDropdowns() {
@@ -3784,6 +3842,67 @@ curl -X POST https://wagmiphotos.dev/v1/images/generations \
 
     function escapeHtml(str) {
       return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    // ---- Library ----
+    const LIB_PAGE_SIZE = 24;
+    let libQuery = '', libOffset = 0, libLoaded = false, libSeq = 0, libDebounce = null;
+
+    function initLibrary() { if (!libLoaded) searchLibrary(''); }
+
+    function onLibraryInput(value) {
+      clearTimeout(libDebounce);
+      libDebounce = setTimeout(() => searchLibrary(value.trim()), 300);
+    }
+    function onLibraryKeydown(e) {
+      if (e.key === 'Enter') { clearTimeout(libDebounce); searchLibrary(e.target.value.trim()); }
+    }
+
+    function searchLibrary(q) { libQuery = q; libOffset = 0; loadLibrary(false); }
+    function loadMoreLibrary() { loadLibrary(true); }
+
+    async function loadLibrary(append) {
+      const seq = ++libSeq;
+      const grid = document.getElementById('library-grid');
+      const status = document.getElementById('library-status');
+      const moreBtn = document.getElementById('library-more');
+      if (!append) { grid.innerHTML = ''; libOffset = 0; moreBtn.style.display = 'none'; }
+      status.textContent = 'Loading…';
+      status.style.display = 'block';
+      try {
+        const params = new URLSearchParams({ limit: LIB_PAGE_SIZE, offset: libOffset });
+        if (libQuery) params.set('q', libQuery);
+        const res = await fetch('/v1/library?' + params);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (seq !== libSeq) return; // superseded by a newer search
+        libLoaded = true;
+        libOffset += data.images.length;
+        grid.insertAdjacentHTML('beforeend', data.images.map(libraryCard).join(''));
+        if (grid.children.length) {
+          status.style.display = 'none';
+        } else {
+          status.textContent = libQuery ? 'No images match “' + libQuery + '”.' : 'The library is empty.';
+        }
+        moreBtn.style.display = data.has_more ? 'block' : 'none';
+      } catch (err) {
+        if (seq !== libSeq) return;
+        status.innerHTML = 'Could not load the library. <a href="javascript:void 0" onclick="loadLibrary(' + append + ')">Retry</a>';
+        status.style.display = 'block';
+      }
+    }
+
+    function libraryCard(img) {
+      const thumb = img.thumb_url || img.medium_url || img.url;
+      const tags = [img.model_used, img.source].filter(Boolean)
+        .map(t => '<span class="library-tag">' + escapeHtml(t) + '</span>').join('');
+      return '<div class="library-card">' +
+        '<img class="library-thumb" loading="lazy" src="' + escapeHtml(thumb) + '" alt="' + escapeHtml(img.prompt) + '">' +
+        '<div class="library-meta">' +
+          '<p class="library-prompt" title="' + escapeHtml(img.prompt) + '">' + escapeHtml(img.prompt) + '</p>' +
+          '<div class="library-tags">' + tags + '</div>' +
+          '<a class="library-download" href="/v1/library/' + encodeURIComponent(img.id) + '/download">Download</a>' +
+        '</div></div>';
     }
 
     function viewProvenance() {
