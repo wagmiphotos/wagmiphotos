@@ -4,6 +4,7 @@ import { makeVectorize } from "./vectorize";
 import { clipTextEmbed } from "./embed";
 import { checkAuth } from "./auth";
 import { handleGenerate, handleKeygen, type GenBody } from "./handler";
+import { handleLibrarySearch, handleLibraryDownload } from "./library";
 
 function buildServices(env: Env): Services {
   const { assets, queries, keys } = makeD1Stores(env.DB);
@@ -69,6 +70,15 @@ export default {
       if (url.pathname === "/v1/meta/stars") {
         if (request.method !== "GET") return new Response("Not found", { status: 404 });
         return await handleStars(env);
+      }
+
+      if (url.pathname === "/v1/library" && request.method === "GET") {
+        return await handleLibrarySearch(url, buildServices(env));
+      }
+
+      const dl = url.pathname.match(/^\/v1\/library\/([^/]+)\/download$/);
+      if (dl && request.method === "GET") {
+        return await handleLibraryDownload(decodeURIComponent(dl[1]), buildServices(env), (u) => fetch(u));
       }
 
       if (url.pathname === "/v1/keys/generate" && request.method === "POST") {

@@ -101,3 +101,23 @@ it("generate: upstream throw (vectorize.query throws) -> structured 502", async 
   expect(j.error).toBe("upstream error");
   expect(j.detail).toMatch(/boom/);
 });
+
+it("library: GET returns images/has_more, POST is 404", async () => {
+  const res = await worker.fetch(new Request("https://x/v1/library"), fakeEnv());
+  expect(res.status).toBe(200);
+  const j: any = await res.json();
+  expect(j.images).toEqual([]);
+  expect(j.has_more).toBe(false);
+  const post = await worker.fetch(new Request("https://x/v1/library", { method: "POST" }), fakeEnv());
+  expect(post.status).toBe(404);
+});
+
+it("library: invalid limit -> 400", async () => {
+  const res = await worker.fetch(new Request("https://x/v1/library?limit=abc"), fakeEnv());
+  expect(res.status).toBe(400);
+});
+
+it("library download: unknown id -> 404", async () => {
+  const res = await worker.fetch(new Request("https://x/v1/library/nope/download"), fakeEnv());
+  expect(res.status).toBe(404);
+});
