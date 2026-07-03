@@ -9,6 +9,8 @@ export const DEFAULT_API_BASE_URL = "https://api.wagmi.photos/v1";
  * HTML only; anything else streams through untouched.
  */
 export async function rewritePublicUrls(res: Response, env: Env): Promise<Response> {
+  if (!res.body) return res; // null-body responses (204/205/304) have nothing to rewrite
+
   const contentType = res.headers.get("content-type") ?? "";
   if (!contentType.includes("text/html")) return res;
 

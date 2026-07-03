@@ -43,3 +43,9 @@ it("drops the stale Content-Length header on rewrite", async () => {
   expect(res.headers.get("content-length")).toBeNull();
   expect(await res.text()).toBe("https://api.dev.wagmi.photos/v1");
 });
+
+it("passes null-body responses (304) through untouched", async () => {
+  const res = new Response(null, { status: 304, headers: { "content-type": "text/html" } });
+  const out = await rewritePublicUrls(res, envWith({ PUBLIC_API_BASE_URL: "https://api.dev.wagmi.photos/v1" }));
+  expect(out).toBe(res);
+});
