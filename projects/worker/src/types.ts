@@ -4,10 +4,14 @@ export interface AssetRow {
   model_used: string | null; width: number | null; height: number | null;
   mime: string | null; source_url: string | null; locally_cached: number;
 }
+export interface LibraryAssetRow extends AssetRow { created_at: string; }
 export interface Match { id: string; score: number; }
 export interface Clip { textEmbed(prompt: string): Promise<number[]>; }
 export interface VectorizeStore { query(vector: number[], topK: number): Promise<Match[]>; }
-export interface AssetStore { getAsset(id: string): Promise<AssetRow | null>; }
+export interface AssetStore {
+  getAsset(id: string): Promise<AssetRow | null>;
+  searchAssets(i: { q: string; limit: number; offset: number }): Promise<LibraryAssetRow[]>;
+}
 export interface QueryStore {
   /** Upserts the query row and returns the row's effective generate state after merging. */
   recordQuery(i: { normalized: string; original: string; assetId: string | null; similarity: number; built: boolean; generate: boolean }): Promise<boolean>;

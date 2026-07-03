@@ -1,13 +1,26 @@
-import type { AssetRow, AssetStore, QueryStore, KeyStore } from "./types";
+import type { AssetRow, AssetStore, LibraryAssetRow, QueryStore, KeyStore } from "./types";
 
 const ASSET_COLS =
   "id, prompt, source, source_id, thumb_url, medium_url, url, model_used, width, height, mime, source_url, locally_cached";
+
+function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, (c) => "\\" + c);
+}
 
 export function makeD1Stores(db: any): { assets: AssetStore; queries: QueryStore; keys: KeyStore } {
   const assets: AssetStore = {
     async getAsset(id) {
       const row = await db.prepare(`SELECT ${ASSET_COLS} FROM assets WHERE id = ?`).bind(id).first();
       return (row as AssetRow) ?? null;
+    },
+    async searchAssets({ q, limit, offset }) {
+      const tail = "ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?";
+      const stmt = q
+        ? db.prepare(`SELECT ${ASSET_COLS}, created_at FROM assets WHERE prompt LIKE ? ESCAPE '\\' ${tail}`)
+            .bind(`%${escapeLike(q)}%`, limit, offset)
+        : db.prepare(`SELECT ${ASSET_COLS}, created_at FROM assets ${tail}`).bind(limit, offset);
+      const { results } = await stmt.all();
+      return (results ?? []) as LibraryAssetRow[];
     },
   };
   const queries: QueryStore = {

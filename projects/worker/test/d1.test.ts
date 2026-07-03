@@ -1,7 +1,7 @@
 import { it, expect } from "vitest";
 import { makeD1Stores } from "../src/d1";
 
-function fakeDb(firstResult: any = null) {
+function fakeDb(firstResult: any = null, allResults: any[] = []) {
   const calls: { sql: string; args: any[] }[] = [];
   const db: any = {
     prepare(sql: string) {
@@ -10,7 +10,7 @@ function fakeDb(firstResult: any = null) {
         bind(...args: any[]) { this._args = args; return this; },
         async first() { calls.push({ sql, args: this._args }); return firstResult; },
         async run() { calls.push({ sql, args: this._args }); return { success: true }; },
-        async all() { calls.push({ sql, args: this._args }); return { results: [] }; },
+        async all() { calls.push({ sql, args: this._args }); return { results: allResults }; },
       };
       return stmt;
     },
@@ -82,4 +82,39 @@ it("verifyKey and addKey hit api_keys", async () => {
   expect(calls[1].sql).toContain("INSERT");
   expect(calls[1].sql).toContain("api_keys");
   expect(calls[1].args).toEqual(["hashY"]);
+});
+
+it("searchAssets browse mode: no WHERE, ordered newest-first, binds limit/offset", async () => {
+  const row = { id: "a1", prompt: "p", source: "pd12m", source_id: null, thumb_url: null,
+    medium_url: null, url: "u", model_used: null, width: null, height: null,
+    mime: null, source_url: null, locally_cached: 0, created_at: "2026-07-03 00:00:00" };
+  const { db, calls } = fakeDb(null, [row]);
+  const { assets } = makeD1Stores(db);
+  const got = await assets.searchAssets({ q: "", limit: 25, offset: 0 });
+  expect(got).toEqual([row]);
+  expect(calls[0].sql).not.toContain("WHERE");
+  expect(calls[0].sql).toContain("ORDER BY created_at DESC, id DESC");
+  expect(calls[0].sql).toContain("created_at");
+  expect(calls[0].args).toEqual([25, 0]);
+});
+
+it("searchAssets query mode: LIKE over prompt with bound pattern", async () => {
+  const { db, calls } = fakeDb(null, []);
+  const { assets } = makeD1Stores(db);
+  await assets.searchAssets({ q: "fox", limit: 10, offset: 20 });
+  expect(calls[0].sql).toContain("WHERE prompt LIKE ? ESCAPE '\\'");
+  expect(calls[0].args).toEqual(["%fox%", 10, 20]);
+});
+
+it("searchAssets escapes LIKE wildcards in user input", async () => {
+  const { db, calls } = fakeDb(null, []);
+  const { assets } = makeD1Stores(db);
+  await assets.searchAssets({ q: "100%_\\", limit: 5, offset: 0 });
+  expect(calls[0].args[0]).toBe("%100\\%\\_\\\\%");
+});
+
+it("searchAssets tolerates missing results array", async () => {
+  const { db } = fakeDb(null, undefined as any);
+  const { assets } = makeD1Stores(db);
+  expect(await assets.searchAssets({ q: "", limit: 5, offset: 0 })).toEqual([]);
 });
