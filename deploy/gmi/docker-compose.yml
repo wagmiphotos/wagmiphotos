@@ -31,7 +31,7 @@ services:
     restart: unless-stopped
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.6.1
     command: tunnel run --token ${TUNNEL_TOKEN}
     depends_on:
       - embedder
