@@ -2698,9 +2698,8 @@
   <span class="tk-flag">-d</span> <span class="tk-str">'{
     "prompt": "a vintage bicycle against
                a brick wall",
-    "model": "shared-cache-gmicloud-
-              flux-schnell",
-    "cache_tolerance": 0.15
+    "cache_tolerance": 0.15,
+    "generate_on_miss": true
   }'</span></pre>
                 <pre class="code-example" data-lang="python" hidden><span class="tk-flag">from</span> openai <span class="tk-flag">import</span> OpenAI
 
@@ -2710,12 +2709,11 @@ client = OpenAI(
 )
 
 img = client.images.generate(
-    model=<span class="tk-str">"shared-cache-gmicloud"</span>
-          <span class="tk-str">"-flux-schnell"</span>,
     prompt=<span class="tk-str">"a vintage bicycle "</span>
            <span class="tk-str">"against a brick wall"</span>,
     extra_body={
-        <span class="tk-str">"cache_tolerance"</span>: <span class="tk-num">0.15</span>},
+        <span class="tk-str">"cache_tolerance"</span>: <span class="tk-num">0.15</span>,
+        <span class="tk-str">"generate_on_miss"</span>: <span class="tk-num">True</span>},
 )
 <span class="tk-cmd">print</span>(img.data[<span class="tk-num">0</span>].url)</pre>
                 <pre class="code-example" data-lang="js" hidden><span class="tk-flag">import</span> OpenAI <span class="tk-flag">from</span> <span class="tk-str">"openai"</span>;
@@ -2727,11 +2725,10 @@ img = client.images.generate(
 
 <span class="tk-flag">const</span> img = <span class="tk-flag">await</span> client.images
   .generate({
-    model: <span class="tk-str">"shared-cache-gmicloud"</span> +
-           <span class="tk-str">"-flux-schnell"</span>,
     prompt: <span class="tk-str">"a vintage bicycle "</span> +
             <span class="tk-str">"against a brick wall"</span>,
     cache_tolerance: <span class="tk-num">0.15</span>,
+    generate_on_miss: <span class="tk-num">true</span>,
   });
 console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].url);</pre>
               </div>
@@ -2745,7 +2742,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
   <span class="tk-key">"shared_cache"</span>: {
     <span class="tk-key">"result"</span>: <span class="tk-hit">"hit"</span>,
     <span class="tk-key">"similarity"</span>: <span class="tk-num">0.3124</span>,
-    <span class="tk-key">"source"</span>: <span class="tk-str">"cache"</span>,
+    <span class="tk-key">"source"</span>: <span class="tk-str">"pd12m"</span>,
     <span class="tk-key">"model_used"</span>: <span class="tk-str">"flux-schnell"</span>,
     <span class="tk-key">"cost_saved_usd"</span>: <span class="tk-num">0.04</span>
   }
@@ -2914,13 +2911,11 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
             </div>
 
             <div class="form-group">
-              <label for="model-select">Target model</label>
-              <select id="model-select" class="input-field">
-                <option value="shared-cache-openai-gpt-image-1">shared-cache-openai-gpt-image-1 (Stub Fallback)</option>
-                <option value="shared-cache-openai-dall-e-3">shared-cache-openai-dall-e-3 (DALL-E 3)</option>
-                <option value="shared-cache-google-imagen-3">shared-cache-google-imagen-3 (Imagen 3)</option>
-                <option value="shared-cache-gmicloud-flux-schnell">shared-cache-gmicloud-flux-schnell (Flux Schnell)</option>
-              </select>
+              <label for="gen-on-miss">On cache miss</label>
+              <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 0.8125rem; color: var(--muted); line-height: 1.45; text-transform: none; letter-spacing: normal; font-weight: 400; margin: 0;">
+                <input type="checkbox" id="gen-on-miss" checked style="width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; accent-color: var(--red);">
+                <span><b style="color: var(--ink); font-weight: 600;">Generate on demand.</b> If nothing close enough is cached, the prompt is queued and generated in the backend with the configured model, then stored in the shared library.</span>
+              </label>
             </div>
 
             <button id="btn-submit" class="btn btn-primary" onclick="generateImage()">
@@ -3185,7 +3180,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
     <span class="tk-key">"similarity"</span>: <span class="tk-num">0.41</span>,
     <span class="tk-key">"cost_saved_usd"</span>: <span class="tk-num">0.04</span>,
     <span class="tk-key">"model_used"</span>: <span class="tk-str">"flux-schnell"</span>,
-    <span class="tk-key">"source"</span>: <span class="tk-str">"cache"</span>,
+    <span class="tk-key">"source"</span>: <span class="tk-str">"pd12m"</span>,
     <span class="tk-key">"sizes"</span>: { <span class="tk-key">"thumb"</span>: <span class="tk-str">"…"</span>, <span class="tk-key">"medium"</span>: <span class="tk-str">"…"</span>, <span class="tk-key">"large"</span>: <span class="tk-str">"…"</span> }
   }
 }</pre>
@@ -4029,7 +4024,7 @@ curl -X POST https://wagmiphotos.dev/v1/images/generations \
 
       try {
         const apiKey = keyInput.value.trim();
-        const modelVal = document.getElementById('model-select').value;
+        const genOnMiss = document.getElementById('gen-on-miss').checked;
 
         const headers = {
           'Content-Type': 'application/json',
@@ -4041,8 +4036,8 @@ curl -X POST https://wagmiphotos.dev/v1/images/generations \
           headers: headers,
           body: JSON.stringify({
             prompt: promptVal,
-            model: modelVal,
-            cache_tolerance: tolVal
+            cache_tolerance: tolVal,
+            generate_on_miss: genOnMiss
           })
         });
 
@@ -4060,7 +4055,9 @@ curl -X POST https://wagmiphotos.dev/v1/images/generations \
         if (sc.result === 'pending' || !rawUrl) {
           // No image yet — the backfill will build it.
           outImg.removeAttribute('src');
-          placeholderMsg.textContent = 'Generating — the backfill is building this image. Check back shortly.';
+          placeholderMsg.textContent = sc.generation_queued
+            ? 'Generating — the backfill is building this image. Check back shortly.'
+            : 'No close match cached. Generation was not requested (generate on demand is off).';
           placeholder.style.display = 'flex';
           loader.style.display = 'none';
           imgWrapper.style.display = 'none';
