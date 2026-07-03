@@ -126,3 +126,12 @@ it("library download: malformed percent-encoding -> 404, not 502", async () => {
   const res = await worker.fetch(new Request("https://x/v1/library/%zz/download"), fakeEnv());
   expect(res.status).toBe(404);
 });
+
+it("serves SPA HTML with env-configured public URLs substituted", async () => {
+  const env = fakeEnv({
+    ASSETS: { fetch: async () => new Response('<a href="https://api.wagmi.photos/v1">docs</a>', { status: 200, headers: { "content-type": "text/html" } }) },
+    PUBLIC_API_BASE_URL: "https://api.dev.wagmi.photos/v1",
+  });
+  const res = await worker.fetch(new Request("https://x/"), env);
+  expect(await res.text()).toBe('<a href="https://api.dev.wagmi.photos/v1">docs</a>');
+});

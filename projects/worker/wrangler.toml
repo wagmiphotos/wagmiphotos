@@ -25,6 +25,8 @@ CLIP_TEXT_EMBED_URL = ""   # set to your CLIP ViT-L/14 text endpoint
 FLOOR_SIM_MAX = "0.35"
 FLOOR_SIM_MIN = "0.18"
 IMAGE_PRICE_USD = "0.04"
+PUBLIC_SITE_URL = "https://wagmi.photos"           # canonical site origin (override per environment / .dev.vars)
+PUBLIC_API_BASE_URL = "https://api.wagmi.photos/v1"  # documented API base rendered into docs/examples
 # Secrets (set with `wrangler secret put`): MASTER_API_KEY, CLIP_EMBED_TOKEN
 
 [assets]

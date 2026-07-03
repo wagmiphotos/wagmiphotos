@@ -5,6 +5,7 @@ import { clipTextEmbed } from "./embed";
 import { checkAuth } from "./auth";
 import { handleGenerate, handleKeygen, type GenBody } from "./handler";
 import { handleLibrarySearch, handleLibraryDownload } from "./library";
+import { rewritePublicUrls } from "./rewrite";
 
 function buildServices(env: Env): Services {
   const { assets, queries, keys } = makeD1Stores(env.DB);
@@ -114,7 +115,7 @@ export default {
       if (url.pathname.startsWith("/v1/")) {
         return new Response("Not found", { status: 404 });
       }
-      return env.ASSETS.fetch(request);
+      return await rewritePublicUrls(await env.ASSETS.fetch(request), env);
     } catch (err) {
       console.error(err);
       return Response.json({ error: "upstream error", detail: String(err) }, { status: 502 });
