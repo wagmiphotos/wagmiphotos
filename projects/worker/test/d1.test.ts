@@ -118,3 +118,21 @@ it("searchAssets tolerates missing results array", async () => {
   const { assets } = makeD1Stores(db);
   expect(await assets.searchAssets({ q: "", limit: 5, offset: 0 })).toEqual([]);
 });
+
+it("searchAssets multi-word query: ANDs one LIKE clause per token", async () => {
+  const { db, calls } = fakeDb(null, []);
+  const { assets } = makeD1Stores(db);
+  await assets.searchAssets({ q: "flamingo sunset", limit: 24, offset: 0 });
+  const likeClauseCount = calls[0].sql.split("prompt LIKE ? ESCAPE '\\'").length - 1;
+  expect(likeClauseCount).toBe(2);
+  expect(calls[0].sql).toContain("prompt LIKE ? ESCAPE '\\' AND prompt LIKE ? ESCAPE '\\'");
+  expect(calls[0].args).toEqual(["%flamingo%", "%sunset%", 24, 0]);
+});
+
+it("searchAssets whitespace-only query: browse mode (no WHERE)", async () => {
+  const { db, calls } = fakeDb(null, []);
+  const { assets } = makeD1Stores(db);
+  await assets.searchAssets({ q: "   ", limit: 24, offset: 0 });
+  expect(calls[0].sql).not.toContain("WHERE");
+  expect(calls[0].args).toEqual([24, 0]);
+});

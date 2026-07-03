@@ -121,3 +121,8 @@ it("library download: unknown id -> 404", async () => {
   const res = await worker.fetch(new Request("https://x/v1/library/nope/download"), fakeEnv());
   expect(res.status).toBe(404);
 });
+
+it("library download: malformed percent-encoding -> 404, not 502", async () => {
+  const res = await worker.fetch(new Request("https://x/v1/library/%zz/download"), fakeEnv());
+  expect(res.status).toBe(404);
+});

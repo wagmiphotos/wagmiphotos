@@ -14,10 +14,12 @@ export function makeD1Stores(db: any): { assets: AssetStore; queries: QueryStore
       return (row as AssetRow) ?? null;
     },
     async searchAssets({ q, limit, offset }) {
+      const tokens = q.split(/\s+/).filter(Boolean);
       const tail = "ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?";
-      const stmt = q
-        ? db.prepare(`SELECT ${ASSET_COLS}, created_at FROM assets WHERE prompt LIKE ? ESCAPE '\\' ${tail}`)
-            .bind(`%${escapeLike(q)}%`, limit, offset)
+      const stmt = tokens.length
+        ? db.prepare(
+            `SELECT ${ASSET_COLS}, created_at FROM assets WHERE ${tokens.map(() => "prompt LIKE ? ESCAPE '\\'").join(" AND ")} ${tail}`
+          ).bind(...tokens.map((t) => `%${escapeLike(t)}%`), limit, offset)
         : db.prepare(`SELECT ${ASSET_COLS}, created_at FROM assets ${tail}`).bind(limit, offset);
       const { results } = await stmt.all();
       return (results ?? []) as LibraryAssetRow[];

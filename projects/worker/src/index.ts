@@ -78,7 +78,13 @@ export default {
 
       const dl = url.pathname.match(/^\/v1\/library\/([^/]+)\/download$/);
       if (dl && request.method === "GET") {
-        return await handleLibraryDownload(decodeURIComponent(dl[1]), buildServices(env), (u) => fetch(u));
+        let id: string;
+        try {
+          id = decodeURIComponent(dl[1]);
+        } catch {
+          return new Response("Not found", { status: 404 });
+        }
+        return await handleLibraryDownload(id, buildServices(env), (u) => fetch(u));
       }
 
       if (url.pathname === "/v1/keys/generate" && request.method === "POST") {
