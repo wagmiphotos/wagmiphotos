@@ -30,7 +30,7 @@ class D1Client:
     def pending_queries(self, limit: int) -> list[QueryRow]:
         rows = self._query(
             "SELECT normalized_prompt, original_prompt, count FROM queries "
-            "WHERE status='pending' ORDER BY count DESC LIMIT ?", [limit])
+            "WHERE status='pending' AND generate=1 ORDER BY count DESC LIMIT ?", [limit])
         return [QueryRow(r["normalized_prompt"], r["original_prompt"], int(r["count"])) for r in rows]
 
     def mark_query_built(self, normalized_prompt: str, asset_id: str) -> None:

@@ -11,19 +11,23 @@ export function makeD1Stores(db: any): { assets: AssetStore; queries: QueryStore
     },
   };
   const queries: QueryStore = {
-    async recordQuery({ normalized, original, assetId, similarity, built }) {
+    async recordQuery({ normalized, original, assetId, similarity, built, generate }) {
       const status = built ? "built" : "pending";
-      await db.prepare(
-        `INSERT INTO queries (normalized_prompt, original_prompt, count, status, last_asset_id, last_similarity)
-         VALUES (?, ?, 1, ?, ?, ?)
+      // generate is forward-only to 1: one request asking for generation wins over any opt-out
+      const row = await db.prepare(
+        `INSERT INTO queries (normalized_prompt, original_prompt, count, status, last_asset_id, last_similarity, generate)
+         VALUES (?, ?, 1, ?, ?, ?, ?)
          ON CONFLICT(normalized_prompt) DO UPDATE SET
            count = queries.count + 1,
            original_prompt = excluded.original_prompt,
            last_similarity = excluded.last_similarity,
            last_seen = datetime('now'),
            last_asset_id = COALESCE(excluded.last_asset_id, queries.last_asset_id),
-           status = CASE WHEN queries.status = 'built' THEN 'built' ELSE excluded.status END`
-      ).bind(normalized, original, status, assetId, similarity).run();
+           status = CASE WHEN queries.status = 'built' THEN 'built' ELSE excluded.status END,
+           generate = MAX(queries.generate, excluded.generate)
+         RETURNING generate`
+      ).bind(normalized, original, status, assetId, similarity, generate ? 1 : 0).first();
+      return row ? row.generate === 1 : generate;
     },
   };
   const keys: KeyStore = {

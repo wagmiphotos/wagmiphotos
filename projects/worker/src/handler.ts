@@ -3,15 +3,19 @@ import { similarityFloor } from "./floor";
 import { normalizePrompt } from "./normalize";
 import { sha256Hex } from "./auth";
 
-export interface GenBody { prompt: string; n?: number; size?: string; cache_tolerance?: number; }
+export interface GenBody { prompt: string; n?: number; size?: string; cache_tolerance?: number; generate_on_miss?: boolean; }
 export interface GenCfg { floorSimMax: number; floorSimMin: number; imagePrice: number; now: () => number; }
 
 export async function handleGenerate(body: GenBody, s: Services, cfg: GenCfg): Promise<Response> {
   if (body.n != null && body.n !== 1) {
     return Response.json({ error: "only n=1 is supported" }, { status: 422 });
   }
+  if (body.generate_on_miss != null && typeof body.generate_on_miss !== "boolean") {
+    return Response.json({ error: "generate_on_miss must be a boolean" }, { status: 422 });
+  }
   const prompt = body.prompt ?? "";
   const tol = body.cache_tolerance ?? 0.15;
+  const generateOnMiss = body.generate_on_miss ?? true;
   const floor = similarityFloor(tol, cfg.floorSimMax, cfg.floorSimMin);
   const normalized = normalizePrompt(prompt);
 
@@ -22,20 +26,24 @@ export async function handleGenerate(body: GenBody, s: Services, cfg: GenCfg): P
 
   // empty pool: nothing to serve
   if (!best || !asset) {
+    let generationQueued = generateOnMiss;
     try {
-      await s.queries.recordQuery({ normalized, original: prompt, assetId: null, similarity: 0, built: false });
+      generationQueued = await s.queries.recordQuery({
+        normalized, original: prompt, assetId: null, similarity: 0, built: false, generate: generateOnMiss,
+      });
     } catch (e) { console.error("recordQuery failed", e); }
     return Response.json(
-      { created: cfg.now(), data: [], shared_cache: { result: "pending", similarity: 0, cost_saved_usd: 0 } },
+      { created: cfg.now(), data: [], shared_cache: { result: "pending", similarity: 0, cost_saved_usd: 0, generation_queued: generationQueued } },
       { status: 202 }
     );
   }
 
   const isHit = best.score >= floor;
   const result = isHit ? "hit" : "approximate";
+  let generationQueued = generateOnMiss;
   try {
-    await s.queries.recordQuery({
-      normalized, original: prompt, assetId: asset.id, similarity: best.score, built: isHit,
+    generationQueued = await s.queries.recordQuery({
+      normalized, original: prompt, assetId: asset.id, similarity: best.score, built: isHit, generate: generateOnMiss,
     });
   } catch (e) { console.error("recordQuery failed", e); }
   return Response.json({
@@ -48,6 +56,7 @@ export async function handleGenerate(body: GenBody, s: Services, cfg: GenCfg): P
       model_used: asset.model_used,
       source: asset.source,
       sizes: { thumb: asset.thumb_url, medium: asset.medium_url, large: asset.url },
+      ...(isHit ? {} : { generation_queued: generationQueued }),
     },
   });
 }

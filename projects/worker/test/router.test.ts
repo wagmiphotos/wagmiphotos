@@ -72,6 +72,24 @@ it("healthz: GET ok, POST 404 (method-gated)", async () => {
   expect(post.status).toBe(404);
 });
 
+it("stars: GET returns {stars} from GitHub, POST is 404", async () => {
+  vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ stargazers_count: 42 }), { status: 200 }));
+  const res = await worker.fetch(new Request("https://x/v1/meta/stars"), fakeEnv());
+  expect(res.status).toBe(200);
+  const j: any = await res.json();
+  expect(j.stars).toBe(42);
+  const post = await worker.fetch(new Request("https://x/v1/meta/stars", { method: "POST" }), fakeEnv());
+  expect(post.status).toBe(404);
+});
+
+it("stars: GitHub failure degrades to {stars: null}, still 200", async () => {
+  vi.stubGlobal("fetch", async () => new Response("nope", { status: 404 }));
+  const res = await worker.fetch(new Request("https://x/v1/meta/stars"), fakeEnv());
+  expect(res.status).toBe(200);
+  const j: any = await res.json();
+  expect(j.stars).toBeNull();
+});
+
 it("generate: upstream throw (vectorize.query throws) -> structured 502", async () => {
   vi.stubGlobal("fetch", async () => new Response(JSON.stringify([[0.1, 0.2]]), { status: 200 }));
   const res = await worker.fetch(

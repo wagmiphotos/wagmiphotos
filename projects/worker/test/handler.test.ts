@@ -88,6 +88,60 @@ it("match found but asset row missing -> 202 pending", async () => {
   expect((s as any)._recorded[0]).toMatchObject({ built: false, assetId: null });
 });
 
+it("rejects non-boolean generate_on_miss with 422", async () => {
+  const s = fakeServices();
+  const res = await handleGenerate({ prompt: "x", generate_on_miss: "no" } as any, s, cfg);
+  expect(res.status).toBe(422);
+});
+
+it("miss: generate_on_miss defaults to true and is reported as generation_queued", async () => {
+  const s = fakeServices(); // no matches -> 202
+  const res = await handleGenerate({ prompt: "nothing here" }, s, cfg);
+  expect(res.status).toBe(202);
+  const j: any = await res.json();
+  expect(j.shared_cache.generation_queued).toBe(true);
+  expect((s as any)._recorded[0]).toMatchObject({ built: false, generate: true });
+});
+
+it("miss with generate_on_miss=false: recorded but not queued", async () => {
+  const s = fakeServices();
+  const res = await handleGenerate({ prompt: "nothing here", generate_on_miss: false }, s, cfg);
+  expect(res.status).toBe(202);
+  const j: any = await res.json();
+  expect(j.shared_cache.generation_queued).toBe(false);
+  expect((s as any)._recorded[0]).toMatchObject({ built: false, generate: false });
+});
+
+it("miss with generate_on_miss=false but prompt already queued -> generation_queued true", async () => {
+  // store reports the merged state: an earlier request already asked for generation
+  const s = fakeServices({ queries: { recordQuery: async () => true } });
+  const res = await handleGenerate({ prompt: "nothing here", generate_on_miss: false }, s, cfg);
+  const j: any = await res.json();
+  expect(j.shared_cache.generation_queued).toBe(true);
+});
+
+it("approximate includes generation_queued, hit does not", async () => {
+  const s = fakeServices();
+  (s as any)._assets.set("a1", asset());
+  (s as any)._matches.push({ id: "a1", score: 0.20 }); // below floor -> approximate
+  const approx: any = await (await handleGenerate({ prompt: "a fox", generate_on_miss: false }, s, cfg)).json();
+  expect(approx.shared_cache.result).toBe("approximate");
+  expect(approx.shared_cache.generation_queued).toBe(false);
+
+  (s as any)._matches[0] = { id: "a1", score: 0.40 }; // above floor -> hit
+  const hit: any = await (await handleGenerate({ prompt: "a fox" }, s, cfg)).json();
+  expect(hit.shared_cache.result).toBe("hit");
+  expect(hit.shared_cache.generation_queued).toBeUndefined();
+});
+
+it("miss: recordQuery throws -> 202 still reports the requested generate flag", async () => {
+  const s = fakeServices({ queries: { recordQuery: async () => { throw new Error("d1 down"); } } });
+  const res = await handleGenerate({ prompt: "nothing here", generate_on_miss: false }, s, cfg);
+  expect(res.status).toBe(202);
+  const j: any = await res.json();
+  expect(j.shared_cache.generation_queued).toBe(false);
+});
+
 it("keygen mints and stores a hashed key", async () => {
   const s = fakeServices();
   const res = await handleKeygen(new Request("https://x", { headers: { "CF-Connecting-IP": "1.2.3.4" } }), s, () => "sc-fixed");

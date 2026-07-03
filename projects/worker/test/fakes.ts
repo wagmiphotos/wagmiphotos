@@ -9,7 +9,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
     clip: { textEmbed: async () => [0.1, 0.2, 0.3] },
     vectorize: { query: async () => matches },
     assets: { getAsset: async (id) => assets.get(id) ?? null },
-    queries: { recordQuery: async (i) => { recorded.push(i); } },
+    queries: { recordQuery: async (i) => { recorded.push(i); return i.generate; } },
     keys: { verifyKey: async (h) => keyHashes.has(h), addKey: async (h) => { keyHashes.add(h); } },
     rateLimiter: { limit: async () => true },
   };

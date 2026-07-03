@@ -17,6 +17,7 @@ def test_pending_queries_orders_and_maps(monkeypatch):
     assert out == [QueryRow("a fox", "A Fox", 5)]
     sql, params = calls[0]
     assert "status='pending'" in sql and "ORDER BY count DESC" in sql and params == [10]
+    assert "generate=1" in sql  # opted-out prompts are never picked up by the backfill
 
 def test_mark_query_built_sends_update(monkeypatch):
     c, calls = _client(monkeypatch, [[]])

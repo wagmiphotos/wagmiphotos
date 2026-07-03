@@ -27,6 +27,36 @@ function genKey(): string {
   return `sc-${b64}`;
 }
 
+// GitHub star count for the header badge. Cached at the edge ~10 min so we never
+// hit GitHub's unauthenticated rate limit per visitor. Always 200s with {stars}
+// (null when unavailable) so the frontend can degrade gracefully.
+async function handleStars(env: Env): Promise<Response> {
+  const repo = env.GITHUB_REPO || "sharedcache/sharedcache";
+  const cacheKey = new Request(`https://wagmiphotos.internal/meta/stars/${repo}`);
+  try {
+    const cache = (globalThis as any).caches?.default;
+    if (cache) {
+      const hit = await cache.match(cacheKey);
+      if (hit) return hit;
+    }
+    const gh = await fetch(`https://api.github.com/repos/${repo}`, {
+      headers: { "User-Agent": "wagmiphotos", Accept: "application/vnd.github+json" },
+    });
+    let stars: number | null = null;
+    if (gh.ok) {
+      const data: any = await gh.json();
+      if (typeof data?.stargazers_count === "number") stars = data.stargazers_count;
+    }
+    const res = Response.json({ stars }, { headers: { "Cache-Control": "public, max-age=600" } });
+    const cache2 = (globalThis as any).caches?.default;
+    if (cache2 && stars != null) await cache2.put(cacheKey, res.clone());
+    return res;
+  } catch (e) {
+    console.error("stars fetch failed", e);
+    return Response.json({ stars: null });
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
@@ -34,6 +64,11 @@ export default {
       if (url.pathname === "/healthz") {
         if (request.method !== "GET") return new Response("Not found", { status: 404 });
         return Response.json({ status: "ok" });
+      }
+
+      if (url.pathname === "/v1/meta/stars") {
+        if (request.method !== "GET") return new Response("Not found", { status: 404 });
+        return await handleStars(env);
       }
 
       if (url.pathname === "/v1/keys/generate" && request.method === "POST") {

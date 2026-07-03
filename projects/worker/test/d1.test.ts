@@ -39,7 +39,7 @@ it("getAsset returns null when missing", async () => {
 it("recordQuery upserts with count increment and forward-only built", async () => {
   const { db, calls } = fakeDb();
   const { queries } = makeD1Stores(db);
-  await queries.recordQuery({ normalized: "a fox", original: "A Fox", assetId: "a1", similarity: 0.3, built: true });
+  await queries.recordQuery({ normalized: "a fox", original: "A Fox", assetId: "a1", similarity: 0.3, built: true, generate: true });
   expect(calls[0].sql).toContain("INSERT INTO queries");
   expect(calls[0].sql).toContain("ON CONFLICT");
   expect(calls[0].sql).toContain("count = queries.count + 1");
@@ -48,6 +48,28 @@ it("recordQuery upserts with count increment and forward-only built", async () =
   expect(calls[0].args).toContain("a fox");
   // assert the forward-only clause: built rows never revert to pending
   expect(calls[0].sql).toContain("CASE WHEN queries.status = 'built' THEN 'built' ELSE excluded.status END");
+});
+
+it("recordQuery merges generate forward-only: generation wins over opt-out", async () => {
+  // DB row already wants generation; a generate_on_miss=false request must not downgrade it
+  const { db, calls } = fakeDb({ generate: 1 });
+  const { queries } = makeD1Stores(db);
+  const effective = await queries.recordQuery({
+    normalized: "a fox", original: "A Fox", assetId: null, similarity: 0, built: false, generate: false,
+  });
+  expect(calls[0].sql).toContain("generate = MAX(queries.generate, excluded.generate)");
+  expect(calls[0].sql).toContain("RETURNING generate");
+  expect(calls[0].args).toContain(0); // request's opt-out bound as 0
+  expect(effective).toBe(true); // merged state: still queued for generation
+});
+
+it("recordQuery returns effective generate=false when row stays opted out", async () => {
+  const { db } = fakeDb({ generate: 0 });
+  const { queries } = makeD1Stores(db);
+  const effective = await queries.recordQuery({
+    normalized: "a fox", original: "A Fox", assetId: null, similarity: 0, built: false, generate: false,
+  });
+  expect(effective).toBe(false);
 });
 
 it("verifyKey and addKey hit api_keys", async () => {
