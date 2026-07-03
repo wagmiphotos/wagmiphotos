@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { handleLibrarySearch } from "../src/library";
+import { handleLibrarySearch, handleLibraryDownload, assetFilename } from "../src/library";
 import { fakeServices } from "./fakes";
 import type { LibraryAssetRow } from "../src/types";
 
@@ -45,4 +45,53 @@ it("search: non-numeric limit/offset and negative or fractional offset -> 400", 
     const j: any = await res.json();
     expect(typeof j.error).toBe("string");
   }
+});
+
+function okUpstream(contentType: string | null = "image/webp"): (url: string) => Promise<Response> {
+  return async () => new Response("BYTES", { status: 200, headers: contentType ? { "content-type": contentType } : {} });
+}
+
+it("download: unknown id -> 404", async () => {
+  const s = fakeServices();
+  const res = await handleLibraryDownload("nope", s, okUpstream());
+  expect(res.status).toBe(404);
+});
+
+it("download: streams upstream with attachment filename from prompt slug", async () => {
+  const s = fakeServices();
+  (s as any)._assets.set("a1", libRow({ prompt: "A Fox! Jumping Over 2 Logs" }));
+  let fetched = "";
+  const res = await handleLibraryDownload("a1", s, async (u) => { fetched = u; return okUpstream()(u); });
+  expect(res.status).toBe(200);
+  expect(fetched).toBe("https://cdn/large.webp");
+  expect(res.headers.get("content-type")).toBe("image/webp");
+  expect(res.headers.get("content-disposition")).toBe('attachment; filename="a-fox-jumping-over-2-logs.webp"');
+  expect(await res.text()).toBe("BYTES");
+});
+
+it("download: upstream non-OK or thrown fetch -> 502", async () => {
+  const s = fakeServices();
+  (s as any)._assets.set("a1", libRow());
+  const bad = await handleLibraryDownload("a1", s, async () => new Response("nope", { status: 403 }));
+  expect(bad.status).toBe(502);
+  const threw = await handleLibraryDownload("a1", s, async () => { throw new Error("net"); });
+  expect(threw.status).toBe(502);
+});
+
+it("download: content type falls back to asset mime, then octet-stream", async () => {
+  const s = fakeServices();
+  (s as any)._assets.set("a1", libRow({ mime: "image/png" }));
+  const res = await handleLibraryDownload("a1", s, okUpstream(null));
+  expect(res.headers.get("content-type")).toBe("image/png");
+  (s as any)._assets.set("a2", libRow({ id: "a2", mime: null }));
+  const res2 = await handleLibraryDownload("a2", s, okUpstream(null));
+  expect(res2.headers.get("content-type")).toBe("application/octet-stream");
+});
+
+it("assetFilename: slugs, truncates to 60 chars, falls back to id, maps mime to ext", () => {
+  expect(assetFilename({ id: "x", prompt: "Neon:  City!!", mime: null }, "image/jpeg")).toBe("neon-city.jpg");
+  expect(assetFilename({ id: "x", prompt: "???", mime: null }, null)).toBe("x.bin");
+  const long = "a".repeat(80);
+  expect(assetFilename({ id: "x", prompt: long, mime: "image/gif" }, null)).toBe("a".repeat(60) + ".gif");
+  expect(assetFilename({ id: "x", prompt: "p", mime: "image/webp; charset=binary" }, null)).toBe("p.webp");
 });

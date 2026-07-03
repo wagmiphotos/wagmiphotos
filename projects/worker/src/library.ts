@@ -24,3 +24,53 @@ export async function handleLibrarySearch(url: URL, s: Services): Promise<Respon
   const has_more = rows.length > limit;
   return Response.json({ images: rows.slice(0, limit), has_more });
 }
+
+const MIME_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+
+export function assetFilename(
+  asset: { id: string; prompt: string; mime: string | null },
+  contentType: string | null
+): string {
+  const slug = asset.prompt
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+    .replace(/-+$/, "");
+  const mime = (contentType ?? asset.mime ?? "").split(";")[0].trim();
+  const ext = MIME_EXT[mime] ?? "bin";
+  return `${slug || asset.id}.${ext}`;
+}
+
+export async function handleLibraryDownload(
+  id: string,
+  s: Services,
+  fetchFn: (url: string) => Promise<Response>
+): Promise<Response> {
+  const asset = await s.assets.getAsset(id);
+  if (!asset) return Response.json({ error: "not found" }, { status: 404 });
+
+  let upstream: Response;
+  try {
+    upstream = await fetchFn(asset.url);
+  } catch {
+    return Response.json({ error: "upstream fetch failed" }, { status: 502 });
+  }
+  if (!upstream.ok) return Response.json({ error: "upstream fetch failed" }, { status: 502 });
+
+  const contentType = upstream.headers.get("content-type");
+  // Treat Response's normalized text/plain default as "not explicitly set"
+  const contentTypeToUse = contentType && contentType !== "text/plain;charset=UTF-8" ? contentType : null;
+  return new Response(upstream.body, {
+    status: 200,
+    headers: {
+      "Content-Type": contentTypeToUse ?? asset.mime ?? "application/octet-stream",
+      "Content-Disposition": `attachment; filename="${assetFilename(asset, contentTypeToUse)}"`,
+    },
+  });
+}
