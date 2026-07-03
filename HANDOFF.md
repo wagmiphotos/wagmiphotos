@@ -73,6 +73,18 @@ cd projects/worker && npx wrangler dev
 - Local overrides go in `projects/worker/.dev.vars` (git-ignored). The SPA's
   own requests are origin-relative, so local dev needs no configuration.
 
+## GMI box (embedder + backfill)
+
+- One CPU GMI instance runs `deploy/gmi/docker-compose.yml`: the CLIP
+  ViT-L/14 embedding service (`projects/embedder/`), the backfill worker,
+  and a Cloudflare Tunnel publishing the embedder as `embed.wagmi.photos`.
+- The Worker's `CLIP_TEXT_EMBED_URL` points at that hostname; its bearer
+  token is the `CLIP_EMBED_TOKEN` secret (`wrangler secret put`). The
+  backfill reaches the embedder in-network (`http://embedder:8000`).
+- Full runbook: `deploy/gmi/README.md`. Local dev without a tunnel: run the
+  embedder locally and point `projects/worker/.dev.vars`
+  `CLIP_TEXT_EMBED_URL` at it.
+
 ## Design trail
 
 - `docs/superpowers/specs/2026-07-01-cloudflare-edge-cache-design.md` — the Worker + backfill re-architecture.

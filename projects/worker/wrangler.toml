@@ -21,7 +21,7 @@ namespace_id = "1001"
 simple = { limit = 10, period = 60 }
 
 [vars]
-CLIP_TEXT_EMBED_URL = ""   # set to your CLIP ViT-L/14 text endpoint
+CLIP_TEXT_EMBED_URL = "https://embed.wagmi.photos/embed/text"  # GMI box via Cloudflare Tunnel (deploy/gmi)
 FLOOR_SIM_MAX = "0.35"
 FLOOR_SIM_MIN = "0.18"
 IMAGE_PRICE_USD = "0.04"
