@@ -62,6 +62,17 @@ uv run python -m sharedcache.backfill --once
 cd projects/worker && npx wrangler dev
 ```
 
+## Domains & public URLs
+
+- Route BOTH custom domains to this worker: `wagmi.photos` (site + API) and
+  `api.wagmi.photos` (documented API base for external developers).
+- `[vars]` `PUBLIC_SITE_URL` / `PUBLIC_API_BASE_URL` hold the canonical URLs.
+  The SPA ships them as defaults; the worker substitutes overrides at serve
+  time (`src/rewrite.ts`), so a dev deployment (e.g. `dev.wagmi.photos` /
+  `api.dev.wagmi.photos`) renders its own URLs in docs and examples.
+- Local overrides go in `projects/worker/.dev.vars` (git-ignored). The SPA's
+  own requests are origin-relative, so local dev needs no configuration.
+
 ## Design trail
 
 - `docs/superpowers/specs/2026-07-01-cloudflare-edge-cache-design.md` — the Worker + backfill re-architecture.

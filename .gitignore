@@ -9,6 +9,7 @@ __pycache__/
 node_modules/
 projects/worker/node_modules/
 .wrangler/
+.dev.vars
 
 # Python build artifacts
 dist/
