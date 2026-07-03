@@ -64,13 +64,11 @@ export async function handleLibraryDownload(
   if (!upstream.ok) return Response.json({ error: "upstream fetch failed" }, { status: 502 });
 
   const contentType = upstream.headers.get("content-type");
-  // Treat Response's normalized text/plain default as "not explicitly set"
-  const contentTypeToUse = contentType && contentType !== "text/plain;charset=UTF-8" ? contentType : null;
   return new Response(upstream.body, {
     status: 200,
     headers: {
-      "Content-Type": contentTypeToUse ?? asset.mime ?? "application/octet-stream",
-      "Content-Disposition": `attachment; filename="${assetFilename(asset, contentTypeToUse)}"`,
+      "Content-Type": contentType ?? asset.mime ?? "application/octet-stream",
+      "Content-Disposition": `attachment; filename="${assetFilename(asset, contentType)}"`,
     },
   });
 }

@@ -48,7 +48,11 @@ it("search: non-numeric limit/offset and negative or fractional offset -> 400", 
 });
 
 function okUpstream(contentType: string | null = "image/webp"): (url: string) => Promise<Response> {
-  return async () => new Response("BYTES", { status: 200, headers: contentType ? { "content-type": contentType } : {} });
+  return async () => {
+    const res = new Response("BYTES", { status: 200, headers: contentType ? { "content-type": contentType } : {} });
+    if (!contentType) res.headers.delete("content-type");
+    return res;
+  };
 }
 
 it("download: unknown id -> 404", async () => {
