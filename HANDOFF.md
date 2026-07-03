@@ -1,7 +1,7 @@
 # SharedCache — Handoff / Resume Here
 
 _Last updated: 2026-07-02. Everything below is merged to `main` and green
-(Python **42 passed**, Worker **34 passed**)._
+(Python **52 passed**, Worker **69 passed**)._
 
 ## What SharedCache is
 
@@ -47,10 +47,10 @@ Python dep graph: `common ← generation ← backfill`. Imports are `sharedcache
 
 ```bash
 # Python (offline, fakes for D1/Vectorize/CLIP/B2)
-uv sync && uv run pytest -q                      # 42 passed
+uv sync && uv run pytest -q                      # 52 passed
 
 # Worker (offline, faked bindings — no Miniflare)
-cd projects/worker && npm install && npm test    # 34 passed
+cd projects/worker && npm install && npm test    # 69 passed
 
 # Build each Python package into a wheel
 uv build --package sharedcache-{common,generation,backfill}
