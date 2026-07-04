@@ -122,7 +122,7 @@ The SPA (`projects/worker/public/index.html`) still says **"WagmiPhotos"**; the 
   `source_url`_ — add a size cap + allowlist then); spend cap is per-tick not lifetime (consider a daily budget);
   `build_worker_from_settings` silently falls back to `StubGenerator` when keys are absent (warn when unattended);
   generated-asset `manifest.json` isn't persisted to B2 (spec §4.3); backfill Dockerfile runs as root.
-- **Worker:** master-key compare isn't constant-time; falsy-but-valid env values (`"0"`) fall through to
+- **Worker:** falsy-but-valid env values (`"0"`) fall through to
   defaults unvalidated; per-key/per-IP throttle on `/v1/images/generations` (only keygen is rate-limited).
 - **Tooling:** dev-only `npm audit` findings in wrangler/vitest/esbuild transitive deps.
 
