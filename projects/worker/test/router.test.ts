@@ -55,6 +55,14 @@ it("generate: empty pool -> 202 (open dev, clip mocked)", async () => {
   expect(res.status).toBe(202);
 });
 
+it("generate: 429 when the rate limiter denies the request", async () => {
+  const res = await worker.fetch(
+    new Request("https://x/v1/images/generations", { method: "POST", body: JSON.stringify({ prompt: "hi" }) }),
+    fakeEnv({ RATE_LIMITER: { limit: async () => ({ success: false }) } })
+  );
+  expect(res.status).toBe(429);
+});
+
 it("generate: null JSON body -> 400", async () => {
   const res = await worker.fetch(
     new Request("https://x/v1/images/generations", { method: "POST", body: "null" }),
@@ -125,6 +133,15 @@ it("library download: unknown id -> 404", async () => {
 it("library download: malformed percent-encoding -> 404, not 502", async () => {
   const res = await worker.fetch(new Request("https://x/v1/library/%zz/download"), fakeEnv());
   expect(res.status).toBe(404);
+});
+
+it("library download: non-GET method -> 404 (method-gated)", async () => {
+  for (const method of ["POST", "PUT", "DELETE"]) {
+    const res = await worker.fetch(
+      new Request("https://x/v1/library/a1/download", { method }), fakeEnv()
+    );
+    expect(res.status).toBe(404);
+  }
 });
 
 it("serves SPA HTML with env-configured public URLs substituted", async () => {

@@ -6,6 +6,7 @@ import { checkAuth } from "./auth";
 import { handleGenerate, handleKeygen, type GenBody } from "./handler";
 import { handleLibrarySearch, handleLibraryDownload } from "./library";
 import { rewritePublicUrls } from "./rewrite";
+import { numEnv } from "./config";
 
 function buildServices(env: Env): Services {
   const { assets, queries, keys } = makeD1Stores(env.DB);
@@ -97,6 +98,12 @@ export default {
         if (!(await checkAuth(request, env, services.keys))) {
           return Response.json({ error: "Invalid API Key" }, { status: 401 });
         }
+        // Throttle the expensive path (CLIP embed + Vectorize) per client IP,
+        // namespaced so it doesn't share a bucket with keygen.
+        const genIp = request.headers.get("CF-Connecting-IP") ?? "unknown";
+        if (!(await services.rateLimiter.limit(`gen:${genIp}`))) {
+          return Response.json({ error: "Too many requests" }, { status: 429 });
+        }
         let body: GenBody;
         try { body = (await request.json()) as GenBody; }
         catch { return Response.json({ error: "invalid JSON body" }, { status: 400 }); }
@@ -104,9 +111,9 @@ export default {
           return Response.json({ error: "body must be a JSON object" }, { status: 400 });
         }
         const cfg = {
-          floorSimMax: env.FLOOR_SIM_MAX ? Number(env.FLOOR_SIM_MAX) : 0.35,
-          floorSimMin: env.FLOOR_SIM_MIN ? Number(env.FLOOR_SIM_MIN) : 0.18,
-          imagePrice: env.IMAGE_PRICE_USD ? Number(env.IMAGE_PRICE_USD) : 0.04,
+          floorSimMax: numEnv(env.FLOOR_SIM_MAX, 0.35),
+          floorSimMin: numEnv(env.FLOOR_SIM_MIN, 0.18),
+          imagePrice: numEnv(env.IMAGE_PRICE_USD, 0.04),
           now: () => Math.floor(Date.now() / 1000),
         };
         return await handleGenerate(body, services, cfg);
