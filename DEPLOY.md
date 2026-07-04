@@ -119,3 +119,43 @@ docker compose logs backfill --tail 20           # (on the box) polling loop tic
 - Worker: `npx wrangler rollback` (or redeploy a prior commit).
 - Migrations are forward-only — do not delete D1 data to "undo"; restore from a
   D1 export if needed.
+
+---
+
+## Still open (do later)
+
+Everything is code-complete and green (Python 58 / Worker 75); these are the
+loose ends to pick up when you resume. Full backlog + design trail: root
+`HANDOFF.md` and `docs/HANDOFF-2026-07-04.md`.
+
+### During / right after deploy
+- **PD12M image vectors** (step 7): confirm PD12M exposes precomputed CLIP
+  *image* vectors. If not, the seeder embeds captions instead — match quality
+  differs; decide before a large seed.
+- **Tune the floor** (step 7): set `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN` from the real
+  seeded pool (cross-modal cosines ~0.2–0.35), not the 0.35/0.18 guess.
+- **Build-verify the non-root images** — they pass `docker build --check` but
+  were never built here (torch/CLIP weights). On the box:
+  `cd deploy/gmi && docker compose up -d --build`, then
+  `docker compose exec embedder id` should print `uid=10001`, and
+  `docker compose logs embedder` should show weights loaded (no permission
+  errors on the open_clip cache). Same for `backfill` (`uv run --no-sync`).
+
+### Deferred hardening (none blocking; triage before real traffic)
+- **Backfill rehost:** 25 MB size cap is in; add a **host allowlist** once
+  `source_url` can be user-influenced (today it's trusted PD12M seed only).
+- **Worker:** add edge caching on the `/v1/library*` endpoints.
+- **Embedder:** third-party `StarletteDeprecationWarning` (httpx vs httpx2) —
+  cosmetic, library-level.
+- **Tooling:** dev-only `npm audit` findings in wrangler/vitest/esbuild
+  transitive deps.
+
+### Follow-ups worth scheduling
+- **Real-D1 (miniflare) integration harness** — retires the "fakeDb records SQL
+  but never executes it" blind spot.
+- **Prompt→embedding caching in the Worker** — cuts most CLIP calls off the hot
+  path (repeat prompts are the whole premise).
+- **SPA smoke test** — a tiny Playwright test for the hit / approximate /
+  pending render states (currently verified by inspection only).
+- **Branding:** the SPA reads `WagmiPhotos` / `wagmi.photos`; the repo/project
+  is `SharedCache`. Pick one and reconcile (see `HANDOFF.md` §2).
