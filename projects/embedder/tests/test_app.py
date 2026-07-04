@@ -62,6 +62,13 @@ def test_text_input_validation():
                   headers={"Content-Type": "application/json"}).status_code == 422
 
 
+def test_text_embed_rejects_valid_but_non_dict_json_body():
+    c = client()
+    assert c.post("/embed/text", json=["a", "b"]).status_code == 422
+    assert c.post("/embed/text", json="just a string").status_code == 422
+    assert c.post("/embed/text", json=42).status_code == 422
+
+
 def test_image_input_validation():
     c = client()
     assert c.post("/embed/image", content=b"").status_code == 422

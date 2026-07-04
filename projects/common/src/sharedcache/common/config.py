@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     worker_interval_seconds: int = 300
     worker_batch_size: int = 5
     worker_max_spend_usd: float = 5.0
+    worker_max_lifetime_spend_usd: float | None = None
     keygen_rate_per_hour: int = 10
     cf_account_id: str | None = None
     cf_api_token: str | None = None
