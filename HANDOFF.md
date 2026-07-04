@@ -1,7 +1,7 @@
 # SharedCache — Handoff / Resume Here
 
-_Last updated: 2026-07-02. Everything below is merged to `main` and green
-(Python **52 passed**, Worker **69 passed**)._
+_Last updated: 2026-07-04. Everything below is merged to `main` and green
+(Python **58 passed**, Worker **75 passed**)._
 
 ## What SharedCache is
 
@@ -118,12 +118,11 @@ The SPA (`projects/worker/public/index.html`) still says **"WagmiPhotos"**; the 
 **SharedCache**. Pick one and reconcile.
 
 ### 3. Deferred hardening (from the reviews — none blocking, triage before real traffic)
-- **Backfill:** rehost download is unbounded / no host allowlist (SSRF/OOM risk _once user input can set
-  `source_url`_ — add a size cap + allowlist then); spend cap is per-tick not lifetime (consider a daily budget);
-  `build_worker_from_settings` silently falls back to `StubGenerator` when keys are absent (warn when unattended);
-  generated-asset `manifest.json` isn't persisted to B2 (spec §4.3); backfill Dockerfile runs as root.
-- **Worker:** falsy-but-valid env values (`"0"`) fall through to
-  defaults unvalidated; per-key/per-IP throttle on `/v1/images/generations` (only keygen is rate-limited).
+Most items are now closed — see `docs/HANDOFF-2026-07-04.md` → "Addressed since". Remaining:
+- **Backfill:** rehost now has a 25 MB size cap, but still no host allowlist — add one _once user
+  input can set `source_url`_ (today it's trusted PD12M seed data only).
+- **Deploy:** the non-root Dockerfiles pass `docker build --check` but haven't been built end-to-end
+  here (torch/CLIP weights) — do a `docker compose up --build` smoke check on the GMI box.
 - **Tooling:** dev-only `npm audit` findings in wrangler/vitest/esbuild transitive deps.
 
 ### 4. Nice-to-haves
