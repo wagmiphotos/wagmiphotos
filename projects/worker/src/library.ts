@@ -1,7 +1,22 @@
-import type { Services } from "./types";
+import type { Services, LibraryAssetRow } from "./types";
+
+// The documented public shape for a library image (spec §GET /v1/library).
+// Internal columns (source_id, source_url, locally_cached) are intentionally dropped.
+function publicAsset(r: LibraryAssetRow) {
+  return {
+    id: r.id, prompt: r.prompt, thumb_url: r.thumb_url, medium_url: r.medium_url,
+    url: r.url, width: r.width, height: r.height, mime: r.mime,
+    model_used: r.model_used, source: r.source, created_at: r.created_at,
+  };
+}
+
+const MAX_Q_LEN = 200;
 
 export async function handleLibrarySearch(url: URL, s: Services): Promise<Response> {
   const q = url.searchParams.get("q") ?? "";
+  if (q.length > MAX_Q_LEN) {
+    return Response.json({ error: `q must be at most ${MAX_Q_LEN} characters` }, { status: 400 });
+  }
   const rawLimit = url.searchParams.get("limit");
   const rawOffset = url.searchParams.get("offset");
 
@@ -22,7 +37,7 @@ export async function handleLibrarySearch(url: URL, s: Services): Promise<Respon
 
   const rows = await s.assets.searchAssets({ q, limit: limit + 1, offset });
   const has_more = rows.length > limit;
-  return Response.json({ images: rows.slice(0, limit), has_more });
+  return Response.json({ images: rows.slice(0, limit).map(publicAsset), has_more });
 }
 
 const MIME_EXT: Record<string, string> = {

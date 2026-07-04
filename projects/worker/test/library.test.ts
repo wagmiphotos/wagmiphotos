@@ -20,6 +20,22 @@ it("search: defaults q='' limit 24 offset 0, fetches limit+1", async () => {
   expect((s as any)._searchCalls[0]).toEqual({ q: "", limit: 25, offset: 0 });
 });
 
+it("search: response projects to documented public shape, omits internal columns", async () => {
+  const s = fakeServices();
+  (s as any)._libraryRows.push(libRow());
+  const res = await handleLibrarySearch(new URL("https://x/v1/library"), s);
+  const j: any = await res.json();
+  const img = j.images[0];
+  expect(img).not.toHaveProperty("source_id");
+  expect(img).not.toHaveProperty("source_url");
+  expect(img).not.toHaveProperty("locally_cached");
+  expect(img).toEqual({
+    id: "a1", prompt: "a fox", thumb_url: "T", medium_url: "M",
+    url: "https://cdn/large.webp", width: 10, height: 20, mime: "image/webp",
+    model_used: "flux", source: "pd12m", created_at: "2026-07-03 00:00:00",
+  });
+});
+
 it("search: has_more true when a full extra row exists, images trimmed to limit", async () => {
   const s = fakeServices();
   for (let i = 0; i < 25; i++) (s as any)._libraryRows.push(libRow({ id: "a" + i }));
@@ -35,6 +51,17 @@ it("search: passes q and offset through, clamps numeric limit to 1..60", async (
   expect((s as any)._searchCalls[0]).toEqual({ q: "fox", limit: 61, offset: 48 });
   await handleLibrarySearch(new URL("https://x/v1/library?limit=0"), s);
   expect((s as any)._searchCalls[1]).toEqual({ q: "", limit: 2, offset: 0 });
+});
+
+it("search: q over 200 chars -> 400, q at the cap still searches", async () => {
+  const s = fakeServices();
+  const tooLong = await handleLibrarySearch(new URL("https://x/v1/library?q=" + "a".repeat(201)), s);
+  expect(tooLong.status).toBe(400);
+  expect(typeof (await tooLong.json() as any).error).toBe("string");
+  expect((s as any)._searchCalls).toHaveLength(0);
+  const atCap = await handleLibrarySearch(new URL("https://x/v1/library?q=" + "a".repeat(200)), s);
+  expect(atCap.status).toBe(200);
+  expect((s as any)._searchCalls[0].q).toHaveLength(200);
 });
 
 it("search: non-numeric limit/offset and negative or fractional offset -> 400", async () => {
