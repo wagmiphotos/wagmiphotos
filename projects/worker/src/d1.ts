@@ -1,4 +1,7 @@
-import type { AssetRow, AssetStore, LibraryAssetRow, QueryStore, KeyStore } from "./types";
+import type {
+  AssetRow, AssetStore, LibraryAssetRow, QueryStore, KeyStore,
+  User, UserStore, SessionStore, LoginTokenStore,
+} from "./types";
 
 const ASSET_COLS =
   "id, prompt, source, source_id, thumb_url, medium_url, url, model_used, width, height, mime, source_url, locally_cached";
@@ -7,7 +10,10 @@ function escapeLike(s: string): string {
   return s.replace(/[\\%_]/g, (c) => "\\" + c);
 }
 
-export function makeD1Stores(db: any): { assets: AssetStore; queries: QueryStore; keys: KeyStore } {
+export function makeD1Stores(db: any): {
+  assets: AssetStore; queries: QueryStore; keys: KeyStore;
+  users: UserStore; sessions: SessionStore; loginTokens: LoginTokenStore;
+} {
   const assets: AssetStore = {
     async getAsset(id) {
       const row = await db.prepare(`SELECT ${ASSET_COLS} FROM assets WHERE id = ?`).bind(id).first();
@@ -46,13 +52,72 @@ export function makeD1Stores(db: any): { assets: AssetStore; queries: QueryStore
     },
   };
   const keys: KeyStore = {
-    async verifyKey(hash) {
-      const row = await db.prepare("SELECT 1 FROM api_keys WHERE key_hash = ?").bind(hash).first();
-      return row != null;
+    async getKeyOwner(hash) {
+      const row = await db.prepare("SELECT user_id FROM api_keys WHERE key_hash = ?").bind(hash).first();
+      return (row?.user_id as string) ?? null;
     },
-    async addKey(hash) {
-      await db.prepare("INSERT OR IGNORE INTO api_keys (key_hash) VALUES (?)").bind(hash).run();
+    async addKey(hash, userId, label) {
+      await db.prepare("INSERT OR IGNORE INTO api_keys (key_hash, user_id, label) VALUES (?, ?, ?)")
+        .bind(hash, userId, label).run();
+    },
+    async listByUser(userId) {
+      const { results } = await db.prepare(
+        "SELECT label, created_at FROM api_keys WHERE user_id = ? ORDER BY created_at DESC"
+      ).bind(userId).all();
+      return (results ?? []) as { label: string | null; created_at: string }[];
     },
   };
-  return { assets, queries, keys };
+
+  const users: UserStore = {
+    async upsertByEmail(id, email) {
+      const row = await db.prepare(
+        `INSERT INTO users (id, email) VALUES (?, ?)
+         ON CONFLICT(email) DO UPDATE SET last_login = datetime('now')
+         RETURNING id, email`
+      ).bind(id, email).first();
+      return row as { id: string; email: string };
+    },
+    async getById(id) {
+      const row = await db.prepare("SELECT id, email, created_at, last_login FROM users WHERE id = ?").bind(id).first();
+      return (row as User) ?? null;
+    },
+  };
+
+  const sessions: SessionStore = {
+    async create(userId, tokenHash) {
+      await db.prepare(
+        "INSERT INTO sessions (user_id, token_hash, expires_at) VALUES (?, ?, datetime('now', '+30 days'))"
+      ).bind(userId, tokenHash).run();
+    },
+    async resolve(tokenHash) {
+      const row = await db.prepare(
+        "SELECT user_id FROM sessions WHERE token_hash = ? AND expires_at > datetime('now')"
+      ).bind(tokenHash).first();
+      return row ? { user_id: row.user_id as string } : null;
+    },
+    async touch(tokenHash) {
+      await db.prepare("UPDATE sessions SET expires_at = datetime('now', '+30 days') WHERE token_hash = ?").bind(tokenHash).run();
+    },
+    async delete(tokenHash) {
+      await db.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(tokenHash).run();
+    },
+  };
+
+  const loginTokens: LoginTokenStore = {
+    async create(tokenHash, email) {
+      await db.prepare(
+        "INSERT INTO login_tokens (token_hash, email, expires_at) VALUES (?, ?, datetime('now', '+15 minutes'))"
+      ).bind(tokenHash, email).run();
+    },
+    async consume(tokenHash) {
+      const row = await db.prepare(
+        `UPDATE login_tokens SET used_at = datetime('now')
+         WHERE token_hash = ? AND used_at IS NULL AND expires_at > datetime('now')
+         RETURNING email`
+      ).bind(tokenHash).first();
+      return row ? { email: row.email as string } : null;
+    },
+  };
+
+  return { assets, queries, keys, users, sessions, loginTokens };
 }

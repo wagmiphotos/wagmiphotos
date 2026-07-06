@@ -72,16 +72,17 @@ it("recordQuery returns effective generate=false when row stays opted out", asyn
   expect(effective).toBe(false);
 });
 
-it("verifyKey and addKey hit api_keys", async () => {
-  const { db, calls } = fakeDb({ 1: 1 });
+it("keys.getKeyOwner/addKey/listByUser use api_keys with user_id", async () => {
+  const { db, calls } = fakeDb({ user_id: "usr_1" }, [{ label: "cli", created_at: "2026-07-06" }]);
   const { keys } = makeD1Stores(db);
-  expect(await keys.verifyKey("hashX")).toBe(true);
-  expect(calls[0].sql).toContain("FROM api_keys");
-  expect(calls[0].args).toEqual(["hashX"]);
-  await keys.addKey("hashY");
-  expect(calls[1].sql).toContain("INSERT");
-  expect(calls[1].sql).toContain("api_keys");
-  expect(calls[1].args).toEqual(["hashY"]);
+  expect(await keys.getKeyOwner("hX")).toBe("usr_1");
+  expect(calls[0].sql).toContain("SELECT user_id FROM api_keys");
+  await keys.addKey("hY", "usr_1", "cli");
+  expect(calls[1].sql).toContain("INSERT OR IGNORE INTO api_keys");
+  expect(calls[1].args).toEqual(["hY", "usr_1", "cli"]);
+  const list = await keys.listByUser("usr_1");
+  expect(list).toEqual([{ label: "cli", created_at: "2026-07-06" }]);
+  expect(calls[2].sql).toContain("WHERE user_id = ?");
 });
 
 it("searchAssets browse mode: no WHERE, ordered newest-first, binds limit/offset", async () => {
@@ -135,4 +136,45 @@ it("searchAssets whitespace-only query: browse mode (no WHERE)", async () => {
   await assets.searchAssets({ q: "   ", limit: 24, offset: 0 });
   expect(calls[0].sql).not.toContain("WHERE");
   expect(calls[0].args).toEqual([24, 0]);
+});
+
+it("users.upsertByEmail inserts with ON CONFLICT and returns id/email", async () => {
+  const { db, calls } = fakeDb({ id: "usr_1", email: "a@b.co" });
+  const { users } = makeD1Stores(db);
+  const u = await users.upsertByEmail("usr_1", "a@b.co");
+  expect(u).toEqual({ id: "usr_1", email: "a@b.co" });
+  expect(calls[0].sql).toContain("INSERT INTO users");
+  expect(calls[0].sql).toContain("ON CONFLICT(email)");
+  expect(calls[0].sql).toContain("RETURNING id, email");
+  expect(calls[0].args).toEqual(["usr_1", "a@b.co"]);
+});
+
+it("sessions.create/resolve/touch/delete hit sessions with TTL and expiry guard", async () => {
+  const { db, calls } = fakeDb({ user_id: "usr_1" });
+  const { sessions } = makeD1Stores(db);
+  await sessions.create("usr_1", "h1");
+  expect(calls[0].sql).toContain("INSERT INTO sessions");
+  expect(calls[0].sql).toContain("+30 days");
+  expect(calls[0].args).toEqual(["usr_1", "h1"]);
+  const r = await sessions.resolve("h1");
+  expect(r).toEqual({ user_id: "usr_1" });
+  expect(calls[1].sql).toContain("expires_at > datetime('now')");
+  await sessions.touch("h1");
+  expect(calls[2].sql).toContain("UPDATE sessions SET expires_at");
+  await sessions.delete("h1");
+  expect(calls[3].sql).toContain("DELETE FROM sessions");
+});
+
+it("loginTokens.create sets 15-min TTL; consume is single-use + expiry-guarded", async () => {
+  const { db, calls } = fakeDb({ email: "a@b.co" });
+  const { loginTokens } = makeD1Stores(db);
+  await loginTokens.create("h1", "a@b.co");
+  expect(calls[0].sql).toContain("INSERT INTO login_tokens");
+  expect(calls[0].sql).toContain("+15 minutes");
+  const c = await loginTokens.consume("h1");
+  expect(c).toEqual({ email: "a@b.co" });
+  expect(calls[1].sql).toContain("UPDATE login_tokens SET used_at");
+  expect(calls[1].sql).toContain("used_at IS NULL");
+  expect(calls[1].sql).toContain("expires_at > datetime('now')");
+  expect(calls[1].sql).toContain("RETURNING email");
 });

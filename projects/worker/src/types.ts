@@ -16,10 +16,34 @@ export interface QueryStore {
   /** Upserts the query row and returns the row's effective generate state after merging. */
   recordQuery(i: { normalized: string; original: string; assetId: string | null; similarity: number; built: boolean; generate: boolean }): Promise<boolean>;
 }
-export interface KeyStore { verifyKey(hash: string): Promise<boolean>; addKey(hash: string): Promise<void>; }
+export interface User { id: string; email: string; created_at: string; last_login: string | null; }
+export interface UserStore {
+  upsertByEmail(id: string, email: string): Promise<{ id: string; email: string }>;
+  getById(id: string): Promise<User | null>;
+}
+export interface SessionStore {
+  create(userId: string, tokenHash: string): Promise<void>;
+  resolve(tokenHash: string): Promise<{ user_id: string } | null>;
+  touch(tokenHash: string): Promise<void>;
+  delete(tokenHash: string): Promise<void>;
+}
+export interface LoginTokenStore {
+  create(tokenHash: string, email: string): Promise<void>;
+  consume(tokenHash: string): Promise<{ email: string } | null>;
+}
+export interface KeyStore {
+  getKeyOwner(hash: string): Promise<string | null>;
+  addKey(hash: string, userId: string, label: string | null): Promise<void>;
+  listByUser(userId: string): Promise<{ label: string | null; created_at: string }[]>;
+}
+// TEMPORARY forward declaration — Task 5 moves this to email.ts and Services imports it from there.
+export interface EmailSender { sendMagicLink(email: string, link: string): Promise<void>; }
 export interface RateLimiter { limit(key: string): Promise<boolean>; }
 export interface Services {
-  clip: Clip; vectorize: VectorizeStore; assets: AssetStore; queries: QueryStore; keys: KeyStore; rateLimiter: RateLimiter;
+  clip: Clip; vectorize: VectorizeStore; assets: AssetStore; queries: QueryStore;
+  keys: KeyStore; rateLimiter: RateLimiter;
+  users: UserStore; sessions: SessionStore; loginTokens: LoginTokenStore;
+  email: EmailSender;
 }
 export interface Env {
   DB: any; VECTORIZE: any; RATE_LIMITER?: any;
@@ -28,4 +52,5 @@ export interface Env {
   IMAGE_PRICE_USD?: string; FLOOR_SIM_MAX?: string; FLOOR_SIM_MIN?: string;
   GITHUB_REPO?: string;
   PUBLIC_SITE_URL?: string; PUBLIC_API_BASE_URL?: string;
+  RESEND_API_KEY?: string; EMAIL_FROM?: string;
 }
