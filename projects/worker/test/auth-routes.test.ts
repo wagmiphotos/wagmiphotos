@@ -45,6 +45,20 @@ it("login: rate-limited still returns generic 200 and does not send", async () =
   const res = await handleLoginRequest(loginReq("a@b.co"), { RESEND_API_KEY: "re" } as any, s, cfg);
   expect(res.status).toBe(200);
   expect(s._sent.length).toBe(0);
+  const j: any = await res.json();
+  expect(j).toEqual({ status: "sent" }); // leaks no distinguishing field vs. the non-rate-limited generic response
+});
+
+it("login: known vs unknown email yields byte-identical response (enumeration-safe)", async () => {
+  const known = svc({ users: { upsertByEmail: async (id: string, email: string) => ({ id, email }), getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null }) } });
+  const unknown = svc({ users: { upsertByEmail: async (id: string, email: string) => ({ id, email }), getById: async () => null } });
+  const env = { RESEND_API_KEY: "re" } as any; // prod mode: no dev_link
+  const resKnown = await handleLoginRequest(loginReq("known@b.co"), env, known, cfg);
+  const resUnknown = await handleLoginRequest(loginReq("unknown@b.co"), env, unknown, cfg);
+  expect(resKnown.status).toBe(resUnknown.status);
+  const jKnown: any = await resKnown.json();
+  const jUnknown: any = await resUnknown.json();
+  expect(jKnown).toEqual(jUnknown);
 });
 
 it("login: dev mode returns the link in the body", async () => {
@@ -68,6 +82,7 @@ it("verify: consumed/expired token -> 302 to login with error", async () => {
   const res = await handleVerify(new URL("https://x/v1/auth/verify?token=BAD"), new Request("https://x/v1/auth/verify?token=BAD"), {} as any, s, cfg);
   expect(res.status).toBe(302);
   expect(res.headers.get("Location")).toContain("#/login?error=");
+  expect(s._created.length).toBe(0); // no session created on failed verify
 });
 
 it("me: 200 with user when session resolves, 401 otherwise", async () => {
