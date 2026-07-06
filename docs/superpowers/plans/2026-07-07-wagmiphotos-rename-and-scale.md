@@ -44,14 +44,15 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 ---
 
-### Task 1: Foundations — contract.json additions + migration 0007
+### Task 1: Foundations — contract.json additions
 
 **Files:**
 - Modify: `contract.json`
-- Create: `projects/worker/migrations/0007_derived_urls.sql`
 
 **Interfaces:**
-- Produces: contract keys `vectorize_index_prefix` (string), `vectorize_shards` (int), `shard_fixtures` (map id→shard), `asset_paths` (map size→template with `{id}`); the 0007 schema (assets WITHOUT thumb_url/medium_url/url/manifest_url).
+- Produces: contract keys `vectorize_index_prefix` (string), `vectorize_shards` (int), `shard_fixtures` (map id→shard), `asset_paths` (map size→template with `{id}`).
+
+(Migration 0007 is created in Task 9 alongside its consumers, so both suites stay green through Tasks 2-8.)
 
 - [ ] **Step 1: Add the new contract keys** (merge into the existing JSON object, keep existing keys):
 
@@ -79,31 +80,13 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 Also extend the `_comment` to mention shard routing (`fnv1a32(id) % vectorize_shards`) and that `shard_fixtures` pins the hash on both sides.
 
-- [ ] **Step 2: Write migration `0007_derived_urls.sql`**
+- [ ] **Step 2: Verify suites untouched** — `uv run pytest projects/ -q` → 117 passed; `cd projects/worker && npm test` → 135 passed (contract tests only assert existing keys).
 
-```sql
--- Asset URLs become derived: {ASSET_BASE_URL}/{asset_paths[size]} when
--- locally_cached=1, else source_url (contract.json: asset_paths). Dropping the
--- stored copies saves ~300B/row (~3.7GB at PD12M scale). No production data
--- exists; local data is re-seedable.
-ALTER TABLE assets DROP COLUMN thumb_url;
-ALTER TABLE assets DROP COLUMN medium_url;
-ALTER TABLE assets DROP COLUMN url;
-ALTER TABLE assets DROP COLUMN manifest_url;
-```
-
-- [ ] **Step 3: Sanity-apply locally**
-
-Run: `cd projects/worker && npx wrangler d1 migrations apply sharedcache --local`
-Expected: `0007_derived_urls.sql ✅` (DB still has old name until Task 3; that's fine — this only proves the SQL parses. The D1 test suite will re-verify in Tasks 9/10.)
-
-Note: the worker suite is now RED (code still selects dropped columns) — expected; Tasks 9-10 fix it. Do NOT run the suites as a gate here.
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add contract.json projects/worker/migrations/0007_derived_urls.sql
-git commit -m "feat(contract): shard + asset-path contract keys; migration 0007 drops stored asset URLs"
+git add contract.json
+git commit -m "feat(contract): shard routing + asset-path keys"
 ```
 
 ---
@@ -167,7 +150,7 @@ npx wrangler d1 migrations apply wagmiphotos --local
 npx wrangler d1 execute wagmiphotos --local --file ../../.claude/skills/running-locally/seed-demo.sql
 ```
 
-Expected: migrations 0001→0007 apply; seed FAILS against the 0007 schema (inserts dropped columns) — record that Task 10 rewrites it; skip the seed for now. Worker tests: `npm test` → suites unaffected by names, but Task 1 already broke schema-dependent paths only in Python's migration test? No — the TS suite uses fakes, so: Expected `135 passed`. `npx tsc --noEmit` silent.
+Expected: migrations 0001→0006 apply to the fresh `wagmiphotos` local DB; the seed succeeds (0007 doesn't exist yet — Task 9 creates it; Task 10 rewrites this seed). Worker tests: `npm test` → `135 passed`; `npx tsc --noEmit` silent.
 
 - [ ] **Step 4: Commit** — `git add -A && git commit -m "refactor: rename worker + D1 database to wagmiphotos"`
 
@@ -446,12 +429,25 @@ class VectorizeClient:
 
 ---
 
-### Task 9: Python derived asset URLs (0007 consumers)
+### Task 9: Migration 0007 + Python derived asset URLs
 
 **Files:**
-- Create: `projects/common/src/wagmiphotos/common/asset_paths.py`
+- Create: `projects/worker/migrations/0007_derived_urls.sql`, `projects/common/src/wagmiphotos/common/asset_paths.py`
 - Modify: `projects/common/src/wagmiphotos/common/models.py` (AssetRecord), `d1_client.py` (`insert_asset`, `mark_asset_rehosted`, SELECT column lists), `projects/backfill/src/wagmiphotos/backfill/worker.py`, `seed_pd12m.py`
 - Test: `projects/common/tests/test_contract.py`, `test_d1_migration.py`, `projects/backfill/tests/test_backfill.py`
+
+- [ ] **Step 0: Write migration `0007_derived_urls.sql`** (this makes the worker's local DB ahead of its code until Task 10 — the TS suite uses fakes, so it stays green; only re-seeding needs Task 10's rewritten seed):
+
+```sql
+-- Asset URLs become derived: {ASSET_BASE_URL}/{asset_paths[size]} when
+-- locally_cached=1, else source_url (contract.json: asset_paths). Dropping the
+-- stored copies saves ~300B/row (~3.7GB at PD12M scale). No production data
+-- exists; local data is re-seedable.
+ALTER TABLE assets DROP COLUMN thumb_url;
+ALTER TABLE assets DROP COLUMN medium_url;
+ALTER TABLE assets DROP COLUMN url;
+ALTER TABLE assets DROP COLUMN manifest_url;
+```
 
 **Interfaces:**
 - Produces: `ASSET_PATHS: dict[str, str]` (keys `large|medium|thumb|manifest`, values with `{id}`) and `asset_key(size: str, asset_id: str) -> str`; `AssetRecord` WITHOUT `url/thumb_url/medium_url/manifest_url`; `D1Client.mark_asset_rehosted(asset_id, *, width, height, mime)`.
@@ -490,7 +486,7 @@ def asset_key(size: str, asset_id: str) -> str:
 
 `worker.py` generate path: `self._storage.put(asset_key("large", asset_id), …)` etc.; the manifest still embeds the URLs **returned by** `storage.put` (they are the ground truth of where bytes landed). `AssetRecord` drops the four fields; `insert_asset` inserts `(id, prompt, source, source_id, content_hash, width, height, mime, source_url, locally_cached)`; `update_asset_urls` → `mark_asset_rehosted` (`UPDATE assets SET width=?, height=?, mime=?, locally_cached=1 WHERE id=?`); `rehost_pass` calls it; `seed_pd12m` builds slim records (`source_url=<hf url>`, `locally_cached=False`).
 
-- [ ] **Step 4:** `uv run pytest projects/ -q` green. **Commit** `"feat(backfill): derived asset URLs — slim AssetRecord, contract-pinned B2 keys (0007)"`.
+- [ ] **Step 4:** `uv run pytest projects/ -q` green. Apply 0007 locally: `cd projects/worker && npx wrangler d1 migrations apply wagmiphotos --local` → `0007_derived_urls.sql ✅`. **Commit** (include the migration file): `"feat(backfill): derived asset URLs — slim AssetRecord, contract-pinned B2 keys, migration 0007"`.
 
 ---
 
@@ -711,7 +707,7 @@ Expected: hits ONLY inside `lsGet`'s legacy-fallback lines in `projects/worker/p
 ## Execution notes
 
 - Tasks 2-4 are the rename (behavior-neutral); Tasks 5-6 are independent of each other; Task 7 depends on 5; Task 8 depends on 6 (and 2); Tasks 9-10 depend on 1 (and the rename); Task 11 depends on 7+10. Docs (12) last before verification (13).
-- Suites are RED between Task 1 and Tasks 9/10 only for schema-dependent paths — the Python migration test is the one to watch; if executing tasks out of order, run it to know where you stand.
+- Both suites stay green at every task boundary. Within Task 9, the local D1 schema (0007 applied) runs ahead of the worker code until Task 10 lands — the TS suite uses fakes and is unaffected; just don't re-seed between 9 and 10.
 - If `wrangler d1 migrations apply` complains the local `sharedcache` DB is gone after Task 3's rename, that's expected: the new name gets a fresh local DB; re-apply + re-seed.
 
 
