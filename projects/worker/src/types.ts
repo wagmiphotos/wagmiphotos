@@ -1,3 +1,5 @@
+import type { EmailSender } from "./email";
+
 export interface AssetRow {
   id: string; prompt: string; source: string; source_id: string | null;
   thumb_url: string | null; medium_url: string | null; url: string;
@@ -36,8 +38,6 @@ export interface KeyStore {
   addKey(hash: string, userId: string, label: string | null): Promise<void>;
   listByUser(userId: string): Promise<{ label: string | null; created_at: string }[]>;
 }
-// TEMPORARY forward declaration — Task 5 moves this to email.ts and Services imports it from there.
-export interface EmailSender { sendMagicLink(email: string, link: string): Promise<void>; }
 export interface RateLimiter { limit(key: string): Promise<boolean>; }
 export interface Services {
   clip: Clip; vectorize: VectorizeStore; assets: AssetStore; queries: QueryStore;
