@@ -70,15 +70,26 @@ npx wrangler deploy --dry-run   # confirm the output lists the RATE_LIMITER bind
 npm run deploy
 ```
 
-## 6. Seed the pool and tune the floor
+## 6. Check embedding parity, seed the pool, and tune the floor
+
+**Drift check (required — this gates the two-runtime BGE contract).** The Worker
+embeds queries with Workers AI `@cf/baai/bge-base-en-v1.5`; the backfill embeds with
+local `BAAI/bge-base-en-v1.5`. They must produce vectors in the *same* space or every
+match is wrong. Embed a fixture of ~10 strings with **both** — the Worker's binding
+(a one-off `wrangler dev` request that returns the vector, or a temporary debug route)
+and `sharedcache.common.bge.BgeEmbedder.from_pretrained().text_embed(...)` — and assert
+pairwise cosine **≥ 0.98**. If it fails, reconcile preprocessing (an accidental query
+prefix, wrong pooling, or a missing L2-normalize on one side). Code review can't verify
+this — Workers AI's internal pooling vs sentence-transformers' is only checkable live.
 
 ```bash
-uv run python -m sharedcache.backfill.seed_pd12m --limit 100
+uv run python -m sharedcache.backfill.seed_pd12m --limit 100   # BGE captions → wagmiphotos-bge
 ```
 
 Then **tune** `FLOOR_SIM_MAX` / `FLOOR_SIM_MIN` against the seeded pool. BGE
 text-to-text cosines run high (typically ~0.7–0.95) — the defaults (0.90 / 0.72)
-are a starting guess, not calibrated.
+are a starting guess, not calibrated. Set them in both the Worker `wrangler.toml`
+`[vars]` and the backfill env (`sharedcache.common.config`).
 
 ---
 
@@ -107,9 +118,17 @@ docker compose logs backfill --tail 20           # (on the box) polling loop tic
 
 ## Still open (do later)
 
-Everything is code-complete and green (Python 58 / Worker 75); these are the
+Everything is code-complete and green (Python 46 / Worker 113); these are the
 loose ends to pick up when you resume. Full backlog + design trail: root
 `HANDOFF.md` and `docs/HANDOFF-2026-07-04.md`.
+
+### BGE embeddings — provision at deploy (Task 6, not yet run — needs live CF + GMI)
+The BGE search layer is code-complete but has never touched live infra. At deploy:
+create the `wagmiphotos-bge` index (step 2), run the **embedding drift check**
+(Worker Workers-AI BGE vs local BGE, cosine ≥ 0.98 — step 6), seed the pool, then
+tune the floor. See `docs/superpowers/plans/2026-07-06-bge-edge-embeddings.md` Task 6.
+Also do a real `docker build` of the backfill image with `--extra model` (pulls CPU
+torch + BGE weights) — so far only verified via `uv sync --dry-run`.
 
 ### During / right after deploy
 - **Tune the floor** (step 6): set `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN` from the real
