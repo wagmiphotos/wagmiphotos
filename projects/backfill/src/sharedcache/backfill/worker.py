@@ -16,15 +16,15 @@ def normalize_prompt(s: str) -> str:
     return " ".join(s.strip().lower().split())
 
 class BackfillWorker:
-    def __init__(self, d1, vectorize, clip, generator, storage, *, floor_tolerance: float = 0.15,
-                 floor_sim_max: float = 0.35, floor_sim_min: float = 0.18, batch_size: int = 5,
+    def __init__(self, d1, vectorize, embedder, generator, storage, *, floor_tolerance: float = 0.15,
+                 floor_sim_max: float = 0.90, floor_sim_min: float = 0.72, batch_size: int = 5,
                  max_spend_usd: float = 5.0, price_usd: float = 0.04,
                  max_lifetime_spend_usd: float | None = None,
                  max_rehost_bytes: int = DEFAULT_MAX_REHOST_BYTES,
                  model: str = "shared-cache-gmicloud-gpt-image-1"):
         self._d1 = d1
         self._vec = vectorize
-        self._clip = clip
+        self._embedder = embedder
         self._gen = generator
         self._storage = storage
         self._floor = similarity_floor(floor_tolerance, sim_max=floor_sim_max, sim_min=floor_sim_min)
@@ -40,7 +40,8 @@ class BackfillWorker:
         built = 0
         spent = 0.0
         for q in self._d1.pending_queries(self._batch):
-            match = self._vec.query(self._clip.text_embed(q.original_prompt), top_k=1)
+            prompt_vec = self._embedder.text_embed(q.original_prompt)
+            match = self._vec.query(prompt_vec, top_k=1)
             if match and match[0]["score"] >= self._floor:
                 self._d1.mark_query_built(q.normalized_prompt, match[0]["id"])
                 continue
@@ -51,7 +52,6 @@ class BackfillWorker:
                 break
             gen = await self._gen.generate(q.original_prompt, model=self._model, size="1024x1024")
             original = self._storage.get(gen.storage_key)
-            image_vec = self._clip.image_embed(original)
             sizes = derive_sizes(original)
             w, h = dimensions(sizes["large"])
             asset_id = str(uuid.uuid4())
@@ -70,7 +70,7 @@ class BackfillWorker:
                               medium_url=med, model_used=gen.model_used, source="generated",
                               source_id=None, content_hash=gen.content_hash, width=w, height=h,
                               mime="image/webp", manifest_url=manifest_url, created_at="", locally_cached=True)
-            self._vec.upsert(asset_id, image_vec, {"source": "generated"})
+            self._vec.upsert(asset_id, prompt_vec, {"source": "generated"})
             self._d1.insert_asset(rec)
             self._d1.mark_query_built(q.normalized_prompt, asset_id)
             spent += self._price
@@ -127,7 +127,7 @@ class BackfillWorker:
 
 
 def build_worker_from_settings(s) -> "BackfillWorker":
-    from sharedcache.common.clip import ClipEmbedder
+    from sharedcache.common.bge import BgeEmbedder
     from sharedcache.common.d1_client import D1Client
     from sharedcache.common.vectorize_client import VectorizeClient
     from sharedcache.generation.generator import GenblazeGenerator, StubGenerator
@@ -142,10 +142,10 @@ def build_worker_from_settings(s) -> "BackfillWorker":
         logger.warning("no generation API key + B2 bucket configured; falling back to "
                        "StubGenerator — no real images will be generated")
         generator = StubGenerator(storage)
-    clip = ClipEmbedder(s.clip_text_embed_url, s.clip_image_embed_url, token=s.clip_embed_token)
+    embedder = BgeEmbedder.from_pretrained(s.bge_model_name)
     d1 = D1Client(s.cf_account_id, s.d1_database_id, s.cf_api_token)
     vec = VectorizeClient(s.cf_account_id, s.vectorize_index_name, s.cf_api_token)
-    return BackfillWorker(d1, vec, clip, generator, storage,
+    return BackfillWorker(d1, vec, embedder, generator, storage,
                           floor_sim_max=s.floor_sim_max, floor_sim_min=s.floor_sim_min,
                           batch_size=s.worker_batch_size, max_spend_usd=s.worker_max_spend_usd,
                           max_lifetime_spend_usd=s.worker_max_lifetime_spend_usd,

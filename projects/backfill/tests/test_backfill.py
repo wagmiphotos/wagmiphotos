@@ -7,16 +7,15 @@ from sharedcache.generation.storage import InMemoryStorage
 from sharedcache.generation.generator import StubGenerator
 from fakes import FakeD1, FakeVectorize
 
-class FakeClip:
+class FakeEmbedder:
     def text_embed(self, text): return [float(len(text) % 7)] * 8
-    def image_embed(self, b): return [0.5] * 8
 
 def _jpeg():
     out = io.BytesIO(); Image.new("RGB", (40, 20), "blue").save(out, format="JPEG"); return out.getvalue()
 
 def _worker(d1, vec, **kw):
     storage = InMemoryStorage()
-    return BackfillWorker(d1, vec, FakeClip(), StubGenerator(storage), storage,
+    return BackfillWorker(d1, vec, FakeEmbedder(), StubGenerator(storage), storage,
                           floor_sim_max=0.35, floor_sim_min=0.18, **kw)
 
 class _FakeStream:
@@ -53,10 +52,13 @@ async def test_generate_pass_builds_pending_and_upserts(monkeypatch):
     built = await w.generate_pass()
     assert built == 2
     assert d1.pending == []                       # both marked built
-    assert len(vec.vectors) == 2                   # generated image vectors upserted
+    assert len(vec.vectors) == 2                   # generated prompt vectors upserted
     assert len(d1.inserted) == 2                   # asset rows inserted
     # highest-count first
     assert d1.built[0][0] == "popular"
+    # upserted vector is the prompt's BGE embedding, not a separate image vector
+    popular_asset_id = d1.built[0][1]
+    assert vec.vectors[popular_asset_id]["values"] == FakeEmbedder().text_embed("popular")
 
 @pytest.mark.asyncio
 async def test_generate_pass_rechecks_and_skips(monkeypatch):
@@ -121,7 +123,7 @@ async def test_generate_pass_writes_provenance_manifest():
     d1, vec = FakeD1(), FakeVectorize()
     d1.pending = [QueryRow("popular", "popular", 9)]
     storage = InMemoryStorage()
-    w = BackfillWorker(d1, vec, FakeClip(), StubGenerator(storage), storage,
+    w = BackfillWorker(d1, vec, FakeEmbedder(), StubGenerator(storage), storage,
                        floor_sim_max=0.35, floor_sim_min=0.18, batch_size=5, max_spend_usd=100.0)
     assert await w.generate_pass() == 1
     rec = d1.inserted[0]
@@ -143,9 +145,11 @@ async def test_lifetime_spend_cap_persists_across_ticks():
     assert await w.generate_pass() == 0        # lifetime cap already reached
     assert len(d1.inserted) == 1
 
-def test_build_worker_from_settings_warns_on_stub_fallback(caplog):
+def test_build_worker_from_settings_warns_on_stub_fallback(caplog, monkeypatch):
     from sharedcache.backfill.worker import build_worker_from_settings
+    from sharedcache.common.bge import BgeEmbedder
     from sharedcache.common.config import Settings
+    monkeypatch.setattr(BgeEmbedder, "from_pretrained", classmethod(lambda cls, model_name: FakeEmbedder()))
     s = Settings(_env_file=None, gmicloud_api_key=None, openai_api_key=None,
                  gemini_api_key=None, b2_bucket=None, b2_key_id=None)
     with caplog.at_level("WARNING"):
