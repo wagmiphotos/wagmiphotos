@@ -82,7 +82,17 @@ it("keys.getKeyOwner/addKey/listByUser use api_keys with user_id", async () => {
   expect(calls[1].args).toEqual(["hY", "usr_1", "cli"]);
   const list = await keys.listByUser("usr_1");
   expect(list).toEqual([{ label: "cli", created_at: "2026-07-06" }]);
+  expect(calls[2].sql).toContain("SELECT key_hash AS id");
   expect(calls[2].sql).toContain("WHERE user_id = ?");
+});
+
+it("keys.deleteKey deletes scoped to the owner (key_hash AND user_id)", async () => {
+  const { db, calls } = fakeDb();
+  const { keys } = makeD1Stores(db);
+  await keys.deleteKey("usr_1", "hZ");
+  expect(calls[0].sql).toContain("DELETE FROM api_keys");
+  expect(calls[0].sql).toContain("WHERE key_hash = ? AND user_id = ?");
+  expect(calls[0].args).toEqual(["hZ", "usr_1"]);   // id bound first, then userId
 });
 
 it("searchAssets browse mode: no WHERE, ordered newest-first, binds limit/offset", async () => {

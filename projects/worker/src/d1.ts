@@ -62,9 +62,14 @@ export function makeD1Stores(db: any): {
     },
     async listByUser(userId) {
       const { results } = await db.prepare(
-        "SELECT label, created_at FROM api_keys WHERE user_id = ? ORDER BY created_at DESC"
+        "SELECT key_hash AS id, label, created_at FROM api_keys WHERE user_id = ? ORDER BY created_at DESC"
       ).bind(userId).all();
-      return (results ?? []) as { label: string | null; created_at: string }[];
+      return (results ?? []) as { id: string; label: string | null; created_at: string }[];
+    },
+    // Owner-scoped: a user can only delete their own keys. `id` is the key_hash
+    // (a sha256 — not the key itself, so it's safe to expose to the owner).
+    async deleteKey(userId, id) {
+      await db.prepare("DELETE FROM api_keys WHERE key_hash = ? AND user_id = ?").bind(id, userId).run();
     },
   };
 

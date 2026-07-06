@@ -36,7 +36,8 @@ export interface LoginTokenStore {
 export interface KeyStore {
   getKeyOwner(hash: string): Promise<string | null>;
   addKey(hash: string, userId: string, label: string | null): Promise<void>;
-  listByUser(userId: string): Promise<{ label: string | null; created_at: string }[]>;
+  listByUser(userId: string): Promise<{ id: string; label: string | null; created_at: string }[]>;
+  deleteKey(userId: string, id: string): Promise<void>;
 }
 export interface RateLimiter { limit(key: string): Promise<boolean>; }
 export interface Services {

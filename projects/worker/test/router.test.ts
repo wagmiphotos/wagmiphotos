@@ -185,6 +185,11 @@ it("keys/generate: 401 without a session", async () => {
   expect(res.status).toBe(401);
 });
 
+it("keys DELETE: 401 without a session", async () => {
+  const res = await worker.fetch(new Request("https://x/v1/keys/deadbeef", { method: "DELETE" }), fakeEnv({ MASTER_API_KEY: "master" }));
+  expect(res.status).toBe(401);
+});
+
 it("serves SPA HTML with env-configured public URLs substituted", async () => {
   const env = fakeEnv({
     ASSETS: { fetch: async () => new Response('<a href="https://api.wagmi.photos/v1">docs</a>', { status: 200, headers: { "content-type": "text/html" } }) },

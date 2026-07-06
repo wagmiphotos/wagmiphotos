@@ -8,7 +8,7 @@ import { rewritePublicUrls } from "./rewrite";
 import { numEnv } from "./config";
 import { makeEmailSender } from "./email";
 import { resolveApiPrincipal, resolveSession } from "./session";
-import { handleLoginRequest, handleVerify, handleMe, handleLogout, handleListKeys } from "./auth-routes";
+import { handleLoginRequest, handleVerify, handleMe, handleLogout, handleListKeys, handleDeleteKey } from "./auth-routes";
 
 function buildServices(env: Env): Services {
   const { assets, queries, keys, users, sessions, loginTokens } = makeD1Stores(env.DB);
@@ -89,6 +89,12 @@ export default {
         return await handleLogout(request, env, buildServices(env));
       if (url.pathname === "/v1/keys" && request.method === "GET")
         return await handleListKeys(request, env, buildServices(env));
+      const keyDel = url.pathname.match(/^\/v1\/keys\/([^/]+)$/);
+      if (keyDel && request.method === "DELETE") {
+        let id: string;
+        try { id = decodeURIComponent(keyDel[1]); } catch { return new Response("Not found", { status: 404 }); }
+        return await handleDeleteKey(id, request, env, buildServices(env));
+      }
 
       if (url.pathname === "/v1/library" && request.method === "GET") {
         const services = buildServices(env);

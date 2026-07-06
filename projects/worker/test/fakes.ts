@@ -19,6 +19,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
       getKeyOwner: async (h) => (keyOwners.get(h) ?? null),
       addKey: async (h, u) => { keyOwners.set(h, u); },
       listByUser: async () => [],
+      deleteKey: async (u, id) => { if (keyOwners.get(id) === u) keyOwners.delete(id); },
     },
     rateLimiter: { limit: async () => true },
     users: { upsertByEmail: async (id, email) => ({ id, email }), getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null }) },

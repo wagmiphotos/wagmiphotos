@@ -81,3 +81,12 @@ export async function handleListKeys(request: Request, env: Env, s: Services): P
   if (!principal) return Response.json({ error: "not authenticated" }, { status: 401 });
   return Response.json({ keys: await s.keys.listByUser(principal.userId) });
 }
+
+export async function handleDeleteKey(id: string, request: Request, env: Env, s: Services): Promise<Response> {
+  const principal = await resolveSession(request, env, s.sessions);
+  if (!principal) return Response.json({ error: "not authenticated" }, { status: 401 });
+  // Scoped to the caller's own keys inside deleteKey; a no-match is a silent no-op
+  // (idempotent, and no signal about whether the id belonged to another user).
+  await s.keys.deleteKey(principal.userId, id);
+  return Response.json({ status: "ok" });
+}
