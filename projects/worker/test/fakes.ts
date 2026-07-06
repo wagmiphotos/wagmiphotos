@@ -5,7 +5,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   const libraryRows: LibraryAssetRow[] = [];
   const searchCalls: { q: string; limit: number; offset: number }[] = [];
   const recorded: any[] = [];
-  const keyHashes = new Set<string>();
+  const keyOwners = new Map<string, string>();
   const matches: Match[] = [];
   const base: Services = {
     clip: { textEmbed: async () => [0.1, 0.2, 0.3] },
@@ -15,8 +15,16 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
       searchAssets: async (i) => { searchCalls.push(i); return libraryRows.slice(i.offset, i.offset + i.limit); },
     },
     queries: { recordQuery: async (i) => { recorded.push(i); return i.generate; } },
-    keys: { verifyKey: async (h) => keyHashes.has(h), addKey: async (h) => { keyHashes.add(h); } },
+    keys: {
+      getKeyOwner: async (h) => (keyOwners.get(h) ?? null),
+      addKey: async (h, u) => { keyOwners.set(h, u); },
+      listByUser: async () => [],
+    },
     rateLimiter: { limit: async () => true },
+    users: { upsertByEmail: async (id, email) => ({ id, email }), getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null }) },
+    sessions: { create: async () => {}, resolve: async () => null, touch: async () => {}, delete: async () => {} },
+    loginTokens: { create: async () => {}, consume: async () => null },
+    email: { sendMagicLink: async () => {} },
   };
   // expose internals for assertions
   (base as any)._assets = assets;
@@ -24,6 +32,6 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   (base as any)._searchCalls = searchCalls;
   (base as any)._recorded = recorded;
   (base as any)._matches = matches;
-  (base as any)._keyHashes = keyHashes;
+  (base as any)._keyOwners = keyOwners;
   return { ...base, ...overrides };
 }

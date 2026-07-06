@@ -65,10 +65,12 @@ function clientIp(request: Request): string {
   return request.headers.get("CF-Connecting-IP") ?? "unknown";
 }
 
-export async function handleKeygen(request: Request, s: Services, genKey: () => string): Promise<Response> {
+export async function handleKeygen(request: Request, s: Services, genKey: () => string, userId: string): Promise<Response> {
   const ok = await s.rateLimiter.limit(clientIp(request));
   if (!ok) return Response.json({ error: "Too many key requests" }, { status: 429 });
+  let label: string | null = null;
+  try { const b: any = await request.json(); if (typeof b?.label === "string") label = b.label.slice(0, 80); } catch { /* body optional */ }
   const key = genKey();
-  await s.keys.addKey(await sha256Hex(key));
+  await s.keys.addKey(await sha256Hex(key), userId, label);
   return Response.json({ key, created_at: Math.floor(Date.now() / 1000) });
 }

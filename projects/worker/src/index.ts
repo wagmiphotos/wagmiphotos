@@ -2,14 +2,16 @@ import type { Env, Services, RateLimiter } from "./types";
 import { makeD1Stores } from "./d1";
 import { makeVectorize } from "./vectorize";
 import { clipTextEmbed } from "./embed";
-import { checkAuth } from "./auth";
 import { handleGenerate, handleKeygen, type GenBody } from "./handler";
 import { handleLibrarySearch, handleLibraryDownload } from "./library";
 import { rewritePublicUrls } from "./rewrite";
 import { numEnv } from "./config";
+import { makeEmailSender } from "./email";
+import { resolveApiPrincipal, resolveSession } from "./session";
+import { handleLoginRequest, handleVerify, handleMe, handleLogout, handleListKeys } from "./auth-routes";
 
 function buildServices(env: Env): Services {
-  const { assets, queries, keys } = makeD1Stores(env.DB);
+  const { assets, queries, keys, users, sessions, loginTokens } = makeD1Stores(env.DB);
   const rateLimiter: RateLimiter = {
     async limit(key) {
       if (!env.RATE_LIMITER) return true; // no binding in dev
@@ -21,6 +23,7 @@ function buildServices(env: Env): Services {
     clip: { textEmbed: (p) => clipTextEmbed(p, env) },
     vectorize: makeVectorize(env.VECTORIZE),
     assets, queries, keys, rateLimiter,
+    users, sessions, loginTokens, email: makeEmailSender(env),
   };
 }
 
@@ -64,6 +67,8 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url);
+      const verifyBase = env.PUBLIC_SITE_URL || "https://wagmi.photos";
+      const authCfg = { verifyBase };
       if (url.pathname === "/healthz") {
         if (request.method !== "GET") return new Response("Not found", { status: 404 });
         return Response.json({ status: "ok" });
@@ -74,34 +79,50 @@ export default {
         return await handleStars(env);
       }
 
+      if (url.pathname === "/v1/auth/login" && request.method === "POST")
+        return await handleLoginRequest(request, env, buildServices(env), authCfg);
+      if (url.pathname === "/v1/auth/verify" && request.method === "GET")
+        return await handleVerify(url, request, env, buildServices(env), authCfg);
+      if (url.pathname === "/v1/me" && request.method === "GET")
+        return await handleMe(request, env, buildServices(env));
+      if (url.pathname === "/v1/auth/logout" && request.method === "POST")
+        return await handleLogout(request, env, buildServices(env));
+      if (url.pathname === "/v1/keys" && request.method === "GET")
+        return await handleListKeys(request, env, buildServices(env));
+
       if (url.pathname === "/v1/library" && request.method === "GET") {
-        return await handleLibrarySearch(url, buildServices(env));
+        const services = buildServices(env);
+        if (!(await resolveApiPrincipal(request, env, services))) return Response.json({ error: "login required" }, { status: 401 });
+        return await handleLibrarySearch(url, services);
       }
 
       const dl = url.pathname.match(/^\/v1\/library\/([^/]+)\/download$/);
       if (dl && request.method === "GET") {
+        const services = buildServices(env);
+        if (!(await resolveApiPrincipal(request, env, services))) return Response.json({ error: "login required" }, { status: 401 });
         let id: string;
         try {
           id = decodeURIComponent(dl[1]);
         } catch {
           return new Response("Not found", { status: 404 });
         }
-        return await handleLibraryDownload(id, buildServices(env), (u) => fetch(u));
+        return await handleLibraryDownload(id, services, (u) => fetch(u));
       }
 
       if (url.pathname === "/v1/keys/generate" && request.method === "POST") {
-        return await handleKeygen(request, buildServices(env), genKey);
+        const services = buildServices(env);
+        const principal = await resolveSession(request, env, services.sessions);
+        if (!principal) return Response.json({ error: "login required" }, { status: 401 });
+        return await handleKeygen(request, services, genKey, principal.userId);
       }
 
       if (url.pathname === "/v1/images/generations" && request.method === "POST") {
         const services = buildServices(env);
-        if (!(await checkAuth(request, env, services.keys))) {
-          return Response.json({ error: "Invalid API Key" }, { status: 401 });
-        }
-        // Throttle the expensive path (CLIP embed + Vectorize) per client IP,
-        // namespaced so it doesn't share a bucket with keygen.
-        const genIp = request.headers.get("CF-Connecting-IP") ?? "unknown";
-        if (!(await services.rateLimiter.limit(`gen:${genIp}`))) {
+        const principal = await resolveApiPrincipal(request, env, services);
+        if (!principal) return Response.json({ error: "Invalid API Key" }, { status: 401 });
+        // Throttle the expensive path (CLIP embed + Vectorize) per authenticated
+        // principal, namespaced so it doesn't share a bucket with keygen.
+        if (!(await services.rateLimiter.limit(`gen:${principal.userId}`))) {
           return Response.json({ error: "Too many requests" }, { status: 429 });
         }
         let body: GenBody;

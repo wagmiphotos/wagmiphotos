@@ -142,17 +142,17 @@ it("miss: recordQuery throws -> 202 still reports the requested generate flag", 
   expect(j.shared_cache.generation_queued).toBe(false);
 });
 
-it("keygen mints and stores a hashed key", async () => {
+it("keygen mints and stores a hashed key owned by the caller", async () => {
   const s = fakeServices();
-  const res = await handleKeygen(new Request("https://x", { headers: { "CF-Connecting-IP": "1.2.3.4" } }), s, () => "sc-fixed");
+  const res = await handleKeygen(new Request("https://x", { headers: { "CF-Connecting-IP": "1.2.3.4" } }), s, () => "sc-fixed", "usr_1");
   const j: any = await res.json();
   expect(j.key).toBe("sc-fixed");
-  expect((s as any)._keyHashes.size).toBe(1);
-  expect((s as any)._keyHashes.has(await sha256Hex("sc-fixed"))).toBe(true);
+  expect((s as any)._keyOwners.size).toBe(1);
+  expect((s as any)._keyOwners.get(await sha256Hex("sc-fixed"))).toBe("usr_1");
 });
 
 it("keygen 429 when rate limited", async () => {
   const s = fakeServices({ rateLimiter: { limit: async () => false } });
-  const res = await handleKeygen(new Request("https://x"), s, () => "sc-fixed");
+  const res = await handleKeygen(new Request("https://x"), s, () => "sc-fixed", "usr_1");
   expect(res.status).toBe(429);
 });

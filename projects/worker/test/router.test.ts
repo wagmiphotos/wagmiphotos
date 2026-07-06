@@ -144,6 +144,42 @@ it("library download: non-GET method -> 404 (method-gated)", async () => {
   }
 });
 
+it("generate: 401 when gated and no principal (master set, no creds)", async () => {
+  const res = await worker.fetch(
+    new Request("https://x/v1/images/generations", { method: "POST", body: JSON.stringify({ prompt: "hi" }) }),
+    fakeEnv({ MASTER_API_KEY: "master" })
+  );
+  expect(res.status).toBe(401);
+});
+
+it("library: now gated -> 401 without a principal when master set", async () => {
+  const res = await worker.fetch(new Request("https://x/v1/library"), fakeEnv({ MASTER_API_KEY: "master" }));
+  expect(res.status).toBe(401);
+});
+
+it("library: open in dev (no master) -> 200", async () => {
+  const res = await worker.fetch(new Request("https://x/v1/library"), fakeEnv());
+  expect(res.status).toBe(200);
+});
+
+it("auth/login: POST returns 200 generic (dev returns dev_link)", async () => {
+  const res = await worker.fetch(
+    new Request("https://x/v1/auth/login", { method: "POST", body: JSON.stringify({ email: "a@b.co" }) }),
+    fakeEnv()
+  );
+  expect(res.status).toBe(200);
+});
+
+it("me: 401 without cookie", async () => {
+  const res = await worker.fetch(new Request("https://x/v1/me"), fakeEnv({ MASTER_API_KEY: "master" }));
+  expect(res.status).toBe(401);
+});
+
+it("keys/generate: 401 without a session", async () => {
+  const res = await worker.fetch(new Request("https://x/v1/keys/generate", { method: "POST" }), fakeEnv({ MASTER_API_KEY: "master" }));
+  expect(res.status).toBe(401);
+});
+
 it("serves SPA HTML with env-configured public URLs substituted", async () => {
   const env = fakeEnv({
     ASSETS: { fetch: async () => new Response('<a href="https://api.wagmi.photos/v1">docs</a>', { status: 200, headers: { "content-type": "text/html" } }) },
