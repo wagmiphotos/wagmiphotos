@@ -27,6 +27,11 @@ export async function handleLoginRequest(request: Request, env: Env, s: Services
   const okEmail = await s.rateLimiter.limit(`login:email:${email}`);
   if (!okIp || !okEmail) return genGeneric();
 
+  // Opportunistic GC: both tables are indexed on expires_at; failures are
+  // logged, never fatal to the login itself.
+  try { await s.loginTokens.purgeExpired(); } catch (e) { console.error("login_tokens purge failed", e); }
+  try { await s.sessions.purgeExpired(); } catch (e) { console.error("sessions purge failed", e); }
+
   const token = (cfg.token ?? randomToken)();
   const nonce = (cfg.nonce ?? randomToken)();
   await s.loginTokens.create(await sha256Hex(token), email, await sha256Hex(nonce));

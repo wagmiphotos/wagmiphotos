@@ -6,7 +6,9 @@ order** — several have hard dependencies (noted inline).
 
 Prereqs: a Cloudflare account, a Backblaze B2 bucket, a GMI Cloud (CPU) box with
 Docker, and a GMI Cloud generation API key. All commands are run from the repo
-root unless a `cd` is shown.
+root unless a `cd` is shown. The Worker requires **wrangler v4** (pinned in
+`projects/worker/package.json` — every `npx wrangler …` below picks it up from
+there; don't run an older global wrangler).
 
 ---
 
@@ -33,14 +35,28 @@ Edit `projects/worker/wrangler.toml` → replace `REPLACE_WITH_D1_DATABASE_ID`
 npx wrangler vectorize create wagmiphotos-bge --dimensions=768 --metric=cosine
 ```
 
-## 3. Apply D1 migrations remotely — **BEFORE any deploy**
+## 3. Back up D1, then apply migrations remotely — **BEFORE any deploy**
 
-Migrations `0002` (`queries.generate`, backfill demand tracking) and `0003`
-(assets browse index) must be live first. Deploying the Worker ahead of them
-breaks demand tracking and **hard-errors the Python backfill**.
+Take a backup first (migrations are forward-only; this is the rollback path):
 
 ```bash
-npx wrangler d1 migrations apply sharedcache --remote   # runs 0001 → 0002 → 0003
+npx wrangler d1 export sharedcache --remote --output=backup.sql
+```
+
+Then apply all pending migrations. Deploying the Worker ahead of them breaks
+demand tracking and **hard-errors the Python backfill**:
+
+- `0002` — `queries.generate`, backfill demand tracking; `0003` — assets browse index.
+- `0004` — accounts. ⚠️ **Breaking:** wipes all pre-existing anonymous API keys
+  (`DELETE FROM api_keys WHERE user_id IS NULL`); any live integration using a
+  self-minted key must sign up and reissue a key from the dashboard.
+- `0005` — nonce-bound login tokens; applying it voids outstanding magic links —
+  users just request a new one.
+- `0006` — backfill reliability (query/rehost attempt tracking + `building`
+  claims), the `meta` table (durable backfill spend cap), and a session-expiry index.
+
+```bash
+npx wrangler d1 migrations apply sharedcache --remote   # runs 0001 → 0006
 ```
 
 ## 4. Stand up the GMI box (backfill)
@@ -60,7 +76,23 @@ Full detail in `deploy/gmi/README.md`. Summary:
 The backfill loads `BAAI/bge-base-en-v1.5` in-process; there is no separate
 embedding service or tunnel to stand up.
 
-## 5. Route the custom domains, then deploy
+## 5. Set Worker secrets, route the custom domains, then deploy
+
+Worker secrets (one-time, `cd projects/worker`):
+
+```bash
+npx wrangler secret put MASTER_API_KEY    # master bearer for the API
+npx wrangler secret put RESEND_API_KEY    # magic-link email sending (see Accounts section)
+```
+
+**`DEV_MODE` — production must NEVER set it.** All the local-dev conveniences —
+the unauthenticated dev-open API lane (requests act as `usr_dev`), the `dev_link`
+echo in the login response, and console-logged magic links — now require
+`DEV_MODE=true` and **fail closed without it**: a missing `MASTER_API_KEY` no
+longer opens the API, and a missing `RESEND_API_KEY` no longer leaks login links.
+Local dev sets it in `projects/worker/.dev.vars` (gitignored; copy
+`.dev.vars.example`). Before deploying, confirm `DEV_MODE` appears nowhere in
+`wrangler.toml` `[vars]` or the dashboard.
 
 Route **both** `wagmi.photos` (site + API) and `api.wagmi.photos` (documented
 API base) to this Worker in the Cloudflare dashboard, then:
@@ -118,9 +150,9 @@ docker compose logs backfill --tail 20           # (on the box) polling loop tic
 
 ## Still open (do later)
 
-Everything is code-complete and green (Python 46 / Worker 113); these are the
-loose ends to pick up when you resume. Full backlog + design trail: root
-`HANDOFF.md` and `docs/HANDOFF-2026-07-04.md`.
+Everything is code-complete and green (both test suites pass offline); these are
+the loose ends to pick up when you resume. Full backlog + design trail: root
+`HANDOFF.md` and `docs/HANDOFF-2026-07-07.md`.
 
 ### BGE embeddings — provision at deploy (Task 6, not yet run — needs live CF + GMI)
 The BGE search layer is code-complete but has never touched live infra. At deploy:
@@ -157,32 +189,25 @@ torch + BGE weights) — so far only verified via `uv sync --dry-run`.
 - **Branding:** the SPA reads `WagmiPhotos` / `wagmi.photos`; the repo/project
   is `SharedCache`. Pick one and reconcile (see `HANDOFF.md` §2).
 
-## Accounts + magic-link login (feat/accounts-magic-link-auth)
+## Accounts + magic-link login
 
-New passwordless email-magic-link auth gates the product (playground/library/account
-+ the API). Deploy steps:
+Passwordless email-magic-link auth gates the product (playground/library/account
++ the API). Login tokens are nonce-bound (migration `0005`), so a stolen or
+prefetched verify link alone can't log anyone in. Deploy steps:
 
-1. **Apply migration `0004` to remote D1 BEFORE deploying the Worker:**
-   `cd projects/worker && npx wrangler d1 migrations apply sharedcache`
-   ⚠️ **Breaking change:** `0004` runs `DELETE FROM api_keys WHERE user_id IS NULL`,
-   wiping **all pre-existing anonymous API keys**. Any live SDK integration using a
-   self-minted key stops working and must sign up + reissue a key from the dashboard.
+1. **Apply migrations to remote D1 BEFORE deploying the Worker** — covered by
+   step 3 above (note `0004`'s breaking anonymous-key wipe and `0005` voiding
+   outstanding magic links).
 2. **Set the Resend secret + sender:** `npx wrangler secret put RESEND_API_KEY`;
    confirm `EMAIL_FROM` in `wrangler.toml` (`login@wagmi.photos`) and **verify that
-   sending domain in Resend**. With `RESEND_API_KEY` unset the Worker runs in dev mode
-   (magic link logged/returned, not emailed) — never deploy prod without it.
+   sending domain in Resend**. With `RESEND_API_KEY` unset (and no `DEV_MODE`, which
+   prod must never set — see step 5) login fails closed: no email is sent and no
+   link is logged or returned. Never deploy prod without the Resend secret.
 3. **Confirm** `wrangler deploy --dry-run` bundles; after deploy, a logged-out visit
    to `#/playground` should redirect to `#/login`, and a real email should receive a
    working magic link.
 
-### Security fast-follows (from final review — not blocking merge, do before real traffic)
-- **Login session-fixation:** the GET `/v1/auth/verify` sets the session cookie, and
-  `SameSite=Lax` gates cookie *send*, not *set* — an attacker can request a link to
-  their own inbox and induce a victim's browser to load the verify URL, logging the
-  victim into the attacker's account. Bind the login token to a nonce cookie set at
-  `/v1/auth/login` (or a POST-confirm interstitial).
-- **Email-scanner prefetch** (Safe Links/Proofpoint) GETs the link and consumes the
-  single-use token before the user clicks. A POST-confirm interstitial fixes both this
-  and the fixation vector in one change.
-- **Token/session GC:** `login_tokens`/`sessions` are never purged — add an
-  expired-row cleanup before the tables grow unbounded.
+### Security fast-follows (not blocking; do before real traffic)
+- **Token/session GC:** expired `login_tokens`/`sessions` rows are now purged
+  opportunistically during login requests; a scheduled GC (cron trigger) remains
+  optional hardening for long idle periods.

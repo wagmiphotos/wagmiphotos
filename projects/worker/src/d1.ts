@@ -10,14 +10,14 @@ function escapeLike(s: string): string {
   return s.replace(/[\\%_]/g, (c) => "\\" + c);
 }
 
-export function makeD1Stores(db: any): {
+export function makeD1Stores(db: D1Database): {
   assets: AssetStore; queries: QueryStore; keys: KeyStore;
   users: UserStore; sessions: SessionStore; loginTokens: LoginTokenStore;
 } {
   const assets: AssetStore = {
     async getAsset(id) {
-      const row = await db.prepare(`SELECT ${ASSET_COLS} FROM assets WHERE id = ?`).bind(id).first();
-      return (row as AssetRow) ?? null;
+      const row = await db.prepare(`SELECT ${ASSET_COLS} FROM assets WHERE id = ?`).bind(id).first<AssetRow>();
+      return row ?? null;
     },
     async searchAssets({ q, limit, offset }) {
       const tokens = q.split(/\s+/).filter(Boolean);
@@ -27,8 +27,8 @@ export function makeD1Stores(db: any): {
             `SELECT ${ASSET_COLS}, created_at FROM assets WHERE ${tokens.map(() => "prompt LIKE ? ESCAPE '\\'").join(" AND ")} ${tail}`
           ).bind(...tokens.map((t) => `%${escapeLike(t)}%`), limit, offset)
         : db.prepare(`SELECT ${ASSET_COLS}, created_at FROM assets ${tail}`).bind(limit, offset);
-      const { results } = await stmt.all();
-      return (results ?? []) as LibraryAssetRow[];
+      const { results } = await stmt.all<LibraryAssetRow>();
+      return results ?? [];
     },
   };
   const queries: QueryStore = {
@@ -44,7 +44,7 @@ export function makeD1Stores(db: any): {
            last_similarity = excluded.last_similarity,
            last_seen = datetime('now'),
            last_asset_id = COALESCE(excluded.last_asset_id, queries.last_asset_id),
-           status = CASE WHEN queries.status = 'built' THEN 'built' ELSE excluded.status END,
+           status = CASE WHEN queries.status IN ('built','building') THEN queries.status ELSE excluded.status END,
            generate = MAX(queries.generate, excluded.generate)
          RETURNING generate`
       ).bind(normalized, original, status, assetId, similarity, generate ? 1 : 0).first();
@@ -83,8 +83,8 @@ export function makeD1Stores(db: any): {
       return row as { id: string; email: string };
     },
     async getById(id) {
-      const row = await db.prepare("SELECT id, email, created_at, last_login FROM users WHERE id = ?").bind(id).first();
-      return (row as User) ?? null;
+      const row = await db.prepare("SELECT id, email, created_at, last_login FROM users WHERE id = ?").bind(id).first<User>();
+      return row ?? null;
     },
   };
 
@@ -101,10 +101,17 @@ export function makeD1Stores(db: any): {
       return row ? { user_id: row.user_id as string } : null;
     },
     async touch(tokenHash) {
-      await db.prepare("UPDATE sessions SET expires_at = datetime('now', '+30 days') WHERE token_hash = ?").bind(tokenHash).run();
+      // Conditional sliding renewal: only rewrite expiry once it has slid by
+      // >= a day, so the hot path writes at most ~once/day per session.
+      await db.prepare(
+        "UPDATE sessions SET expires_at = datetime('now','+30 days') WHERE token_hash = ? AND expires_at < datetime('now','+29 days')"
+      ).bind(tokenHash).run();
     },
     async delete(tokenHash) {
       await db.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(tokenHash).run();
+    },
+    async purgeExpired() {
+      await db.prepare("DELETE FROM sessions WHERE expires_at <= datetime('now')").run();
     },
   };
 
@@ -121,6 +128,9 @@ export function makeD1Stores(db: any): {
          RETURNING email`
       ).bind(tokenHash, nonceHash).first();
       return row ? { email: row.email as string } : null;
+    },
+    async purgeExpired() {
+      await db.prepare("DELETE FROM login_tokens WHERE expires_at <= datetime('now')").run();
     },
   };
 

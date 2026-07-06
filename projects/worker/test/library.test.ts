@@ -64,14 +64,15 @@ it("search: q over 200 chars -> 400, q at the cap still searches", async () => {
   expect((s as any)._searchCalls[0].q).toHaveLength(200);
 });
 
-it("search: non-numeric limit/offset and negative or fractional offset -> 400", async () => {
+it("search: non-numeric or fractional limit/offset and negative offset -> 400", async () => {
   const s = fakeServices();
-  for (const qs of ["limit=abc", "offset=-1", "offset=1.5", "offset=xyz"]) {
+  for (const qs of ["limit=abc", "limit=1.5", "offset=-1", "offset=1.5", "offset=xyz"]) {
     const res = await handleLibrarySearch(new URL(`https://x/v1/library?${qs}`), s);
     expect(res.status).toBe(400);
     const j: any = await res.json();
     expect(typeof j.error).toBe("string");
   }
+  expect((s as any)._searchCalls).toHaveLength(0);
 });
 
 function okUpstream(contentType: string | null = "image/webp"): (url: string) => Promise<Response> {

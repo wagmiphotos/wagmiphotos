@@ -1,13 +1,21 @@
 import type { Env } from "./types";
+import { isDevMode } from "./config";
 
 export interface EmailSender { sendMagicLink(email: string, link: string): Promise<void>; }
 
-export function emailIsDevMode(env: Env): boolean { return !env.RESEND_API_KEY; }
+// Dev email mode (console-logged magic links, dev_link in the login response)
+// requires the explicit DEV_MODE opt-in; a missing RESEND_API_KEY alone is a
+// misconfiguration, not dev mode.
+export function emailIsDevMode(env: Env): boolean { return !env.RESEND_API_KEY && isDevMode(env); }
 
 export function makeEmailSender(env: Env): EmailSender {
   return {
     async sendMagicLink(email, link) {
       if (!env.RESEND_API_KEY) {
+        if (!isDevMode(env)) {
+          // Fail closed: never silently swallow magic links in production.
+          throw new Error("RESEND_API_KEY is not configured and DEV_MODE is off; cannot send magic link");
+        }
         console.log(`[dev] magic link for ${email}: ${link}`);
         return;
       }

@@ -1,3 +1,4 @@
+from sharedcache.common.bge import BGE_MODEL
 from sharedcache.common.config import Settings
 
 def test_defaults_apply_when_env_absent():
@@ -12,19 +13,24 @@ def test_overrides_win():
     assert s.embedding_dims == 3072
 
 def test_new_defaults(monkeypatch):
-    for k in ("DEFAULT_PROVIDER", "IMAGE_PRICE_USD", "WORKER_ENABLED",
-              "WORKER_INTERVAL_SECONDS", "WORKER_BATCH_SIZE", "WORKER_MAX_SPEND_USD",
-              "KEYGEN_RATE_PER_HOUR"):
+    for k in ("DEFAULT_PROVIDER", "IMAGE_PRICE_USD",
+              "WORKER_INTERVAL_SECONDS", "WORKER_BATCH_SIZE", "WORKER_MAX_SPEND_USD"):
         monkeypatch.delenv(k, raising=False)
     from sharedcache.common.config import Settings
     s = Settings(_env_file=None)
     assert s.default_provider == "gmicloud"
     assert s.image_price_usd == 0.04
-    assert s.worker_enabled is True
     assert s.worker_interval_seconds == 300
     assert s.worker_batch_size == 5
     assert s.worker_max_spend_usd == 5.0
-    assert s.keygen_rate_per_hour == 10
+
+def test_dead_settings_are_gone():
+    for name in ("database_url", "embedder_type", "api_key",
+                 "keygen_rate_per_hour", "worker_enabled"):
+        assert name not in Settings.model_fields
+
+def test_bge_model_name_default_is_the_bge_module_constant():
+    assert Settings(_env_file=None).bge_model_name == BGE_MODEL
 
 def test_cf_and_floor_defaults(monkeypatch):
     for k in ("CF_ACCOUNT_ID","CF_API_TOKEN","D1_DATABASE_ID","VECTORIZE_INDEX_NAME",

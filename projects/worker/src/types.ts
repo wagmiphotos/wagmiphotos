@@ -28,10 +28,14 @@ export interface SessionStore {
   resolve(tokenHash: string): Promise<{ user_id: string } | null>;
   touch(tokenHash: string): Promise<void>;
   delete(tokenHash: string): Promise<void>;
+  /** Best-effort GC of rows past expiry. */
+  purgeExpired(): Promise<void>;
 }
 export interface LoginTokenStore {
   create(tokenHash: string, email: string, nonceHash: string): Promise<void>;
   consume(tokenHash: string, nonceHash: string): Promise<{ email: string } | null>;
+  /** Best-effort GC of rows past expiry. */
+  purgeExpired(): Promise<void>;
 }
 export interface KeyStore {
   getKeyOwner(hash: string): Promise<string | null>;
@@ -40,6 +44,8 @@ export interface KeyStore {
   deleteKey(userId: string, id: string): Promise<void>;
 }
 export interface RateLimiter { limit(key: string): Promise<boolean>; }
+/** Minimal structural type for the unsafe `ratelimit` binding (no exported type in workers-types). */
+export interface RateLimitBinding { limit(opts: { key: string }): Promise<{ success: boolean }>; }
 export interface Services {
   embedder: Embedder; vectorize: VectorizeStore; assets: AssetStore; queries: QueryStore;
   keys: KeyStore; rateLimiter: RateLimiter;
@@ -47,9 +53,11 @@ export interface Services {
   email: EmailSender;
 }
 export interface Env {
-  DB: any; VECTORIZE: any; AI: any; RATE_LIMITER?: any;
+  DB: D1Database; VECTORIZE: VectorizeIndex; AI: Ai; RATE_LIMITER?: RateLimitBinding;
   ASSETS: { fetch(request: Request): Promise<Response> };
   MASTER_API_KEY?: string;
+  /** "true"/"1" opens dev-only lanes (dev API principal, console magic links). NEVER set in production. */
+  DEV_MODE?: string;
   IMAGE_PRICE_USD?: string; FLOOR_SIM_MAX?: string; FLOOR_SIM_MIN?: string;
   GITHUB_REPO?: string;
   RESEND_API_KEY?: string; EMAIL_FROM?: string;

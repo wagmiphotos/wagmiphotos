@@ -1,74 +1,48 @@
-# SharedCache — TODO
+# SharedCache / wagmi.photos — TODO
 
-Semantic cache for image generation behind an OpenAI-compatible API, for the
-**Backblaze Generative Media Hackathon** (deadline **Aug 3, 2026, 5:00 pm EDT**;
-judging Aug 5–11). Requires Backblaze **B2** + **Genblaze**.
+Semantic image-generation cache for the **Backblaze Generative Media Hackathon**
+(deadline **Aug 3, 2026, 5:00 pm EDT**; judging Aug 5–11). Requires Backblaze
+**B2** + **Genblaze**.
 
-- Spec: `docs/specs/2026-06-23-sharedcache-design.md`
-- Plan: `docs/plans/2026-06-23-sharedcache-mvp.md`
+Where things live:
 
-## Status (2026-06-23)
+- **Current state / resume here:** `HANDOFF.md` (root) → `docs/HANDOFF-2026-07-07.md`
+- **Deployment runbook:** `DEPLOY.md` (ordered; includes migrations, secrets, GMI box)
+- **Design trail:** `docs/superpowers/` (specs + plans)
+- Archived FastAPI/pgvector-era docs: `docs/archive/` (historical only)
 
-- ✅ MVP built — all 12 plan tasks complete on `master` (clean single-line history).
-- ✅ Offline test suite: **33 passed / 1 skipped** (`uv run pytest`). The skip is
-  `tests/test_index_pg.py` — the Postgres integration test, runs only when `DATABASE_URL` is set.
-- ⚠️ Real adapters (Gemini / pgvector / Genblaze-S3 / Genblaze pipeline) are verified-by-introspection
-  against the pinned SDK but **have NOT been run against live B2 / OpenAI / Postgres** (no keys yet).
+## 1. Deploy / live verification (the big open item)
 
----
+Everything is verified offline with fakes; nothing has run against live infra.
+Follow `DEPLOY.md` in order — it covers D1 create + migrations (through `0006`),
+the Vectorize index, the BGE embedding drift check, seeding, and floor tuning.
 
-## 1. Do first — get it running live
+- [ ] **Task 6 — BGE live provisioning:** create `wagmiphotos-bge`, run the
+      drift check (Workers AI BGE vs local BGE, cosine ≥ 0.98), seed the pool,
+      tune `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN`.
+      (`docs/superpowers/plans/2026-07-06-bge-edge-embeddings.md` Task 6.)
+- [ ] **sharedcache → wagmiphotos rename:** reconcile the repo/project naming
+      with the wagmi.photos brand (the GitHub origin is already renamed).
 
-- [ ] Provision credentials in `.env` (copy from `.env.example`):
-      `OPENAI_API_KEY`, `B2_KEY_ID`, `B2_APP_KEY`, `B2_BUCKET`, `B2_PUBLIC_URL_BASE`
-      (optional: `GEMINI_API_KEY`, `DATABASE_URL`, `EMBEDDING_DIMS`, `API_KEY`).
-- [ ] Claim **GMI Cloud credits** (first 270 hackathon signups) — optional provider.
-- [ ] Local boot smoke (offline, no keys): `uv sync && uv pip install -e .` then
-      `uv run uvicorn sharedcache.api:app --reload` → open http://localhost:8000/ →
-      first generate = MISS, identical prompt (same server process) = HIT.
+## 2. Hackathon submission
 
-## 2. Live verification (needs real keys — the 3 things stub tests can't cover)
-
-- [ ] **Public B2 URL delivery:** make the B2 bucket **public-read** and set
-      `B2_PUBLIC_URL_BASE=https://f004.backblazeb2.com/file/<bucket>`. Generate one image and
-      confirm `data[0].url` returns **200 in a browser** (otherwise served images 403).
-- [ ] **Postgres schema:** run `uv run python scripts/migrate.py | psql "$DATABASE_URL"` against a
-      live Postgres + pgvector instance. `migrate.py` templates `vector(EMBEDDING_DIMS)` —
-      confirm `\d assets` shows the right vector dimension.
-- [ ] **End-to-end miss:** with all creds set, confirm a first miss inserts an `assets` row whose
-      `url`/`thumb_url`/`manifest_url` are `https://…` (NOT `memory://…`), the asset + `manifest.json`
-      land in B2, and a re-run of the same prompt returns HIT with `cost_saved_usd > 0`.
-
-## 3. Hackathon submission
-
-- [ ] Create the project's **own public GitHub repo** and push `master` (`gh repo create …`).
-      (Separate from anything wypiwyg/mysitebot.)
-- [ ] Deploy to a public URL judges can test; create a test `API_KEY` + note it in the submission.
-- [ ] Record **<3-min demo video** (YouTube/Vimeo) — show MISS → HIT and the live **"$ saved"** counter.
-- [ ] Devpost write-up: what it does, **how it uses B2**, **how it uses Genblaze**, and the
-      **list of AI providers/models** used (README already covers these).
-- [ ] (Bonus) File substantive product feedback as Genblaze repo issues → **Feedback Prize**
-      (e.g. provenance issue #77, the no-raw-bytes return ergonomics, empty pricing data).
+- [x] Create the project's own public GitHub repo — done: origin =
+      `github.com/wagmiphotos/wagmiphotos`, `main` pushed.
+- [ ] Deploy to a public URL judges can test (`DEPLOY.md`); note a test
+      login / API key in the submission.
+- [ ] Record **<3-min demo video** (YouTube/Vimeo) — show a miss getting
+      queued, the backfill building it, the follow-up HIT, and the **"$ saved"**
+      counter.
+- [ ] Devpost write-up: what it does, **how it uses B2**, **how it uses
+      Genblaze**, and the **providers/models** used (README covers these).
+- [ ] (Bonus) File substantive product feedback as Genblaze repo issues →
+      **Feedback Prize**.
 - [ ] Submit on Devpost before **Aug 3, 2026, 5:00 pm EDT**.
 
-## 4. Polish (deferred — non-blocking, from the final review)
+## 3. Optional follow-ups (non-blocking)
 
-- [ ] One `ruff format` + `ruff check` pass for PEP 8 spacing across files (recurring cosmetic nit).
-- [ ] `floor.py` docstring; direct test for `Generated` dataclass; direct test for `cost_meter.cost_saved`.
-- [ ] `StubGenerator` `size.split("x")` validation; non-default-size test.
-- [ ] `PgCacheIndex`: drop redundant `conn.commit()` inside the psycopg3 `with`; use `_dims` for validation.
-- [ ] Thread the authenticated bearer key into the cost ledger (currently `api_key="caller"` hardcoded).
-
-## 5. Stretch goals (only if MVP is solid before the deadline)
-
-- [ ] **S1 — Moderation gate:** Cloud Vision SafeSearch on generated bytes before index insert
-      (reject adult/racy/violence; store scores in `assets.safety`). Strengthens "Production Readiness."
-- [ ] **S2 — Second modality:** `audio-cache-1` via a Genblaze TTS provider (`modality=AUDIO`) —
-      hits the hackathon "multimodal" theme; same cache flow.
-- [ ] **S3 — Per-key metering:** real API keys + `savings_ledger` persisted in Postgres;
-      `GET /v1/usage` returns per-key savings.
-
-## 6. Post-hackathon
-
-- [ ] Migrate mysitebot's `imagelibrary` (GCS-based) onto SharedCache via its `MediaSearch`
-      protocol / OpenAI client — SharedCache replaces the current ingestion pipeline.
+- [ ] **Scheduled token/session GC:** expired sessions and login tokens are now
+      purged opportunistically during login requests; a scheduled sweep (cron
+      trigger) is optional extra hardening for long idle periods.
+- [ ] Remaining hardening/nice-to-haves are tracked in `DEPLOY.md` → "Still
+      open" and `HANDOFF.md` → "Next steps".

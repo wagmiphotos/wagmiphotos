@@ -31,10 +31,3 @@ class Generated:
     manifest_json: str
     manifest_hash: str
     storage_key: str
-
-@dataclass
-class GenerationResult:
-    record: AssetRecord
-    result: str  # "hit" | "miss"
-    similarity: float
-    cost_saved_usd: float

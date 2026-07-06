@@ -50,6 +50,7 @@ export function clearLoginNonceCookie(secure: boolean): string {
 
 import type { Env, SessionStore, KeyStore } from "./types";
 import { sha256Hex, constantTimeEqual, bearer } from "./auth";
+import { isDevMode } from "./config";
 
 export const MASTER_USER_ID = "usr_master";
 export const DEV_USER_ID = "usr_dev";
@@ -78,6 +79,8 @@ export async function resolveApiPrincipal(
   }
   const session = await resolveSession(request, env, stores.sessions);
   if (session) return session;
-  if (!env.MASTER_API_KEY) return { userId: DEV_USER_ID }; // dev-open API lane
+  // Dev-open API lane: requires an explicit DEV_MODE opt-in AND no configured
+  // master key. Absence of MASTER_API_KEY alone must never open the API.
+  if (!env.MASTER_API_KEY && isDevMode(env)) return { userId: DEV_USER_ID };
   return null;
 }

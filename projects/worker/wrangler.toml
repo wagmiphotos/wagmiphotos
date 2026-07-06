@@ -5,8 +5,8 @@ compatibility_date = "2026-06-01"
 # D1 — same database the backfill/seed write (set database_id after `wrangler d1 create`)
 [[d1_databases]]
 binding = "DB"
-database_name = "sharedcache"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_name = "wagmiphotos"
+database_id = "f154509c-622f-451f-a004-70e91a0ed68a"
 
 # Workers AI — BGE text embedding
 [ai]
@@ -25,6 +25,9 @@ namespace_id = "1001"
 simple = { limit = 10, period = 60 }
 
 [vars]
+# DEV_MODE must NEVER be set in production: it opens the unauthenticated dev API
+# lane and console-logs magic links. Set it only in .dev.vars for local dev
+# (see .dev.vars.example).
 EMAIL_FROM = "login@wagmi.photos"   # verified Resend sending address
 FLOOR_SIM_MAX = "0.90"
 FLOOR_SIM_MIN = "0.72"

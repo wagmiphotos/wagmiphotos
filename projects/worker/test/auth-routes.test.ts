@@ -7,9 +7,10 @@ function svc(over: any = {}) {
   const sent: any[] = [];
   const created: any[] = [];
   const consumeCalls: any[] = [];
+  const purged: string[] = [];
   const base = {
     users: { upsertByEmail: async (id: string, email: string) => ({ id, email }), getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null }) },
-    sessions: { create: async (u: string, h: string) => { created.push({ u, h }); }, resolve: async () => ({ user_id: "usr_1" }), touch: async () => {}, delete: async () => {} },
+    sessions: { create: async (u: string, h: string) => { created.push({ u, h }); }, resolve: async () => ({ user_id: "usr_1" }), touch: async () => {}, delete: async () => {}, purgeExpired: async () => { purged.push("sessions"); } },
     loginTokens: {
       create: async () => {},
       // Models the atomic nonce guard: only the expected nonceHash (sha256("NON")) redeems the token.
@@ -17,13 +18,14 @@ function svc(over: any = {}) {
         consumeCalls.push({ tokenHash, nonceHash });
         return nonceHash === (await sha256Hex("NON")) ? { email: "a@b.co" } : null;
       },
+      purgeExpired: async () => { purged.push("loginTokens"); },
     },
     keys: { getKeyOwner: async () => null, addKey: async () => {}, listByUser: async () => [] },
     rateLimiter: { limit: async () => true },
     email: { sendMagicLink: async (e: string, l: string) => { sent.push({ e, l }); } },
   };
   const s = { ...base, ...over };
-  (s as any)._sent = sent; (s as any)._created = created; (s as any)._consumeCalls = consumeCalls;
+  (s as any)._sent = sent; (s as any)._created = created; (s as any)._consumeCalls = consumeCalls; (s as any)._purged = purged;
   return s as any;
 }
 const cfg = { token: () => "TOK", nonce: () => "NON", verifyBase: "https://wagmi.photos", now: () => 0 };
@@ -72,11 +74,42 @@ it("login: known vs unknown email yields byte-identical response (enumeration-sa
   expect(jKnown).toEqual(jUnknown);
 });
 
-it("login: dev mode returns the link in the body", async () => {
+it("login: dev mode (DEV_MODE set, no RESEND_API_KEY) returns the link in the body", async () => {
   const s = svc();
-  const res = await handleLoginRequest(loginReq("a@b.co"), {} as any, s, cfg); // no RESEND_API_KEY
+  const res = await handleLoginRequest(loginReq("a@b.co"), { DEV_MODE: "true" } as any, s, cfg);
   const j: any = await res.json();
   expect(j.dev_link).toBe("https://wagmi.photos/v1/auth/verify?token=TOK");
+});
+
+it("login: RESEND_API_KEY unset and NOT dev mode -> generic 200 without dev_link", async () => {
+  const s = svc();
+  const res = await handleLoginRequest(loginReq("a@b.co"), {} as any, s, cfg); // prod misconfig: no provider
+  expect(res.status).toBe(200);
+  const j: any = await res.json();
+  expect(j).toEqual({ status: "sent" }); // no magic link leaked to the caller
+});
+
+it("login: opportunistically purges expired login tokens and sessions", async () => {
+  const s = svc();
+  await handleLoginRequest(loginReq("a@b.co"), { RESEND_API_KEY: "re" } as any, s, cfg);
+  expect(s._purged).toContain("loginTokens");
+  expect(s._purged).toContain("sessions");
+});
+
+it("login: rate-limited requests do not purge (returns generic early)", async () => {
+  const s = svc({ rateLimiter: { limit: async () => false } });
+  await handleLoginRequest(loginReq("a@b.co"), { RESEND_API_KEY: "re" } as any, s, cfg);
+  expect(s._purged).toEqual([]);
+});
+
+it("login: purge failure is logged, not fatal — login still succeeds", async () => {
+  const s = svc({
+    sessions: { create: async () => {}, resolve: async () => null, touch: async () => {}, delete: async () => {}, purgeExpired: async () => { throw new Error("d1 down"); } },
+    loginTokens: { create: async () => {}, consume: async () => null, purgeExpired: async () => { throw new Error("d1 down"); } },
+  });
+  const res = await handleLoginRequest(loginReq("a@b.co"), { RESEND_API_KEY: "re" } as any, s, cfg);
+  expect(res.status).toBe(200);
+  expect(s._sent.length).toBe(1); // link still sent
 });
 
 it("verify: valid token + matching nonce cookie sets session cookie, clears nonce cookie, 302 to playground", async () => {

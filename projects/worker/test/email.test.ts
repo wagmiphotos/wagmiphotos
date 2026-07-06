@@ -3,15 +3,28 @@ import { makeEmailSender, emailIsDevMode } from "../src/email";
 
 afterEach(() => vi.unstubAllGlobals());
 
-it("dev mode when RESEND_API_KEY unset: logs, does not fetch", async () => {
+it("dev mode requires DEV_MODE + no RESEND_API_KEY: logs, does not fetch", async () => {
   const spy = vi.spyOn(console, "log").mockImplementation(() => {});
   const fetchSpy = vi.fn();
   vi.stubGlobal("fetch", fetchSpy);
-  expect(emailIsDevMode({} as any)).toBe(true);
-  await makeEmailSender({} as any).sendMagicLink("a@b.co", "https://x/link");
+  expect(emailIsDevMode({ DEV_MODE: "true" } as any)).toBe(true);
+  await makeEmailSender({ DEV_MODE: "true" } as any).sendMagicLink("a@b.co", "https://x/link");
   expect(fetchSpy).not.toHaveBeenCalled();
   expect(spy).toHaveBeenCalled();
   spy.mockRestore();
+});
+
+it("RESEND_API_KEY unset and NOT dev mode: not dev mode, sendMagicLink throws, no fetch", async () => {
+  const fetchSpy = vi.fn();
+  vi.stubGlobal("fetch", fetchSpy);
+  expect(emailIsDevMode({} as any)).toBe(false);
+  await expect(makeEmailSender({} as any).sendMagicLink("a@b.co", "https://x/link")).rejects.toThrow(/RESEND_API_KEY/);
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
+
+it("RESEND_API_KEY set: never dev mode, even with DEV_MODE", async () => {
+  expect(emailIsDevMode({ RESEND_API_KEY: "re_x" } as any)).toBe(false);
+  expect(emailIsDevMode({ RESEND_API_KEY: "re_x", DEV_MODE: "true" } as any)).toBe(false);
 });
 
 it("prod mode posts to Resend with from/to/subject", async () => {

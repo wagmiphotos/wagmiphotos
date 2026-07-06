@@ -23,8 +23,8 @@ export async function handleLibrarySearch(url: URL, s: Services): Promise<Respon
   let limit = 24;
   if (rawLimit != null) {
     const n = Number(rawLimit);
-    if (!Number.isFinite(n)) return Response.json({ error: "limit must be a number" }, { status: 400 });
-    limit = Math.min(60, Math.max(1, Math.floor(n)));
+    if (!Number.isInteger(n)) return Response.json({ error: "limit must be an integer" }, { status: 400 });
+    limit = Math.min(60, Math.max(1, n));
   }
   let offset = 0;
   if (rawOffset != null) {

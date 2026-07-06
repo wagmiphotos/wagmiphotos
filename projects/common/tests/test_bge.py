@@ -1,4 +1,8 @@
 import math
+import sys
+
+import pytest
+
 from sharedcache.common.bge import BgeEmbedder
 
 class FakeEncoder:
@@ -16,3 +20,9 @@ def test_text_embed_passes_raw_text_no_prefix():
         def encode(self, texts): seen["texts"] = texts; return [[1.0, 0.0]]
     BgeEmbedder(E()).text_embed("hello world")
     assert seen["texts"] == ["hello world"]   # exact text, no instruction prefix
+
+def test_from_pretrained_missing_dependency_names_the_extra(monkeypatch):
+    monkeypatch.setitem(sys.modules, "sentence_transformers", None)  # simulate not installed
+    with pytest.raises(ImportError) as e:
+        BgeEmbedder.from_pretrained()
+    assert "sharedcache-backfill[model]" in str(e.value)

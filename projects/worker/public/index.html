@@ -33,15 +33,7 @@
       --warning-tint: rgba(180, 83, 9, 0.1);
       --danger: #d31c24;
 
-      /* Legacy aliases still referenced from scripts/inline styles */
-      --primary: var(--red);
-      --primary-hover: var(--red-deep);
-      --text-main: var(--ink);
-      --text-muted: var(--muted);
-      --card-border: var(--line);
-
       --font-display: 'Bricolage Grotesque', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      --font-outfit: var(--font-display); /* legacy alias */
       --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       --font-mono: 'JetBrains Mono', ui-monospace, monospace;
     }
@@ -305,28 +297,6 @@
     .nav-github .star-count { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
     .nav-github .star-ic { color: #f5b301; }
 
-    .nav-cta {
-      background: var(--ink);
-      color: #fff;
-      font-family: var(--font-display);
-      font-weight: 700;
-      font-size: 0.875rem;
-      padding: 9px 18px;
-      border-radius: 99px;
-      text-decoration: none;
-      margin-left: 6px;
-      white-space: nowrap;
-      transition: background-color 0.2s ease, transform 0.2s ease;
-    }
-
-    .nav-cta:hover {
-      background: #000;
-      transform: translateY(-1px);
-    }
-
-    .nav-cta.active { background: var(--red); }
-    .nav-cta.active:hover { background: var(--red-deep); }
-
     .auth-nav {
       display: flex;
       align-items: center;
@@ -420,7 +390,6 @@
       .nav-dropdown.nav-list { width: auto; }
       .nav-item .caret { display: none; }
       .nav-col-head { padding: 12px 12px 6px; }
-      .nav-cta { margin-left: 0; text-align: center; padding: 12px 18px; flex: 1; }
     }
 
     /* ============ Views ============ */
@@ -470,6 +439,11 @@
     .library-download:hover { background: var(--red); }
     .library-status { text-align: center; color: var(--muted); padding: 40px 0; font-size: 0.9375rem; }
     .library-status a { color: var(--red); }
+    .link-btn {
+      background: none; border: none; padding: 0;
+      font: inherit; color: var(--red); cursor: pointer;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
     .btn.library-more { display: block; width: auto; margin: 28px auto 0; background: var(--paper); border: 1px solid var(--line); color: var(--ink); padding: 0 24px; height: 40px; }
 
     /* anchored sections/docs clear the sticky navbar when deep-linked */
@@ -1542,7 +1516,7 @@
     /* ============ Forms ============ */
     .form-group { margin-bottom: 20px; }
 
-    label {
+    label, .field-label {
       display: block;
       font-size: 0.75rem;
       font-weight: 600;
@@ -1849,7 +1823,6 @@
     }
 
     .badge-hit { color: var(--success); background: var(--success-tint); border: 1px solid rgba(14, 138, 77, 0.3); }
-    .badge-miss { color: var(--warning); background: var(--warning-tint); border: 1px solid rgba(180, 83, 9, 0.3); }
     .badge-approximate { background: var(--warning-tint); color: var(--warning); border: 1px solid rgba(180, 83, 9, 0.3); }
     .badge-pending { background: rgba(28, 28, 27, 0.07); color: var(--muted); border: 1px solid var(--line); }
 
@@ -1861,7 +1834,9 @@
       border: 1px solid var(--line);
       border-radius: 20px;
       padding: 6px 12px;
+      font-family: inherit;
       font-size: 0.75rem;
+      line-height: inherit;
       color: var(--muted);
       cursor: pointer;
       transition: color 0.2s ease, border-color 0.2s ease;
@@ -1881,6 +1856,9 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      width: 100%;
+      text-align: left;
+      font-family: inherit;
       background: var(--paper);
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -1909,7 +1887,8 @@
     }
 
     .history-badge.hit { color: var(--success); background: var(--success-tint); }
-    .history-badge.miss { color: var(--warning); background: var(--warning-tint); }
+    .history-badge.approximate { color: var(--warning); background: var(--warning-tint); }
+    .history-badge.pending { color: var(--muted); background: rgba(28, 28, 27, 0.07); }
 
     /* ============ Toast ============ */
     .toast {
@@ -2116,7 +2095,7 @@
 
     .docs-note b { color: var(--ink); }
 
-    /* ---- Developer page extras (OpenAI / CLIP / Agents) ---- */
+    /* ---- Developer page extras (OpenAI / Matching / Agents) ---- */
     .dev-lead {
       max-width: 720px;
       margin: 0 auto 8px;
@@ -2199,7 +2178,7 @@
       tab-size: 2;
     }
 
-    /* CLIP similarity illustration */
+    /* Similarity illustration */
     .sim-row { display: grid; grid-template-columns: 1fr; gap: 4px; margin-bottom: 16px; }
     @media (min-width: 620px) { .sim-row { grid-template-columns: 260px 1fr 130px; align-items: center; gap: 14px; } }
     .sim-prompt { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--ink-soft); }
@@ -2210,20 +2189,20 @@
     .sim-verdict { font-size: 0.8125rem; font-weight: 600; }
     .sim-verdict .n { font-family: var(--font-mono); color: var(--ink); }
 
-    .clip-scale-wrap { margin: 14px 0 6px; }
-    .clip-scale {
+    .match-scale-wrap { margin: 14px 0 6px; }
+    .match-scale {
       height: 16px;
       border-radius: 99px;
       background: linear-gradient(90deg, var(--red) 0%, #d98c00 52%, var(--muted) 100%);
     }
-    .clip-scale-labels {
+    .match-scale-labels {
       display: flex;
       justify-content: space-between;
       margin-top: 8px;
       font-size: 0.75rem;
       color: var(--muted);
     }
-    .clip-scale-labels b { color: var(--ink); font-family: var(--font-display); }
+    .match-scale-labels b { color: var(--ink); font-family: var(--font-display); }
 
     /* FAQ */
     .faq-list { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
@@ -2317,41 +2296,41 @@
               Resources
               <svg class="caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
             </button>
-            <div class="nav-dropdown nav-mega" role="menu">
+            <div class="nav-dropdown nav-mega">
               <div class="nav-col">
                 <div class="nav-col-head">On this page</div>
-                <a href="#how-it-works" class="nav-drop-item" role="menuitem">
+                <a href="#how-it-works" class="nav-drop-item">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg></span>
                   <span><span class="nav-drop-title">How it works</span><span class="nav-drop-sub">Request in, image out.</span></span>
                 </a>
-                <a href="#closest-match" class="nav-drop-item" role="menuitem">
+                <a href="#closest-match" class="nav-drop-item">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg></span>
                   <span><span class="nav-drop-title">Closest match</span><span class="nav-drop-sub">Fast, cheap, not exact.</span></span>
                 </a>
-                <a href="#why-it-wins" class="nav-drop-item" role="menuitem">
+                <a href="#why-it-wins" class="nav-drop-item">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16h2M13 12h2M17 8h2"/></svg></span>
                   <span><span class="nav-drop-title">Why it wins</span><span class="nav-drop-sub">Price &amp; speed, charted.</span></span>
                 </a>
-                <a href="#the-api" class="nav-drop-item" role="menuitem">
+                <a href="#the-api" class="nav-drop-item">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg></span>
                   <span><span class="nav-drop-title">The API</span><span class="nav-drop-sub">One endpoint, cache included.</span></span>
                 </a>
               </div>
               <div class="nav-col">
                 <div class="nav-col-head">Explore</div>
-                <a href="#/pricing" class="nav-drop-item explore" role="menuitem">
+                <a href="#/pricing" class="nav-drop-item explore">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg></span>
                   <span><span class="nav-drop-title">Pricing</span><span class="nav-drop-sub">Plans from $0/mo.</span></span>
                 </a>
-                <a href="#/playground" class="nav-drop-item explore" role="menuitem">
+                <a href="#/playground" id="nav-playground" class="nav-drop-item explore">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span>
                   <span><span class="nav-drop-title">Playground</span><span class="nav-drop-sub">Try a live prompt.</span></span>
                 </a>
-                <a href="#/account" class="nav-drop-item explore" role="menuitem">
+                <a href="#/account" class="nav-drop-item explore">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
                   <span><span class="nav-drop-title">Account</span><span class="nav-drop-sub">Keys &amp; usage stats.</span></span>
                 </a>
-                <a href="#/legal" class="nav-drop-item explore" role="menuitem">
+                <a href="#/legal" class="nav-drop-item explore">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 7h14"/><path d="m5 7-2 6a4 4 0 0 0 8 0z"/><path d="m19 7-2 6a4 4 0 0 0 8 0z"/><path d="M8 21h8"/></svg></span>
                   <span><span class="nav-drop-title">Legal</span><span class="nav-drop-sub">Privacy &amp; licensing.</span></span>
                 </a>
@@ -2365,20 +2344,20 @@
               Developers
               <svg class="caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
             </button>
-            <div class="nav-dropdown nav-list" role="menu">
-              <a href="#/docs" id="nav-docs" class="nav-drop-item" role="menuitem">
+            <div class="nav-dropdown nav-list">
+              <a href="#/docs" id="nav-docs" class="nav-drop-item">
                 <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg></span>
                 <span><span class="nav-drop-title">API reference</span><span class="nav-drop-sub">Endpoints, params, responses.</span></span>
               </a>
-              <a href="#/openai" id="nav-openai" class="nav-drop-item" role="menuitem">
+              <a href="#/openai" id="nav-openai" class="nav-drop-item">
                 <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m0 8v3a2 2 0 0 0 2 2h3m8-18h3a2 2 0 0 1 2 2v3m0 8v3a2 2 0 0 1-2 2h-3"/><path d="m9 15 6-6"/><path d="M15 15V9h-6"/></svg></span>
                 <span><span class="nav-drop-title">OpenAI drop-in</span><span class="nav-drop-sub">Swap the base URL, nothing else.</span></span>
               </a>
-              <a href="#/clip" id="nav-clip" class="nav-drop-item" role="menuitem">
+              <a href="#/matching" id="nav-matching" class="nav-drop-item">
                 <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="1.5"/><circle cx="17" cy="6" r="1.5"/><circle cx="10" cy="15" r="1.5"/><circle cx="18" cy="16" r="1.5"/><circle cx="5" cy="17" r="1.5"/></svg></span>
-                <span><span class="nav-drop-title">CLIP embeddings</span><span class="nav-drop-sub">How semantic matching works.</span></span>
+                <span><span class="nav-drop-title">Semantic matching</span><span class="nav-drop-sub">How prompts find images.</span></span>
               </a>
-              <a href="#/agents" id="nav-agents" class="nav-drop-item" role="menuitem">
+              <a href="#/agents" id="nav-agents" class="nav-drop-item">
                 <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M12 4v4M8 2v2M16 2v2"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/></svg></span>
                 <span><span class="nav-drop-title">Agents</span><span class="nav-drop-sub">Copy-paste skill file.</span></span>
               </a>
@@ -2387,12 +2366,8 @@
         </div>
 
         <div class="nav-actions">
-          <a href="#" class="nav-social" target="_blank" rel="noopener" aria-label="wagmi.photos on X" title="X (set your handle)">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-          </a>
-          <a href="#" class="nav-social" target="_blank" rel="noopener" aria-label="wagmi.photos on Discord" title="Discord (set your invite)">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.891.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.331c-1.183 0-2.157-1.086-2.157-2.42 0-1.332.955-2.418 2.157-2.418 1.21 0 2.176 1.096 2.157 2.418 0 1.334-.956 2.42-2.157 2.42zm7.975 0c-1.183 0-2.157-1.086-2.157-2.42 0-1.332.955-2.418 2.157-2.418 1.21 0 2.176 1.096 2.157 2.418 0 1.334-.946 2.42-2.157 2.42z"/></svg>
-          </a>
+          <!-- X / Discord icons intentionally omitted until real profile URLs exist.
+               Re-add as <a class="nav-social" href="…"> links when the handles are live. -->
           <a href="https://github.com/wagmiphotos/wagmiphotos" class="nav-social nav-github" target="_blank" rel="noopener" aria-label="Star wagmiphotos on GitHub">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.523 2 12 2z"/></svg>
             <span class="star-count">
@@ -2403,16 +2378,16 @@
           <div id="auth-nav" class="auth-nav">
             <a href="#/login" id="auth-login" class="nav-login-link">Log in</a>
             <div id="auth-menu" class="nav-item" hidden>
-              <button type="button" class="nav-trigger avatar-btn" aria-expanded="false" aria-haspopup="menu" aria-label="Account menu">
+              <button type="button" class="nav-trigger avatar-btn" aria-expanded="false" aria-label="Account menu">
                 <span class="avatar" id="avatar-initial">·</span>
               </button>
-              <div class="nav-dropdown nav-list account-menu" role="menu">
+              <div class="nav-dropdown nav-list account-menu">
                 <div class="account-head">Signed in as<span class="account-email" id="nav-account-email"></span></div>
-                <a href="#/account" class="nav-drop-item" role="menuitem" onclick="closeMenus()">
+                <a href="#/account" class="nav-drop-item" onclick="closeMenus()">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
                   <span><span class="nav-drop-title">Account</span><span class="nav-drop-sub">Keys &amp; usage.</span></span>
                 </a>
-                <a href="#" class="nav-drop-item" role="menuitem" onclick="logout();return false">
+                <a href="#" class="nav-drop-item" onclick="logout();return false">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg></span>
                   <span><span class="nav-drop-title">Log out</span></span>
                 </a>
@@ -2599,7 +2574,7 @@
           <!-- Edge worker -->
           <div class="flow-card flow-bar">
             <span class="flow-bar-logo"><svg width="30" height="30" viewBox="0 0 24 24" fill="#f38020" xmlns="http://www.w3.org/2000/svg"><path d="M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8.6592-.1123a.1559.1559 0 0 1-.1333-.0713c-.0283-.042-.0351-.0986-.021-.1553.0278-.084.1123-.1484.2036-.1562l8.7359-.1123c1.0351-.0489 2.1601-.8868 2.5537-1.9136l.499-1.3013c.0215-.0561.0293-.1128.0147-.168-.5625-2.5463-2.835-4.4453-5.5499-4.4453-2.5039 0-4.6284 1.6177-5.3876 3.8614-.4927-.3658-1.1187-.5625-1.794-.499-1.2026.119-2.1665 1.083-2.2861 2.2856-.0283.31-.0069.6128.0635.894C1.5683 13.171 0 14.7754 0 16.752c0 .1748.0142.3515.0352.5273.0141.083.0844.1475.1689.1475h15.9814c.0909 0 .1758-.0645.2032-.1553l.12-.4268zm2.7568-5.5634c-.0771 0-.1611 0-.2383.0112-.0566 0-.1054.0415-.127.0976l-.3378 1.1744c-.1475.5068-.0918.9707.1543 1.3164.2256.3164.6055.498 1.0625.5195l1.8437.1133c.0557 0 .1055.0263.1329.0703.0283.043.0351.1074.0214.1562-.0283.084-.1132.1485-.204.1553l-1.921.1123c-1.041.0488-2.1582.8867-2.5527 1.914l-.1406.3585c-.0283.0713.0215.1416.0986.1416h6.5977c.0771 0 .1474-.0489.169-.126.1122-.4082.1757-.837.1757-1.2803 0-2.6025-2.125-4.727-4.7344-4.727"/></svg></span>
-            <p><b>Cloudflare edge worker</b> — authenticates your key, CLIP-embeds the prompt, and answers from the edge. It never runs a GPU in the request path.</p>
+            <p><b>Cloudflare edge worker</b> — authenticates your key, embeds your prompt with BGE on Workers AI, and answers from the edge. It never runs a GPU in the request path.</p>
           </div>
 
           <div class="flow-arrow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg></div>
@@ -2613,7 +2588,7 @@
             <div class="flow-decision-body">
               <div class="flow-mascot"><img src="/assets/logo.webp" alt="" width="76" height="76"></div>
               <ol class="flow-list">
-                <li><span class="n">1</span>Your prompt's CLIP vector is matched against every image in the library.</li>
+                <li><span class="n">1</span>Your prompt's BGE vector is matched against the stored prompt of every image in the library.</li>
                 <li><span class="n">2</span>Near match — the image is served instantly. That's a hit.</li>
                 <li><span class="n">3</span>Truly new — you get a 202 and the prompt joins the build queue. No waiting.</li>
                 <li><span class="n">4</span>The backfill generates the most-requested misses, so tomorrow they're hits.</li>
@@ -2648,7 +2623,7 @@
                 <span class="flow-head-icon plain"><svg width="22" height="22" viewBox="0 0 24 24" fill="#f38020" xmlns="http://www.w3.org/2000/svg"><path d="M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8.6592-.1123a.1559.1559 0 0 1-.1333-.0713c-.0283-.042-.0351-.0986-.021-.1553.0278-.084.1123-.1484.2036-.1562l8.7359-.1123c1.0351-.0489 2.1601-.8868 2.5537-1.9136l.499-1.3013c.0215-.0561.0293-.1128.0147-.168-.5625-2.5463-2.835-4.4453-5.5499-4.4453-2.5039 0-4.6284 1.6177-5.3876 3.8614-.4927-.3658-1.1187-.5625-1.794-.499-1.2026.119-2.1665 1.083-2.2861 2.2856-.0283.31-.0069.6128.0635.894C1.5683 13.171 0 14.7754 0 16.752c0 .1748.0142.3515.0352.5273.0141.083.0844.1475.1689.1475h15.9814c.0909 0 .1758-.0645.2032-.1553l.12-.4268zm2.7568-5.5634c-.0771 0-.1611 0-.2383.0112-.0566 0-.1054.0415-.127.0976l-.3378 1.1744c-.1475.5068-.0918.9707.1543 1.3164.2256.3164.6055.498 1.0625.5195l1.8437.1133c.0557 0 .1055.0263.1329.0703.0283.043.0351.1074.0214.1562-.0283.084-.1132.1485-.204.1553l-1.921.1123c-1.041.0488-2.1582.8867-2.5527 1.914l-.1406.3585c-.0283.0713.0215.1416.0986.1416h6.5977c.0771 0 .1474-.0489.169-.126.1122-.4082.1757-.837.1757-1.2803 0-2.6025-2.125-4.727-4.7344-4.727"/></svg></span>
                 Vectorize
               </div>
-              <p>Indexes each new image's vector so the next similar prompt is a hit.</p>
+              <p>Indexes each new image's prompt vector so the next similar prompt is a hit.</p>
             </div>
           </div>
         </div>
@@ -2805,7 +2780,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
   }],
   <span class="tk-key">"shared_cache"</span>: {
     <span class="tk-key">"result"</span>: <span class="tk-hit">"hit"</span>,
-    <span class="tk-key">"similarity"</span>: <span class="tk-num">0.3124</span>,
+    <span class="tk-key">"similarity"</span>: <span class="tk-num">0.9312</span>,
     <span class="tk-key">"source"</span>: <span class="tk-str">"pd12m"</span>,
     <span class="tk-key">"model_used"</span>: <span class="tk-str">"flux-schnell"</span>,
     <span class="tk-key">"cost_saved_usd"</span>: <span class="tk-num">0.04</span>
@@ -2825,7 +2800,8 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
           <p class="section-sub">Scale your image generation without the scaling costs. No egress fees, no surprises.</p>
         </div>
 
-        <div class="pricing-grid">
+        <!-- Authoritative pricing cards — the #/pricing view clones this grid at startup -->
+        <div class="pricing-grid" id="pricing-grid-src">
           <div class="pricing-card">
             <h3 class="price-title">Free</h3>
             <p class="price-desc">Perfect for sandboxing, prototyping, and integrating the cache.</p>
@@ -2931,50 +2907,8 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
         <p class="section-sub">Scale your image-generation applications without the scaling costs. Choose the plan that fits your workload.</p>
       </div>
 
-      <div class="pricing-grid" style="margin-bottom: 64px;">
-        <div class="pricing-card">
-          <h3 class="price-title">Free</h3>
-          <p class="price-desc">Perfect for sandboxing, developer prototyping, and integrating the cache.</p>
-          <div class="price-value">$0<span class="price-period">/mo</span></div>
-          <ul class="price-features">
-            <li>Restricted cache lookup rate</li>
-            <li>Standard CDN asset delivery</li>
-            <li>Access to public domain index</li>
-            <li class="cross">Immediate GPU fallbacks</li>
-            <li class="cross">SLA uptime guarantees</li>
-          </ul>
-          <a href="#/playground" class="btn-outline">Launch demo</a>
-        </div>
-
-        <div class="pricing-card popular">
-          <div class="pricing-badge">Most popular</div>
-          <h3 class="price-title">Pro</h3>
-          <p class="price-desc">Unlimited semantic cache delivery and managed automatic fallbacks for production apps.</p>
-          <div class="price-value">$15<span class="price-period">/mo</span></div>
-          <ul class="price-features">
-            <li>Unlimited semantic cache lookups</li>
-            <li>Managed automatic queue fallback</li>
-            <li>Z-Image-Turbo background compute</li>
-            <li>High-priority cache warming</li>
-            <li>SLA uptime guarantees</li>
-          </ul>
-          <a href="#/playground" class="btn-solid red">Get started</a>
-        </div>
-
-        <div class="pricing-card">
-          <h3 class="price-title">BYOK</h3>
-          <p class="price-desc">Bring your own GMI Cloud keys. Integrate private GPU generations directly into the cache.</p>
-          <div class="price-value">$5<span class="price-period">/mo</span></div>
-          <ul class="price-features">
-            <li>Unlimited semantic cache lookups</li>
-            <li>Custom GMI Cloud GPU compute</li>
-            <li>Private object storage syncing</li>
-            <li>Dedicated key generation access</li>
-            <li>Zero markup on model generations</li>
-          </ul>
-          <a href="#/account" class="btn-outline">Bind your keys</a>
-        </div>
-      </div>
+      <!-- Populated at startup by cloning #pricing-grid-src (home section) — single source of truth -->
+      <div class="pricing-grid" id="pricing-grid-clone" style="margin-bottom: 64px;"></div>
     </div>
 
     <!-- VIEW 2: PLAYGROUND -->
@@ -2991,10 +2925,10 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
               <label for="prompt">Prompt text</label>
               <textarea id="prompt" class="input-field" placeholder="Describe the image you want to generate or match..."></textarea>
               <div class="presets-container">
-                <span class="preset-pill" onclick="applyPreset('A high-resolution photograph of a glowing futuristic neon city, cyberpunk aesthetics')">Neon City</span>
-                <span class="preset-pill" onclick="applyPreset('A cute fluffy golden retriever puppy sitting in a meadow, sunny day, soft focus')">Cute Puppy</span>
-                <span class="preset-pill" onclick="applyPreset('Abstract 3D rendering of fluid gradient shapes, purple and blue holographic waves')">Abstract Art</span>
-                <span class="preset-pill" onclick="applyPreset('Plate of fresh delicious chocolate chip cookies, cozy kitchen background, steam rising')">Cookies</span>
+                <button type="button" class="preset-pill" onclick="applyPreset('A high-resolution photograph of a glowing futuristic neon city, cyberpunk aesthetics')">Neon City</button>
+                <button type="button" class="preset-pill" onclick="applyPreset('A cute fluffy golden retriever puppy sitting in a meadow, sunny day, soft focus')">Cute Puppy</button>
+                <button type="button" class="preset-pill" onclick="applyPreset('Abstract 3D rendering of fluid gradient shapes, purple and blue holographic waves')">Abstract Art</button>
+                <button type="button" class="preset-pill" onclick="applyPreset('Plate of fresh delicious chocolate chip cookies, cozy kitchen background, steam rising')">Cookies</button>
               </div>
             </div>
 
@@ -3005,7 +2939,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
                   <span>Strict (Exact)</span>
                   <span>Loose (General concept)</span>
                 </div>
-                <input type="range" id="tol" min="0" max="0.5" step="0.01" value="0.15" oninput="updateToleranceValue(this.value)">
+                <input type="range" id="tol" min="0" max="1" step="0.01" value="0.15" oninput="updateToleranceValue(this.value)">
                 <div class="slider-info" id="tolerance-info-box">
                   <span>Tolerance: <span class="slider-val" id="tol-val">0.15</span></span>
                   <span id="tolerance-indicator" style="font-weight: 600; color: var(--red);">Normal Match</span>
@@ -3014,7 +2948,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
             </div>
 
             <div class="form-group">
-              <label for="gen-on-miss">On cache miss</label>
+              <span class="field-label">On cache miss</span>
               <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 0.8125rem; color: var(--muted); line-height: 1.45; text-transform: none; letter-spacing: normal; font-weight: 400; margin: 0;">
                 <input type="checkbox" id="gen-on-miss" checked style="width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; accent-color: var(--red);">
                 <span><b style="color: var(--ink); font-weight: 600;">Generate on demand.</b> If nothing close enough is cached, the prompt is queued and generated in the backend with the configured model, then stored in the shared library.</span>
@@ -3073,11 +3007,11 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
                 </div>
                 <div class="details-item">
                   <span class="details-label">Model</span>
-                  <span class="details-val" id="val-provider">-</span>
+                  <span class="details-val" id="val-model">-</span>
                 </div>
                 <div class="details-item">
                   <span class="details-label">Source</span>
-                  <span class="details-val" id="val-model">-</span>
+                  <span class="details-val" id="val-provider">-</span>
                 </div>
                 <div class="details-item">
                   <span class="details-label">Cache latency</span>
@@ -3204,7 +3138,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
             <input id="login-email" type="email" class="api-key-input" placeholder="you@example.com">
           </div>
 
-          <button class="btn btn-primary" onclick="requestMagicLink()">Send me a login link</button>
+          <button class="btn btn-primary" id="login-submit" onclick="requestMagicLink()">Send me a login link</button>
 
           <div id="login-status" style="font-size: 0.8125rem; color: var(--muted); margin-top: 16px; text-align: center;"></div>
         </div>
@@ -3227,17 +3161,24 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
 
             <h2 id="docs-auth">Authentication</h2>
             <p>
-              All generation requests need a Bearer key. Mint one — no signup, rate-limited to
-              10 keys per minute per IP:
+              All generation requests need a Bearer key, and keys belong to your account.
+              <a href="#/login" style="color: var(--red);">Log in</a> with a magic link (we email
+              it to you — no password), then create a key on the
+              <a href="#/account" style="color: var(--red);">Account</a> page. Or call the
+              endpoint directly with your logged-in session cookie:
             </p>
             <div class="docs-endpoint"><span class="method">POST</span> /v1/keys/generate</div>
-            <pre class="docs-pre"><span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://api.wagmi.photos/v1/keys/generate
+            <pre class="docs-pre"><span class="tk-flag"># requires a logged-in session — unauthenticated calls return 401</span>
+<span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://api.wagmi.photos/v1/keys/generate <span class="tk-flag">\</span>
+  <span class="tk-flag">-H</span> <span class="tk-str">"Cookie: wagmi_session=…"</span> <span class="tk-flag">\</span>
+  <span class="tk-flag">-H</span> <span class="tk-str">"Content-Type: application/json"</span> <span class="tk-flag">\</span>
+  <span class="tk-flag">-d</span> <span class="tk-str">'{ "label": "my-laptop" }'</span>
 
 { <span class="tk-key">"key"</span>: <span class="tk-str">"sc-nA93…"</span>, <span class="tk-key">"created_at"</span>: <span class="tk-num">1783468800</span> }</pre>
             <p>
-              Store the key yourself — it is hashed (SHA-256) before it touches our database, so
-              it cannot be shown again. Send it on every request as
-              <code>Authorization: Bearer sc-your-key</code>.
+              Key minting is rate-limited (10 per minute per IP). Store the key yourself — it is
+              hashed (SHA-256) before it touches our database, so it cannot be shown again. Send
+              it on every request as <code>Authorization: Bearer sc-your-key</code>.
             </p>
 
             <h2 id="docs-generations">Generate or fetch an image</h2>
@@ -3245,8 +3186,9 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
             <p>
               The request shape matches the OpenAI Images API, so the official SDKs work by
               pointing <code>base_url</code> at <code>https://api.wagmi.photos/v1</code>.
-              Your prompt is CLIP-embedded and matched against every image in the shared library;
-              the closest match above your tolerance floor is served instantly.
+              Your prompt is embedded with BGE and matched against the stored prompt of every
+              image in the shared library; the closest match above your tolerance floor is
+              served instantly.
             </p>
 
             <h3>Request body</h3>
@@ -3299,7 +3241,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
   <span class="tk-key">"data"</span>: [{ <span class="tk-key">"url"</span>: <span class="tk-str">"https://cdn.wagmi.photos/img/pd12m-8f31…"</span> }],
   <span class="tk-key">"shared_cache"</span>: {
     <span class="tk-key">"result"</span>: <span class="tk-hit">"hit"</span>,
-    <span class="tk-key">"similarity"</span>: <span class="tk-num">0.41</span>,
+    <span class="tk-key">"similarity"</span>: <span class="tk-num">0.93</span>,
     <span class="tk-key">"cost_saved_usd"</span>: <span class="tk-num">0.04</span>,
     <span class="tk-key">"model_used"</span>: <span class="tk-str">"flux-schnell"</span>,
     <span class="tk-key">"source"</span>: <span class="tk-str">"pd12m"</span>,
@@ -3332,7 +3274,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
                   </tr>
                   <tr>
                     <td>approximate</td><td>200</td>
-                    <td>The best image falls below your floor. It is served anyway so you have something to show, and the prompt is queued for generation (unless opted out). <code>generation_queued</code> is included.</td>
+                    <td>The best image falls below your floor. It is served anyway so you have something to show, and the prompt is queued for generation (unless opted out). <code>generation_queued</code> is included and <code>cost_saved_usd</code> is <code>0</code> — only true hits count as savings.</td>
                   </tr>
                   <tr>
                     <td>pending</td><td>202</td>
@@ -3344,10 +3286,16 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
 
             <h2 id="docs-matching">How matching works</h2>
             <p>
-              Your <code>cache_tolerance</code> maps linearly to a CLIP cosine-similarity floor:
-              tolerance 0 → floor 0.35, tolerance 1 → floor 0.18. The single nearest
-              library image is compared against that floor — at or above it you get a
-              <code>hit</code>, below it an <code>approximate</code>.
+              Matching is prompt-to-prompt: your prompt's BGE text embedding
+              (<code>bge-base-en-v1.5</code> on Workers AI) is compared by cosine similarity
+              against the stored prompt embedding of every library image. Your
+              <code>cache_tolerance</code> (clamped to 0–1) maps linearly to the similarity
+              floor: <code>floor = 0.90 − tolerance × (0.90 − 0.72)</code>, so tolerance 0
+              → floor 0.90 and tolerance 1 → floor 0.72. The single nearest library
+              prompt is compared against that floor — at or above it you get a
+              <code>hit</code>, below it an <code>approximate</code>. Realistic scores live in
+              the ~0.7–0.95 band. See <a href="#/matching" style="color: var(--red);">how
+              semantic matching works</a> for the full picture.
             </p>
 
             <h2 id="docs-generate-on-miss">generate_on_miss semantics</h2>
@@ -3377,7 +3325,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
                   <tr><td>400</td><td>Body is not valid JSON, or not a JSON object.</td></tr>
                   <tr><td>401</td><td>Missing or invalid API key.</td></tr>
                   <tr><td>422</td><td><code>n</code> is set to anything but 1, or <code>generate_on_miss</code> is not a boolean.</td></tr>
-                  <tr><td>429</td><td>Key-generation rate limit exceeded (10 per minute per IP).</td></tr>
+                  <tr><td>429</td><td>Rate limit exceeded — generation requests (per account) and key minting (per IP) are each limited to 10 per minute.</td></tr>
                   <tr><td>502</td><td>An upstream dependency failed; the body includes a <code>detail</code> string.</td></tr>
                 </tbody>
               </table>
@@ -3492,53 +3440,56 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
       </div>
     </div>
 
-    <!-- VIEW: CLIP -->
-    <div id="view-clip" class="spa-view">
+    <!-- VIEW: SEMANTIC MATCHING -->
+    <div id="view-matching" class="spa-view">
       <div class="view-pad">
         <div class="page-head">
           <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>Developers</div>
           <h1 class="section-title">How semantic matching works</h1>
-          <p class="section-sub">Every prompt and every image becomes a CLIP vector. A match is just the nearest image vector to your prompt vector — no keywords, no tags.</p>
+          <p class="section-sub">Every library image is stored with the prompt that made it. A match is just the nearest stored prompt to your prompt — text to text, no keywords, no tags.</p>
         </div>
 
         <div class="glass-card">
           <div class="docs-content">
-            <h2>One space for words and pictures</h2>
+            <h2>Prompts match prompts</h2>
             <p>
-              wagmi.photos embeds text prompts and images into the same 768-dimensional space
-              with a CLIP ViT-L/14 model. Because the seeded library images and your prompt are
-              embedded by the <em style="font-style: normal; color: var(--red); font-weight: 600;">same model</em>, a prompt vector lands near the image vectors
-              that depict it — so "a golden retriever" sits close to actual photos of one.
+              wagmi.photos embeds text prompts into a 768-dimensional space with the
+              <code>bge-base-en-v1.5</code> model, running on Workers AI at the edge. Every
+              image in the library is indexed by the embedding of
+              <em style="font-style: normal; color: var(--red); font-weight: 600;">its own prompt</em> —
+              there are no image vectors. Because your prompt and the stored prompts are embedded
+              by the same model, "a golden retriever" lands right next to the prompts that
+              already produced one.
             </p>
 
             <h2>From prompt to match</h2>
             <ol>
               <li>Your prompt is normalized (trimmed, lowercased, whitespace collapsed).</li>
-              <li>CLIP turns it into a 768-dim vector at the edge.</li>
-              <li>Vectorize finds the single nearest image vector by cosine similarity.</li>
+              <li>BGE turns it into a 768-dim text vector at the edge.</li>
+              <li>Vectorize finds the single nearest stored prompt vector by cosine similarity.</li>
               <li>That similarity is compared to your tolerance floor — at or above it is a <b>hit</b>; below it is <b>approximate</b>.</li>
             </ol>
 
             <h2>Similarity, illustrated</h2>
             <div class="sim-row">
               <div class="sim-prompt">"a dog and a cat"</div>
-              <div class="sim-track"><div class="sim-fill hit" style="width: 82%;"></div></div>
-              <div class="sim-verdict">hit · <span class="n">0.41</span></div>
+              <div class="sim-track"><div class="sim-fill hit" style="width: 93%;"></div></div>
+              <div class="sim-verdict">hit · <span class="n">0.93</span></div>
             </div>
             <div class="sim-row">
               <div class="sim-prompt">"a flamingo in a top hat doing my taxes"</div>
-              <div class="sim-track"><div class="sim-fill approx" style="width: 46%;"></div></div>
-              <div class="sim-verdict">approximate · <span class="n">0.24</span></div>
+              <div class="sim-track"><div class="sim-fill approx" style="width: 78%;"></div></div>
+              <div class="sim-verdict">approximate · <span class="n">0.78</span></div>
             </div>
-            <p style="font-size: 0.8125rem; color: var(--muted);">Illustrative cosine-similarity scores. The generic prompt lands squarely on an existing image; the very specific one only finds a distant cousin.</p>
+            <p style="font-size: 0.8125rem; color: var(--muted);">Illustrative cosine-similarity scores — in practice they land in a fairly narrow ~0.7–0.95 band. The generic prompt lands squarely on an existing prompt; the very specific one only finds a distant cousin.</p>
 
             <h2>Tolerance sets the floor</h2>
-            <p>Your <code>cache_tolerance</code> maps linearly to the cosine-similarity floor a match must clear:</p>
-            <div class="clip-scale-wrap">
-              <div class="clip-scale"></div>
-              <div class="clip-scale-labels">
-                <span><b>tolerance 0</b> → floor 0.35 · strict, near-exact only</span>
-                <span>floor 0.18 · loose, more hits <b>← tolerance 1</b></span>
+            <p>Your <code>cache_tolerance</code> (clamped to 0–1) maps linearly to the cosine-similarity floor a match must clear: <code>floor = 0.90 − tolerance × (0.90 − 0.72)</code>.</p>
+            <div class="match-scale-wrap">
+              <div class="match-scale"></div>
+              <div class="match-scale-labels">
+                <span><b>tolerance 0</b> → floor 0.90 · strict, near-exact only</span>
+                <span>floor 0.72 · loose, more hits <b>← tolerance 1</b></span>
               </div>
             </div>
             <p>At or above the floor you get a <code>hit</code>. Below it, the closest image is still served as <code>approximate</code> and the prompt is queued to generate (unless you opted out).</p>
@@ -3638,13 +3589,14 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
             </div>
 
             <h2>Wire up a key</h2>
-            <p>Mint one with a single unauthenticated call, then export it as <code>WAGMI_KEY</code>:</p>
+            <p>Keys are tied to your account. <a href="#/login" style="color: var(--red);">Log in</a> with a magic link (email, no password), create a key on the <a href="#/account" style="color: var(--red);">Account</a> page, then export it as <code>WAGMI_KEY</code>:</p>
             <div class="copy-wrap">
               <button class="copy-btn" type="button" onclick="copyCode(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span class="copy-label">Copy</span></button>
-              <pre class="docs-pre"><span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://api.wagmi.photos/v1/keys/generate
-<span class="tk-flag"># -> { "key": "sc-…" }  then:  export WAGMI_KEY=sc-…</span></pre>
+              <pre class="docs-pre"><span class="tk-flag"># 1. Log in at https://wagmi.photos/#/login (magic-link email)
+# 2. Account → Create API key → copy the sc-… key (shown once)</span>
+<span class="tk-cmd">export</span> WAGMI_KEY=sc-…</pre>
             </div>
-            <p>The full field reference lives in the <a href="#/docs">API docs</a>.</p>
+            <p>Prefer the API? <code>POST /v1/keys/generate</code> also works with a logged-in session cookie — unauthenticated calls return <code>401</code>. The full field reference lives in the <a href="#/docs">API docs</a>.</p>
           </div>
         </div>
       </div>
@@ -3662,12 +3614,15 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
           <h2>1. Privacy Policy</h2>
           <p>
-            wagmi.photos is designed from the ground up to respect developer and user privacy:
+            What we store, and why:
           </p>
           <ul>
-            <li><strong>Local-Only Key Storage:</strong> All API keys you input (OpenAI, Gemini, GMICloud, and Hugging Face tokens) are saved strictly inside your browser's local <code>localStorage</code>. They never touch our database servers in raw form.</li>
-            <li><strong>Secure Telemetry:</strong> To track metrics without exposing developers, keys used in requests are instantly hashed (SHA-256) on the backend. No raw keys or profile emails are stored in our analytics database.</li>
-            <li><strong>Encrypted Transit:</strong> All communication between the browser client, the proxy server, and the AI providers is fully encrypted via HTTPS.</li>
+            <li><strong>Your email address:</strong> Logging in works by magic link — you give us your email, we send you a sign-in link. We store that email server-side to operate your account. It is not sold or shared.</li>
+            <li><strong>Session cookie:</strong> After you open the login link, a session cookie keeps you logged in. It is HttpOnly and used only to authenticate you to your own account.</li>
+            <li><strong>API keys as hashes:</strong> API keys are shown to you exactly once, at creation. Server-side we store only a SHA-256 hash of each key — we cannot recover or display the key itself, so keep your copy safe.</li>
+            <li><strong>Prompts and images:</strong> This is a shared cache. Prompts you send are stored (with demand counts) to match requests and rank background generation, and generated images join the shared, openly licensed library. Do not put private or personal information in prompts.</li>
+            <li><strong>Local browser state:</strong> The playground's telemetry counters and session history live only in your browser and can be cleared any time from the Account page.</li>
+            <li><strong>Encrypted transit:</strong> All communication with wagmi.photos is encrypted via HTTPS.</li>
           </ul>
 
           <h2>2. Terms of Use &amp; Data Licensing</h2>
@@ -3676,7 +3631,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
           </p>
           <ul>
             <li><strong>Public Domain Data:</strong> wagmi.photos leverages the <strong>PD12M</strong> dataset from Spawning. This dataset is licensed under the <a href="https://spdx.org/licenses/CDLA-Permissive-2.0" target="_blank" style="color: var(--red); text-decoration: none; font-weight: 600;">CDLA-Permissive-2.0</a> agreement. You are permitted to copy, distribute, modify, and utilize all pre-seeded images for commercial or personal purposes without attribution.</li>
-            <li><strong>Proxy Fair Use:</strong> You agree not to abuse the cache endpoints through coordinated denial-of-service, scraping, or cache pollution. Misses are generated on demand and subject to your own provider token limits.</li>
+            <li><strong>Fair Use:</strong> You agree not to abuse the cache endpoints through coordinated denial-of-service, scraping, or cache pollution. Misses are queued and generated in the background by the shared backend, ranked by demand; requests are rate-limited to keep that fair.</li>
           </ul>
         </div>
       </div>
@@ -3698,7 +3653,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         <a href="#/library">Library</a>
         <a href="#/docs">API</a>
         <a href="#/openai">OpenAI drop-in</a>
-        <a href="#/clip">CLIP</a>
+        <a href="#/matching">Matching</a>
         <a href="#/agents">Agents</a>
         <a href="#/pricing">Pricing</a>
         <a href="#/legal">Legal</a>
@@ -3707,7 +3662,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
   </footer>
 
   <!-- Toast Container -->
-  <div id="toast" class="toast">Could not load image resource.</div>
+  <div id="toast" class="toast" role="status" aria-live="polite">Could not load image resource.</div>
 
   <!-- Create API key modal -->
   <div id="key-modal" class="modal-overlay" hidden onclick="if(event.target===this)closeCreateKey()">
@@ -3740,16 +3695,27 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
   </div>
 
   <script>
-    // Global Statistics
-    let saved = parseFloat(localStorage.getItem('sharedcache_saved') || '0.00');
-    let hits = parseInt(localStorage.getItem('sharedcache_hits') || '0');
-    let misses = parseInt(localStorage.getItem('sharedcache_misses') || '0');
-    let history = JSON.parse(localStorage.getItem('sharedcache_history') || '[]');
+    // Global Statistics (guard against corrupted localStorage values)
+    const finiteOrZero = (x) => Number.isFinite(x) ? x : 0;
+    let saved = finiteOrZero(parseFloat(localStorage.getItem('sharedcache_saved') || '0.00'));
+    let hits = finiteOrZero(parseInt(localStorage.getItem('sharedcache_hits') || '0', 10));
+    let misses = finiteOrZero(parseInt(localStorage.getItem('sharedcache_misses') || '0', 10));
+    let runHistory;
+    try { runHistory = JSON.parse(localStorage.getItem('sharedcache_history') || '[]'); } catch { runHistory = []; }
+    if (!Array.isArray(runHistory)) runHistory = [];
+    const HISTORY_MAX = 50;
     let currentManifest = null;
 
     // Load stats initially
     updateStats();
     renderHistory();
+
+    // The #/pricing view mirrors the home pricing cards — clone once at startup
+    (function clonePricingGrid() {
+      const src = document.getElementById('pricing-grid-src');
+      const dst = document.getElementById('pricing-grid-clone');
+      if (src && dst) dst.innerHTML = src.innerHTML;
+    })();
 
     // Client-side Router
     const ROUTES = {
@@ -3766,7 +3732,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       '#/legal':      { view: 'view-legal' },
       '#/docs':       { view: 'view-docs', link: 'nav-docs' },
       '#/openai':     { view: 'view-openai', link: 'nav-openai' },
-      '#/clip':       { view: 'view-clip', link: 'nav-clip' },
+      '#/matching':   { view: 'view-matching', link: 'nav-matching' },
       '#/agents':     { view: 'view-agents', link: 'nav-agents' },
       '#/login':      { view: 'view-login', onShow: () => {
         const status = document.getElementById('login-status');
@@ -3780,7 +3746,8 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     const PATH_TO_HASH = {
       '/playground': '#/playground', '/docs': '#/docs', '/pricing': '#/pricing',
       '/account': '#/account', '/legal': '#/legal', '/openai': '#/openai',
-      '/clip': '#/clip', '/agents': '#/agents', '/library': '#/library',
+      '/matching': '#/matching', '/clip': '#/matching', '/agents': '#/agents',
+      '/library': '#/library',
     };
 
     function closeDropdowns() {
@@ -3803,6 +3770,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
     function showRoute(route) {
       const path = route.split('?')[0];
+      if (path === '#/clip') { location.replace('#/matching'); return; } // legacy route
       if (GATED.has(path) && !currentUser) {
         sessionStorage.setItem('wagmi_return', path);
         route = '#/login';
@@ -3812,7 +3780,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         v.classList.remove('active');
         v.style.display = 'none';
       });
-      document.querySelectorAll('.nav-link, .nav-cta, .nav-drop-item').forEach(l => l.classList.remove('active'));
+      document.querySelectorAll('.nav-link, .nav-drop-item').forEach(l => l.classList.remove('active'));
 
       const r = ROUTES[route.split('?')[0]] || ROUTES['#/'];
       const view = document.getElementById(r.view);
@@ -3875,15 +3843,26 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     async function requestMagicLink() {
       const email = document.getElementById('login-email').value.trim();
       const status = document.getElementById('login-status');
-      const r = await fetch('/v1/auth/login', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin', body: JSON.stringify({ email }),
-      });
-      if (r.status === 400) { status.textContent = 'Please enter a valid email.'; return; }
-      const j = await r.json().catch(() => ({}));
-      status.innerHTML = j.dev_link
-        ? `Dev mode — <a href="${escapeHtml(j.dev_link)}">open your login link</a>`
-        : 'Check your email for a login link.';
+      const btn = document.getElementById('login-submit');
+      if (btn) btn.disabled = true;
+      try {
+        const r = await fetch('/v1/auth/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin', body: JSON.stringify({ email }),
+        });
+        if (r.status === 400) { status.textContent = 'Please enter a valid email.'; return; }
+        const j = await r.json().catch(() => ({}));
+        // Only trust dev_link if it points at this site (relative or same-origin)
+        const devLink = (typeof j.dev_link === 'string' &&
+          (j.dev_link.startsWith('/') || j.dev_link.startsWith(location.origin))) ? j.dev_link : null;
+        status.innerHTML = devLink
+          ? `Dev mode — <a href="${escapeHtml(devLink)}">open your login link</a>`
+          : 'Check your email for a login link.';
+      } catch (err) {
+        status.textContent = 'Could not send the login link — check your connection and try again.';
+      } finally {
+        if (btn) btn.disabled = false;
+      }
     }
     async function logout() {
       closeMenus();
@@ -3894,6 +3873,12 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     window.addEventListener('hashchange', () => navigateTo(window.location.hash));
     window.addEventListener('DOMContentLoaded', async () => {
       await fetchMe();
+      // If a gated route sent the user to log in, return them there after the magic link lands
+      const ret = currentUser ? sessionStorage.getItem('wagmi_return') : null;
+      if (ret) {
+        sessionStorage.removeItem('wagmi_return');
+        if (window.location.hash !== ret) { window.location.hash = ret; return; } // hashchange routes
+      }
       navigateTo(window.location.hash);
     });
 
@@ -3989,28 +3974,31 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
       if (val < 0.1) {
         indicator.textContent = "Strict (Exact Match)";
-        indicator.style.color = '#0e8a4d'; // Strict = Green
+        indicator.style.color = 'var(--success)'; // Strict = Green
       } else if (val < 0.25) {
         indicator.textContent = "Normal Match";
-        indicator.style.color = '#ed141e'; // Normal = Brand red
+        indicator.style.color = 'var(--red)'; // Normal = Brand red
       } else {
         indicator.textContent = "Concept Match (Loose)";
-        indicator.style.color = '#b45309'; // Loose = Amber
+        indicator.style.color = 'var(--warning)'; // Loose = Amber
       }
     }
 
+    let toastTimer = null;
     function showToast(message, type = "error") {
       const toast = document.getElementById('toast');
       toast.textContent = message;
       toast.style.borderLeftColor = type === "error" ? "var(--danger)" : (type === "info" ? "var(--ink)" : "var(--success)");
       toast.classList.add('show');
-      setTimeout(() => {
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
         toast.classList.remove('show');
       }, 3500);
     }
 
     function imageLoadError() {
-      showToast("Could not load image resource. Verify B2 bucket access.", "error");
+      console.error('Image failed to load — verify B2 bucket access / asset URL.');
+      showToast("Image failed to load.", "error");
     }
 
     function updateStats() {
@@ -4031,24 +4019,24 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
     function renderHistory() {
       const histContainer = document.getElementById('history-list');
-      if (history.length === 0) {
+      if (runHistory.length === 0) {
         histContainer.innerHTML = `<div style="font-size:0.75rem; color:var(--muted); text-align:center; padding:12px;">No runs yet.</div>`;
         return;
       }
 
-      histContainer.innerHTML = history.map((item, idx) => `
-        <div class="history-item" onclick="replayHistory(${idx})">
+      histContainer.innerHTML = runHistory.map((item, idx) => `
+        <button type="button" class="history-item" onclick="replayHistory(${idx})">
           <span class="history-prompt" title="${escapeHtml(item.prompt)}">${escapeHtml(item.prompt)}</span>
           <div style="display:flex; align-items:center; gap:6px;">
-            <span style="font-size:0.7rem; color:var(--muted);">tol: ${item.tolerance}</span>
-            <span class="history-badge ${item.result}">${item.result}</span>
+            <span style="font-size:0.7rem; color:var(--muted);">tol: ${escapeHtml(String(item.tolerance))}</span>
+            <span class="history-badge ${escapeHtml(String(item.result))}">${escapeHtml(String(item.result))}</span>
           </div>
-        </div>
+        </button>
       `).join('');
     }
 
     function replayHistory(idx) {
-      const item = history[idx];
+      const item = runHistory[idx];
       document.getElementById('prompt').value = item.prompt;
       document.getElementById('tol').value = item.tolerance;
       updateToleranceValue(item.tolerance);
@@ -4103,7 +4091,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         moreBtn.style.display = data.has_more ? 'block' : 'none';
       } catch (err) {
         if (seq !== libSeq) return;
-        status.innerHTML = 'Could not load the library. <a href="javascript:void 0" onclick="loadLibrary(' + append + ')">Retry</a>';
+        status.innerHTML = 'Could not load the library. <button type="button" class="link-btn" onclick="loadLibrary(' + append + ')">Retry</button>';
         status.style.display = 'block';
       }
     }
@@ -4126,9 +4114,11 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         showToast("No provenance manifest loaded.", "error");
         return;
       }
-      const win = window.open();
-      win.document.write(`<pre style="background:#1c1c1b; color:#f3f4f6; padding:20px; font-family:monospace; border-radius:8px;">${escapeHtml(JSON.stringify(currentManifest, null, 2))}</pre>`);
-      win.document.close();
+      const blob = new Blob([JSON.stringify(currentManifest, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank');
+      if (!win) showToast('Popup blocked — allow popups to view the manifest.', 'error');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
     }
 
     // API key creation modal
@@ -4230,7 +4220,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         saved = 0.00;
         hits = 0;
         misses = 0;
-        history = [];
+        runHistory = [];
         currentManifest = null;
 
         document.getElementById('prompt').value = '';
@@ -4306,12 +4296,25 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         const latency = Math.round(performance.now() - startTime);
 
         if (!response.ok) {
-          const errMsg = await response.text();
-          throw new Error(errMsg || "Unknown API Error");
+          if (response.status === 401) {
+            location.hash = '#/login';
+            throw new Error('Session expired — log in again.');
+          }
+          if (response.status === 429) {
+            throw new Error('Too many requests — wait a moment and try again.');
+          }
+          let msg = 'Request failed (HTTP ' + response.status + ')';
+          try {
+            const ej = await response.json();
+            const m = (ej.error && ej.error.message) || ej.error || ej.detail || ej.message;
+            if (typeof m === 'string' && m) msg = m;
+          } catch { /* non-JSON error body */ }
+          throw new Error(msg);
         }
 
         const data = await response.json();
         const sc = data.shared_cache;
+        if (!sc) throw new Error('Unexpected response — missing shared_cache block.');
 
         const rawUrl = (data.data && data.data[0]) ? data.data[0].url : null;
         if (sc.result === 'pending' || !rawUrl) {
@@ -4326,14 +4329,8 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
           viewport.classList.remove('has-content');
           resultDetails.style.display = 'block';
         } else {
-          let finalUrl = rawUrl;
-
-          if (rawUrl.startsWith('memory://sharedcache/')) {
-            finalUrl = rawUrl.replace('memory://sharedcache/', '/memory/sharedcache/');
-          }
-
           placeholderMsg.textContent = '';
-          outImg.src = finalUrl;
+          outImg.src = rawUrl;
 
           loader.style.display = 'none';
           imgWrapper.style.display = 'block';
@@ -4357,10 +4354,10 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         badge.className = `result-badge badge-${sc.result}`;
         badge.textContent = sc.result;
 
-        document.getElementById('saved-ticker').textContent = `Saved $${sc.cost_saved_usd.toFixed(2)}`;
-        document.getElementById('val-similarity').textContent = sc.similarity.toFixed(4);
-        document.getElementById('val-provider').textContent = sc.model_used ?? '—';
-        document.getElementById('val-model').textContent = sc.source ?? '—';
+        document.getElementById('saved-ticker').textContent = `Saved $${(sc.cost_saved_usd ?? 0).toFixed(2)}`;
+        document.getElementById('val-similarity').textContent = (sc.similarity ?? 0).toFixed(4);
+        document.getElementById('val-model').textContent = sc.model_used ?? '—';
+        document.getElementById('val-provider').textContent = sc.source ?? '—';
         document.getElementById('val-latency').textContent = `${latency}ms`;
 
         currentManifest = {
@@ -4370,12 +4367,13 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
           timestamp: new Date().toISOString()
         };
 
-        history.unshift({
+        runHistory.unshift({
           prompt: promptVal,
           tolerance: tolVal,
           result: sc.result
         });
-        localStorage.setItem('sharedcache_history', JSON.stringify(history));
+        if (runHistory.length > HISTORY_MAX) runHistory.length = HISTORY_MAX;
+        localStorage.setItem('sharedcache_history', JSON.stringify(runHistory));
         renderHistory();
 
       } catch (err) {
@@ -4383,7 +4381,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         showToast(err.message || "Network connection failure.", "error");
 
         loader.style.display = 'none';
-        placeholder.style.display = 'block';
+        placeholder.style.display = 'flex';
       } finally {
         submitBtn.disabled = false;
         submitBtn.innerHTML = `<span>Generate image</span>`;

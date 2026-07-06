@@ -13,6 +13,7 @@ function fakeEnv(over: any = {}) {
     VECTORIZE: { query: async () => ({ matches: [] }) },
     AI: { run: async () => ({ shape: [1, 2], data: [[0.1, 0.2]] }) },
     ASSETS: { fetch: async () => new Response("<!doctype html><title>SPA</title>", { status: 200, headers: { "content-type": "text/html" } }) },
+    DEV_MODE: "true", // tests exercise the dev-open lane unless overridden
     ...over,
   };
 }
@@ -42,6 +43,14 @@ it("generate: 401 when master key set and no bearer", async () => {
   const res = await worker.fetch(
     new Request("https://x/v1/images/generations", { method: "POST", body: JSON.stringify({ prompt: "hi" }) }),
     fakeEnv({ MASTER_API_KEY: "master" })
+  );
+  expect(res.status).toBe(401);
+});
+
+it("generate: 401 when neither MASTER_API_KEY nor DEV_MODE is set (fail closed)", async () => {
+  const res = await worker.fetch(
+    new Request("https://x/v1/images/generations", { method: "POST", body: JSON.stringify({ prompt: "hi" }) }),
+    fakeEnv({ DEV_MODE: undefined })
   );
   expect(res.status).toBe(401);
 });
@@ -97,15 +106,17 @@ it("stars: GitHub failure degrades to {stars: null}, still 200", async () => {
   expect(j.stars).toBeNull();
 });
 
-it("generate: upstream throw (vectorize.query throws) -> structured 502", async () => {
+it("generate: upstream throw (vectorize.query throws) -> 500 without internal detail", async () => {
+  const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
   const res = await worker.fetch(
     new Request("https://x/v1/images/generations", { method: "POST", body: JSON.stringify({ prompt: "hi" }) }),
     fakeEnv({ VECTORIZE: { query: async () => { throw new Error("boom"); } } })
   );
-  expect(res.status).toBe(502);
+  expect(res.status).toBe(500);
   const j: any = await res.json();
-  expect(j.error).toBe("upstream error");
-  expect(j.detail).toMatch(/boom/);
+  expect(j).toEqual({ error: "internal error" }); // no String(err) leaked to the client
+  expect(errSpy).toHaveBeenCalled(); // full detail still goes to the log
+  errSpy.mockRestore();
 });
 
 it("library: GET returns images/has_more, POST is 404", async () => {

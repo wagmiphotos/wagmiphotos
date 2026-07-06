@@ -98,7 +98,18 @@ it("resolveApiPrincipal: cookie session also accepted (browser playground)", asy
   expect(r).toEqual({ userId: "usr_3" });
 });
 
-it("resolveApiPrincipal: dev-open when MASTER_API_KEY unset", async () => {
+it("resolveApiPrincipal: MASTER_API_KEY absence alone no longer opens the API (fail closed)", async () => {
   const r = await resolveApiPrincipal(reqWith(), {} as any, fakeStores());
-  expect(r).toEqual({ userId: DEV_USER_ID });
+  expect(r).toBeNull();
+});
+
+it("resolveApiPrincipal: dev-open lane requires DEV_MODE", async () => {
+  expect(await resolveApiPrincipal(reqWith(), { DEV_MODE: "true" } as any, fakeStores())).toEqual({ userId: DEV_USER_ID });
+  expect(await resolveApiPrincipal(reqWith(), { DEV_MODE: "1" } as any, fakeStores())).toEqual({ userId: DEV_USER_ID });
+  expect(await resolveApiPrincipal(reqWith(), { DEV_MODE: "false" } as any, fakeStores())).toBeNull();
+});
+
+it("resolveApiPrincipal: DEV_MODE does not bypass a configured MASTER_API_KEY", async () => {
+  const r = await resolveApiPrincipal(reqWith(), { DEV_MODE: "true", MASTER_API_KEY: "master" } as any, fakeStores());
+  expect(r).toBeNull();
 });

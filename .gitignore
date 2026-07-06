@@ -4,6 +4,7 @@ __pycache__/
 .env
 .pytest_cache/
 .superpowers/
+.playwright-mcp/
 
 # Node / Cloudflare Worker
 node_modules/
@@ -14,4 +15,3 @@ projects/worker/node_modules/
 # Python build artifacts
 dist/
 *.egg-info/
-__pycache__/

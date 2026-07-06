@@ -27,7 +27,12 @@ class BgeEmbedder:
 
     @classmethod
     def from_pretrained(cls, model_name: str = BGE_MODEL) -> "BgeEmbedder":
-        from sentence_transformers import SentenceTransformer  # lazy, heavy
+        try:
+            from sentence_transformers import SentenceTransformer  # lazy, heavy
+        except ImportError as e:
+            raise ImportError(
+                "sentence-transformers is not installed — real BGE embeddings need "
+                "the model extra: pip install 'sharedcache-backfill[model]'") from e
 
         model = SentenceTransformer(model_name)
 

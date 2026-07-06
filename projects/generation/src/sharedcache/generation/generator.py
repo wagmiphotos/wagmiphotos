@@ -1,4 +1,5 @@
 import hashlib
+import importlib
 import io
 import json
 from typing import Protocol
@@ -6,6 +7,57 @@ from typing import Protocol
 from PIL import Image
 
 from sharedcache.common.models import Generated
+
+MODEL_ID_PREFIX = "shared-cache"
+
+# provider name -> (module, provider class, missing-key error message)
+_PROVIDERS: dict[str, tuple[str, str, str]] = {
+    "openai": ("genblaze_openai", "DalleProvider",
+               "OpenAI API Key is required for generation. Please configure it on the server."),
+    "google": ("genblaze_google", "ImagenProvider",
+               "Google Gemini API Key is required for generation. Please configure it on the server."),
+    "gmicloud": ("genblaze_gmicloud", "GMICloudImageProvider",
+                 "GMICloud API Key is required for generation. Please configure it on the server."),
+}
+
+
+def build_model_id(provider: str, inner_model: str) -> str:
+    """Compose the public 'shared-cache-<provider>-<model>' model id."""
+    return f"{MODEL_ID_PREFIX}-{provider}-{inner_model}"
+
+
+def parse_model_id(model: str, *, default_provider: str = "gmicloud") -> tuple[str, str]:
+    """Split 'shared-cache-<provider>-<model>' into (provider, inner_model).
+
+    Strings without the prefix (or too short to carry one) pass through
+    unchanged with `default_provider`."""
+    if model.startswith(f"{MODEL_ID_PREFIX}-"):
+        parts = model.split("-")
+        if len(parts) >= 4:
+            return parts[2], "-".join(parts[3:])
+    return default_provider, model
+
+
+def resolve_provider(provider_name: str, api_key: str | None, *, model: str = ""):
+    """Import and instantiate the genblaze provider for `provider_name`.
+
+    Raises ValueError with an install hint when the provider package is
+    missing, so misconfiguration surfaces at startup (preflight) rather than
+    on the first generation."""
+    spec = _PROVIDERS.get(provider_name)
+    if spec is None:
+        raise ValueError(f"Unsupported provider: {provider_name}")
+    module_name, class_name, key_error = spec
+    try:
+        module = importlib.import_module(module_name)
+    except ModuleNotFoundError as e:
+        package = module_name.replace("_", "-")
+        raise ValueError(
+            f"provider {provider_name!r} for model {model!r} is not installed — "
+            f"pip install 'genblaze[{provider_name}]' (or {package})") from e
+    if not api_key:
+        raise ValueError(key_error)
+    return getattr(module, class_name)(api_key=api_key)
 
 
 class Generator(Protocol):
@@ -33,11 +85,7 @@ class StubGenerator:
         key = f"assets/{content_hash}/original.png"
         url = self._storage.put(key, data, "image/png")
 
-        inner_model = model
-        if model.startswith("shared-cache-"):
-            parts = model.split("-")
-            if len(parts) >= 4:
-                inner_model = "-".join(parts[3:])
+        _, inner_model = parse_model_id(model)
 
         manifest = {
             "schema_version": "1.5",
@@ -71,54 +119,26 @@ class GenblazeGenerator:
                  gmicloud_api_key: str | None = None,
                  project_id: str = "sharedcache") -> None:
         self._storage = storage
-        self._openai_api_key = openai_api_key
-        self._gemini_api_key = gemini_api_key
-        self._gmicloud_api_key = gmicloud_api_key
+        self._api_keys = {
+            "openai": openai_api_key,
+            "google": gemini_api_key,
+            "gmicloud": gmicloud_api_key,
+        }
         self._project_id = project_id
+
+    def preflight(self, model: str) -> None:
+        """Resolve the provider for `model` now, so a missing provider package
+        or API key fails at startup instead of on the first generation."""
+        provider_name, _ = parse_model_id(model)
+        resolve_provider(provider_name, self._api_keys.get(provider_name), model=model)
 
     async def generate(self, prompt: str, *, model: str, size: str = "1024x1024", provider_api_key: str | None = None) -> Generated:
         # Lazy imports — keeps module importable offline and in unit tests
         from genblaze_core import KeyStrategy, Modality, ObjectStorageSink, Pipeline
 
-        # Parse provider and inner model from model ID
-        # Format can be: shared-cache-<provider>-<inner-model>
-        # e.g., shared-cache-openai-gpt-image-1 -> provider="openai", model="gpt-image-1"
-        provider_name = "gmicloud"
-        inner_model = model
-
-        if model.startswith("shared-cache-"):
-            parts = model.split("-")
-            if len(parts) >= 4:
-                provider_name = parts[2]
-                inner_model = "-".join(parts[3:])
-
-        # Instantiate correct provider dynamically based on provider name
-        if provider_name == "openai":
-            from genblaze_openai import DalleProvider
-            api_key = provider_api_key or self._openai_api_key
-            if not api_key:
-                raise ValueError("OpenAI API Key is required for generation. Please configure it on the server.")
-            provider_inst = DalleProvider(api_key=api_key)
-        elif provider_name == "google":
-            try:
-                from genblaze_google import ImagenProvider
-            except ModuleNotFoundError:
-                raise ValueError("Google Imagen provider is not installed. Please install 'genblaze-google'.")
-            api_key = provider_api_key or self._gemini_api_key
-            if not api_key:
-                raise ValueError("Google Gemini API Key is required for generation. Please configure it on the server.")
-            provider_inst = ImagenProvider(api_key=api_key)
-        elif provider_name == "gmicloud":
-            try:
-                from genblaze_gmicloud import GMICloudImageProvider
-            except ModuleNotFoundError:
-                raise ValueError("GMICloud provider is not installed. Please install 'genblaze-gmicloud'.")
-            api_key = provider_api_key or self._gmicloud_api_key
-            if not api_key:
-                raise ValueError("GMICloud API Key is required for generation. Please configure it on the server.")
-            provider_inst = GMICloudImageProvider(api_key=api_key)
-        else:
-            raise ValueError(f"Unsupported provider: {provider_name}")
+        provider_name, inner_model = parse_model_id(model)
+        api_key = provider_api_key or self._api_keys.get(provider_name)
+        provider_inst = resolve_provider(provider_name, api_key, model=model)
 
         sink = ObjectStorageSink(self._storage.backend, key_strategy=KeyStrategy.CONTENT_ADDRESSABLE)
 

@@ -2,69 +2,81 @@
 
 **Generate once. Serve forever.**
 
-SharedCache is an OpenAI-compatible image-generation proxy that caches AI-generated images in a shared pool. When a new prompt is semantically similar to one already in the pool, it returns the cached image instantly — saving the generation cost entirely. Only genuinely novel prompts trigger a real AI call.
+SharedCache (live as **wagmi.photos**) is an image-generation cache behind an OpenAI-compatible request shape. Every request is answered from a shared pool of already-generated images: the edge Worker embeds the prompt, finds the nearest cached image, and serves it instantly. **The request path never generates.** Novel prompts are queued and generated later by a demand-ranked background backfill — the library grows the more it is used, and the same spend is never paid twice.
 
 ---
 
 ## How it works
 
 ```
-Client → POST /v1/images/generations
-           │
-           ▼
-     Embed the prompt (Gemini text-embedding-004 or hash-fallback)
-           │
-           ▼
-     Search CacheIndex (pgvector cosine similarity, or in-memory)
-           │
-    ┌──────┴──────┐
-    │ similarity  │
-    │ ≥ tolerance │
-    └──────┬──────┘
-           │ HIT                          MISS
-           │                               │
-           │                    GenblazeGenerator.generate()
-           │                    → calls OpenAI gpt-image-1 (or Imagen / GMICloud)
-           │                    → stores asset bytes + thumbnail via genblaze-s3 sink → B2
-           │                    → emits SHA-256 provenance manifest to B2
-           │                    → inserts embedding + AssetRecord into CacheIndex
-           │                               │
-           └───────────────────────────────┘
-           │
-     Return: image URL, HIT/MISS, similarity, cost_saved_usd
+                Client
+                  │  POST /v1/images/generations
+                  │  { prompt, cache_tolerance?, generate_on_miss? }
+                  ▼
+┌─ Cloudflare Worker (projects/worker) — edge request path ────────────┐
+│  authenticate (per-user API key) → validate the request              │
+│  embed the prompt: BGE @cf/baai/bge-base-en-v1.5 via Workers AI      │
+│    (src/embed.ts)                                                    │
+│  query Vectorize index `wagmiphotos-bge` (cosine) + D1 metadata      │
+│                                                                      │
+│   similarity ≥ floor       below floor            empty pool         │
+│   ────────────────────     ────────────────────   ─────────────────  │
+│   HIT — cached image,      APPROXIMATE — the      PENDING — 202,     │
+│   cost_saved_usd > 0       closest match served,  nothing to serve   │
+│                            cost_saved_usd: 0      yet                │
+│                                                                      │
+│  misses/approximates → logged to the D1 `queries` table              │
+│                        (demand-ranked generation queue)              │
+└──────────────────────────────────────────────────────────────────────┘
+                  │  out of band — the Worker NEVER generates in-request
+                  ▼
+┌─ Python backfill (projects/backfill) ────────────────────────────────┐
+│  poll D1 for pending queries, ranked by demand                       │
+│  → generate via genblaze (OpenAI gpt-image-1 / Gemini / GMICloud)    │
+│  → derive webp sizes                                                 │
+│  → store bytes + provenance manifest to Backblaze B2                 │
+│  → write asset metadata to D1 + BGE prompt vector to Vectorize       │
+└──────────────────────────────────────────────────────────────────────┘
+                  │
+                  ▼
+        the next identical/similar prompt is a HIT
 ```
+
+Similarity floors (`FLOOR_SIM_MAX=0.90` / `FLOOR_SIM_MIN=0.72`) and the default `cache_tolerance` (0.15) are pinned in the repo-root `contract.json`, which both the Worker and the backfill test suites assert against.
 
 ### How the cache saves money
 
-Every HIT skips an OpenAI generation call entirely. With `gpt-image-1` at ~$0.04 per 1024×1024 image, a warm cache converting 70 % of requests to HITs reduces your generation spend by 70 %. The playground UI keeps a running `$saved` counter so judges can see the savings mount in real time. The `cache_tolerance` slider (0 = exact match, 1 = accept anything) lets you tune the aggressiveness of the cache for your use-case.
+Every HIT is a generation call that never happens. With `gpt-image-1` at ~$0.04 per 1024×1024 image, a warm pool converting 70 % of requests to HITs cuts generation spend by 70 % — and because misses are generated once by the backfill and then shared, a popular prompt costs the pool exactly one generation, ever. The playground UI keeps a running `$saved` counter, and the `cache_tolerance` slider tunes how close a cached image must be to count as your answer.
 
 ---
 
 ## How it uses Backblaze B2
 
-Generated assets (PNG bytes), thumbnails, and SHA-256 provenance manifests are stored in a Backblaze B2 bucket via the **genblaze-s3 sink**. Each asset lands at a path like `assets/<sha256>/image.png` with a companion `manifest.json` recording the model, prompt, timestamp, and content hash. Cache hits serve the B2-hosted URL directly — no re-generation needed.
+B2 holds the image bytes. The **backfill** (not the request path) writes every generated or rehosted image to a B2 bucket in derived **webp sizes**, alongside a SHA-256 **provenance manifest** recording the model, prompt, timestamp, and content hash (the manifest URL is persisted in D1). The Worker serves B2-hosted URLs straight from D1 metadata — a cache hit never touches a generation provider.
 
 The playground `<img>` tags and the API `data[0].url` field must resolve publicly. This requires a **public-read B2 bucket** and `B2_PUBLIC_URL_BASE` set to the bucket's friendly-URL prefix (e.g. `https://f004.backblazeb2.com/file/<bucket-name>`). Without this, image URLs will 403 in the browser. Presigning is a planned future alternative.
 
-Required B2 env vars: `B2_KEY_ID`, `B2_APP_KEY`, `B2_BUCKET`, `B2_PUBLIC_URL_BASE`.
+Required B2 env vars (backfill side): `B2_KEY_ID`, `B2_APP_KEY`, `B2_BUCKET`, `B2_PUBLIC_URL_BASE`.
 
 ---
 
 ## How it uses Genblaze
 
-The miss-path calls `GenblazeGenerator`, which uses the **Genblaze SDK** to orchestrate the AI provider pipeline: it submits the prompt to the configured provider (OpenAI by default), receives the generated bytes, and uses the **genblaze-s3 sink** to upload the result to B2 and emit the SHA-256 provenance manifest. Genblaze handles retry logic, provider abstraction, and the provenance envelope.
+The backfill generates through the **Genblaze SDK**: it submits the queued prompt to the configured provider, receives the generated bytes, and uses the **genblaze-s3 sink** to upload the result to B2 and emit the SHA-256 provenance manifest. Genblaze handles retry logic, provider abstraction, and the provenance envelope.
 
 ---
 
 ## AI providers and models
 
+Generation providers (used only by the backfill, via Genblaze):
+
 | Provider | Model | Notes |
 |----------|-------|-------|
 | OpenAI (default) | `gpt-image-1` | Set `OPENAI_API_KEY` |
-| Google Imagen | via Genblaze | Optional alternative |
-| GMICloud | via Genblaze | Optional alternative |
+| Google Imagen | via Genblaze | Optional alternative — set `GEMINI_API_KEY` |
+| GMICloud | via Genblaze | Optional alternative — set `GMICLOUD_API_KEY` |
 
-When no API keys are set, the system falls back to `StubGenerator` (returns a deterministic placeholder URL) so the full cache pipeline can be exercised offline.
+Semantic search uses **BGE** (`bge-base-en-v1.5`, 768-dim, text-to-text): the Worker embeds query prompts with Cloudflare **Workers AI** (`@cf/baai/bge-base-en-v1.5`), and the backfill embeds asset prompts/captions with a local `BAAI/bge-base-en-v1.5` — the same base model, so both live in one embedding space. There is no model parameter in the API; callers control only `cache_tolerance` and `generate_on_miss`.
 
 ---
 
@@ -110,38 +122,41 @@ This is a uv monorepo with the following project structure:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `OPENAI_API_KEY` | For live generation | OpenAI key for `gpt-image-1` |
-| `GEMINI_API_KEY` | Recommended | Enables semantic embeddings (falls back to hash-embedder) |
+| `OPENAI_API_KEY` | For live generation | OpenAI key for `gpt-image-1` (backfill generation provider) |
+| `GEMINI_API_KEY` | Optional | Generation-provider credential for the backfill (Imagen via Genblaze) — **not** used for embeddings |
+| `GMICLOUD_API_KEY` | Optional | GMICloud generation provider (backfill) |
 | `B2_KEY_ID` | For B2 storage | Backblaze B2 application key ID |
 | `B2_APP_KEY` | For B2 storage | Backblaze B2 application key |
 | `B2_BUCKET` | For B2 storage | Backblaze B2 bucket name |
 | `B2_REGION` | Optional | B2 region (default: `us-west-004`) |
 | `B2_PUBLIC_URL_BASE` | For image rendering | Public-read URL base (e.g. `https://f004.backblazeb2.com/file/<bucket>`). Required for the playground and API responses to serve accessible image URLs from a public-read bucket. |
-| `MASTER_API_KEY` | Optional | Bearer token protecting the Worker's endpoints (unset = open dev mode). Set via `wrangler secret put`. |
+| `MASTER_API_KEY` | Worker secret | Master bearer token for the Worker API (`wrangler secret put`). A missing key does **not** open the API — the dev-open lane requires `DEV_MODE=true` (local dev only, in `projects/worker/.dev.vars`; never set in production). |
 
-The persistent cache now lives in **Cloudflare D1 + Vectorize** (768-dim BGE, fixed), not Postgres/pgvector.
+The persistent cache lives in **Cloudflare D1 + Vectorize** (768-dim BGE, fixed), not Postgres/pgvector.
 The full Cloudflare/BGE variable list is in **[Backfill worker](#backfill-worker)** and
 **[Cloudflare Worker](#cloudflare-worker-edge-request-path)** below and in `.env.example`.
 
-Without any env vars set, SharedCache runs fully offline with stub components — useful for local development and CI.
+Both test suites run fully offline with fakes — no env vars needed. Local Worker dev
+(`.claude/skills/running-locally/SKILL.md`) works offline too, except the generation path,
+which needs live Vectorize/Workers AI.
 
 ---
 
 ## The `cache_tolerance` knob
 
-`cache_tolerance` (0.0–1.0, default 0.15) sets the minimum cosine similarity for a cache hit. Lower values are stricter (only very close prompts hit the cache); higher values are more aggressive. The playground UI exposes this as a slider so you can tune it interactively.
+`cache_tolerance` (0.0–1.0, default 0.15) controls how far from an exact match a cached image may be and still count as a HIT: 0 accepts only near-exact prompts, 1 accepts anything (the floors map it onto the BGE cosine scale). The playground UI exposes this as a slider so you can tune it interactively. The API validates its inputs — `prompt` is required (≤ 2000 chars) and `cache_tolerance` must be a number in [0, 1] — returning `422` otherwise.
 
 ---
 
 ## Backfill worker
 
-The backfill worker is a long-running process that continuously re-ranks cached images in the Cloudflare D1 database, using BGE embeddings to detect stale or unverified cache entries and re-check their similarity. It runs in the GMI Hermes agentbox.
+The backfill worker is a long-running process that drains the demand-ranked miss queue: it polls D1 for pending `queries` (ranked by how often each prompt was requested), re-checks Vectorize so nothing is built twice, generates the top-ranked prompts via Genblaze providers, derives webp sizes, stores bytes + provenance manifest to B2, and writes asset metadata to D1 and BGE prompt vectors to Vectorize. It also rehosts seeded PD12M images to B2. For reliability it retries transient Cloudflare API errors, skips a prompt after 5 failed attempts, dedupes PD12M seeding on `(source, source_id)`, and persists lifetime spend in D1 (`meta` table) so the cost cap survives restarts. It runs locally or in the GMI Hermes agentbox.
 
 ### Setup
 
-1. **Apply the D1 migration** (creates the asset table with BGE-vector columns):
+1. **Apply the D1 migrations** (schema for assets/queries, accounts, and backfill reliability — currently `0001` → `0006`):
    ```bash
-   wrangler d1 migrations apply sharedcache-prod
+   wrangler d1 migrations apply sharedcache
    ```
 
 2. **Create the Vectorize index** (BGE embeddings, 768 dimensions, cosine similarity):
@@ -155,7 +170,7 @@ The backfill worker is a long-running process that continuously re-ranks cached 
    ```
 
 4. **Run the backfill**:
-   - **Locally** (runs once, re-ranks all assets):
+   - **Locally** (one pass over the queue, then exit):
      ```bash
      uv run python -m sharedcache.backfill --once
      ```
@@ -177,7 +192,7 @@ The backfill worker is a long-running process that continuously re-ranks cached 
 
 ## Cloudflare Worker (edge request path)
 
-The Worker handles incoming image-generation requests at the edge, routing them to the cache-hit or generation paths. It shares the same D1 database and Vectorize index that the Python backfill (Plan 1) populates.
+The Worker handles incoming image-generation requests at the edge, answering each with a cache **hit**, the closest **approximate** match, or a `202` **pending** — it never generates in-request. It shares the same D1 database and Vectorize index that the Python backfill populates.
 
 ### Deploy runbook
 
@@ -192,7 +207,7 @@ The Worker handles incoming image-generation requests at the edge, routing them 
    ```
    Copy the returned `database_id` and set it in `projects/worker/wrangler.toml` (replace `REPLACE_WITH_D1_DATABASE_ID`).
 
-3. **Apply the D1 migration** (creates the asset table with BGE-vector columns):
+3. **Apply the D1 migrations** (currently `0001` → `0006`):
    ```bash
    wrangler d1 migrations apply sharedcache
    ```
@@ -204,7 +219,8 @@ The Worker handles incoming image-generation requests at the edge, routing them 
 
 5. **Set secrets** (one-time; Cloudflare stores these securely):
    ```bash
-   wrangler secret put MASTER_API_KEY       # Your API key for request validation
+   wrangler secret put MASTER_API_KEY       # Master bearer for the API
+   wrangler secret put RESEND_API_KEY       # Magic-link email sending (see Authentication)
    ```
    Query-prompt embedding uses the `[ai] binding = "AI"` Workers AI binding already declared in
    `wrangler.toml` — no external embedding endpoint or token to configure.
@@ -219,15 +235,15 @@ The Worker handles incoming image-generation requests at the edge, routing them 
    npm run deploy
    ```
 
-The Worker is the request path for production image-generation calls. The Python backfill service (described earlier) runs continuously in the background, populating the same D1 + Vectorize with embeddings and keeping cache scores fresh.
+The Worker is the request path for production image-generation calls. The Python backfill service (described earlier) runs in the background, generating queued misses and populating the same D1 + Vectorize + B2 that the Worker serves from.
 
 ---
 
 ## Authentication
 
-The playground, library, and API all require login via **magic-link authentication**. Each user receives a unique API key after verifying their email address. The Worker validates keys on every request to the `/v1/images/generations` endpoint and logs queries to D1 keyed by user.
+The playground, library, and API all require login via **magic-link authentication** (Resend). Login tokens are nonce-bound, and each user receives a per-user API key after verifying their email address. The Worker validates keys on every request to the `/v1/images/generations` endpoint and logs queries to D1 keyed by user.
 
-**Local development** (no Resend API key set): Magic links are logged to stdout and returned in the login response as `dev_link` so you can click them without external email.
+**Local development**: set `DEV_MODE=true` in `projects/worker/.dev.vars` (gitignored — copy `.dev.vars.example`). With it, magic links are logged to the console and returned in the login response as `dev_link` so you can click them without external email, and the API lane is dev-open (unauthenticated requests act as `usr_dev`). Without `DEV_MODE` these conveniences fail closed — a missing `RESEND_API_KEY` no longer leaks login links, and a missing `MASTER_API_KEY` no longer opens the API. **Production must never set `DEV_MODE`.**
 
 **Deploy** (production): Set the `RESEND_API_KEY` secret before deploying:
 ```bash
@@ -241,12 +257,14 @@ The `EMAIL_FROM` sender address is configured in `projects/worker/wrangler.toml`
 
 ## Running tests
 
+All tests should pass in both suites:
+
 ```bash
 # Python backfill worker (offline, fakes for D1/Vectorize/BGE/B2)
-uv run pytest -q          # 42 passed
+uv run pytest -q
 
 # Cloudflare Worker (offline, faked bindings — no Miniflare)
-cd projects/worker && npx vitest run   # 32 passed
+cd projects/worker && npx vitest run
 ```
 
 ---
@@ -267,4 +285,4 @@ Cloudflare/Backblaze/GMI credentials:
 
 A **public-read B2 bucket** (`B2_PUBLIC_URL_BASE`) is required so returned image URLs resolve in the browser.
 
-Verify in the Backblaze console that `assets/<sha256>/image.png` and `manifest.json` objects are present for each generated prompt.
+Verify in the Backblaze console that the webp asset objects and a companion `manifest.json` are present for each generated prompt.

@@ -218,6 +218,9 @@ wheels = [
 ]
 
 [package.optional-dependencies]
+gmicloud = [
+    { name = "genblaze-gmicloud" },
+]
 openai = [
     { name = "genblaze-openai" },
 ]
@@ -233,6 +236,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/93/65/9be769da31fcba42b9cb5300904762059a34a67a1ce3209ceca19ffc486f/genblaze_core-0.3.2.tar.gz", hash = "sha256:56fb37f2f30fb3f911d3537abed0222e6e0b77413dbddebc13a758df73b7f5fa", size = 335844, upload-time = "2026-05-26T17:14:48.019Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/52/45/68436854232b63f0dda5a7267b8cb6993acae3846de3cd86175e9aca61a0/genblaze_core-0.3.2-py3-none-any.whl", hash = "sha256:08827906115caa681bb5ecf7a43e8fc30353eda8f031c00d9f3afcb272d45679", size = 238310, upload-time = "2026-05-26T17:14:46.623Z" },
+]
+
+[[package]]
+name = "genblaze-gmicloud"
+version = "0.3.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "genblaze-core" },
+    { name = "httpx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/94/05/65ddee41d24ea39c3d5deb851855c70df58115d2c08112bc43f0b678a974/genblaze_gmicloud-0.3.1.tar.gz", hash = "sha256:37509805b89933a474a81526d0e3d677d132c8ca5ec777ff4735ce6b5cd9fd46", size = 38778, upload-time = "2026-05-26T17:15:18.053Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/39/4b/dc610bf7114024a8421a51de8a65f023ec51c18b0546c993b1daeece178c/genblaze_gmicloud-0.3.1-py3-none-any.whl", hash = "sha256:983028bfb9bd648c3a9dd70dac69ad34aa2beb91bbeb09ba9c8fecb3c41df8c5", size = 32279, upload-time = "2026-05-26T17:15:16.578Z" },
 ]
 
 [[package]]
@@ -1670,14 +1686,14 @@ name = "sharedcache-generation"
 version = "0.1.0"
 source = { editable = "projects/generation" }
 dependencies = [
-    { name = "genblaze", extra = ["openai"] },
+    { name = "genblaze", extra = ["gmicloud", "openai"] },
     { name = "pillow" },
     { name = "sharedcache-common" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "genblaze", extras = ["openai"], specifier = ">=0.4,<0.5" },
+    { name = "genblaze", extras = ["openai", "gmicloud"], specifier = ">=0.4,<0.5" },
     { name = "pillow", specifier = ">=10" },
     { name = "sharedcache-common", editable = "projects/common" },
 ]

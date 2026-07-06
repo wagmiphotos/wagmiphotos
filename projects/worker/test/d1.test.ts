@@ -46,8 +46,9 @@ it("recordQuery upserts with count increment and forward-only built", async () =
   // status param is 'built' when built=true, else 'pending'
   expect(calls[0].args).toContain("built");
   expect(calls[0].args).toContain("a fox");
-  // assert the forward-only clause: built rows never revert to pending
-  expect(calls[0].sql).toContain("CASE WHEN queries.status = 'built' THEN 'built' ELSE excluded.status END");
+  // assert the state-preserving clause: built rows never revert to pending, and
+  // rows the backfill has claimed (status='building') keep their claim
+  expect(calls[0].sql).toContain("status = CASE WHEN queries.status IN ('built','building') THEN queries.status ELSE excluded.status END");
 });
 
 it("recordQuery merges generate forward-only: generation wins over opt-out", async () => {
@@ -171,8 +172,19 @@ it("sessions.create/resolve/touch/delete hit sessions with TTL and expiry guard"
   expect(calls[1].sql).toContain("expires_at > datetime('now')");
   await sessions.touch("h1");
   expect(calls[2].sql).toContain("UPDATE sessions SET expires_at");
+  // conditional sliding renewal: writes at most ~once/day per session
+  expect(calls[2].sql).toContain("AND expires_at < datetime('now','+29 days')");
   await sessions.delete("h1");
   expect(calls[3].sql).toContain("DELETE FROM sessions");
+});
+
+it("sessions.purgeExpired and loginTokens.purgeExpired delete rows past expiry", async () => {
+  const { db, calls } = fakeDb();
+  const { sessions, loginTokens } = makeD1Stores(db);
+  await sessions.purgeExpired();
+  expect(calls[0].sql).toContain("DELETE FROM sessions WHERE expires_at <= datetime('now')");
+  await loginTokens.purgeExpired();
+  expect(calls[1].sql).toContain("DELETE FROM login_tokens WHERE expires_at <= datetime('now')");
 });
 
 it("loginTokens.create sets 15-min TTL + nonce_hash; consume is nonce-guarded, single-use + expiry-guarded", async () => {

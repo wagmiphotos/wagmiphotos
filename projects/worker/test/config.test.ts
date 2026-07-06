@@ -1,5 +1,14 @@
 import { it, expect } from "vitest";
-import { numEnv } from "../src/config";
+import { numEnv, isDevMode } from "../src/config";
+
+it("isDevMode: true only for DEV_MODE === 'true' or '1'", () => {
+  expect(isDevMode({ DEV_MODE: "true" } as any)).toBe(true);
+  expect(isDevMode({ DEV_MODE: "1" } as any)).toBe(true);
+  expect(isDevMode({} as any)).toBe(false);
+  expect(isDevMode({ DEV_MODE: "false" } as any)).toBe(false);
+  expect(isDevMode({ DEV_MODE: "" } as any)).toBe(false);
+  expect(isDevMode({ DEV_MODE: "TRUE" } as any)).toBe(false);
+});
 
 it("numEnv: default for unset/blank/unparseable, parses valid values including 0", () => {
   expect(numEnv(undefined, 5)).toBe(5);

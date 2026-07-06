@@ -2,7 +2,7 @@
 name = "sharedcache-generation"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["pillow>=10", "genblaze[openai]>=0.4,<0.5", "sharedcache-common"]
+dependencies = ["pillow>=10", "genblaze[openai,gmicloud]>=0.4,<0.5", "sharedcache-common"]
 [tool.uv.sources]
 sharedcache-common = { workspace = true }
 [build-system]

@@ -12,8 +12,9 @@ edge request path for wagmi.photos). Run it with `wrangler dev` in **local mode*
 (Miniflare). Local mode serves the SPA and the D1-backed endpoints fully offline;
 the semantic-match / **generation path cannot run locally** (see below).
 
-The Python side (`projects/backfill`, `projects/embedder`) is not "the app" — it's
-the batch worker. Run those only if the task is specifically about them.
+The Python side (`projects/backfill`, plus the `projects/common` and
+`projects/generation` libraries it builds on) is not "the app" — it's the batch
+worker. Run those only if the task is specifically about them.
 
 ## Quick start
 
@@ -24,6 +25,7 @@ them again is harmless (and required on a fresh checkout — `.wrangler/` is git
 ```bash
 cd projects/worker
 npm install                                            # only if node_modules/ is missing
+cp .dev.vars.example .dev.vars                         # DEV_MODE=true — required for dev login + dev-open API
 npx wrangler d1 migrations apply sharedcache --local   # creates the D1 schema
 npx wrangler d1 execute sharedcache --local \          # seed the demo library
   --file ../../.claude/skills/running-locally/seed-demo.sql
@@ -48,16 +50,16 @@ curl -s --retry 30 --retry-delay 1 --retry-connrefused http://127.0.0.1:8787/hea
 | API-key issue | `POST /v1/keys/generate` | ✅ **requires a session cookie** (log in first) |
 | Health | `GET /healthz` | ✅ |
 | GitHub star badge | `GET /v1/meta/stars` | ✅ (returns `{"stars":null}` offline) |
-| **Image generation / semantic match** | `POST /v1/images/generations` | ❌ **502** |
+| **Image generation / semantic match** | `POST /v1/images/generations` | ❌ **500** |
 
-**Why generation 502s locally** — two infra deps with no local substitute:
+**Why generation 500s locally** — two infra deps with no local substitute:
 1. **Cloudflare Vectorize has no local emulation.** wrangler prints *"Vectorize local
    bindings are not supported yet"*; `s.vectorize.query()` fails.
 2. **Cloudflare Workers AI has no local emulation either.** `bgeTextEmbed` calls
    `env.AI.run('@cf/baai/bge-base-en-v1.5', …)`; the `[ai]` binding always talks to
    your live Cloudflare account (there is no external embedder or tunnel — inference
-   simply requires real infra). The Worker maps both failures to a 502
-   `{"error":"upstream error","detail":"…"}`.
+   simply requires real infra). The Worker maps both failures to a 500
+   `{"error":"internal error"}` (details go to the wrangler console, not the body).
 
 To exercise generation you need the deployed backend, not local mode: either follow
 `DEPLOY.md`, or `wrangler dev --remote --experimental-vectorize-bind-to-prod` after
@@ -70,13 +72,18 @@ needs no separate secret).
 The product is gated: `#/playground`, `#/library`, `#/account`, and the API require a
 logged-in user. Login is passwordless — an email magic link sent via Resend. Locally
 you have neither Resend nor real email, so the Worker runs in **dev auth mode** when
-`RESEND_API_KEY` is unset: instead of emailing, `POST /v1/auth/login` logs the link to
-the Worker console **and returns it as `dev_link` in the JSON response** (the login card
-also shows a "Dev mode — open your login link" affordance).
+`DEV_MODE=true` is set in `.dev.vars` (copy `.dev.vars.example` — see Quick start):
+instead of emailing, `POST /v1/auth/login` logs the link to the Worker console **and
+returns it as `dev_link` in the JSON response** (the login card also shows a "Dev mode
+— open your login link" affordance). Without `DEV_MODE=true` the conveniences fail
+closed: an unset `RESEND_API_KEY` no longer leaks login links (no `dev_link`, no
+console echo), so local login is impossible.
 
 **Gotcha — the link must point at localhost.** The verify link is built from
 `PUBLIC_SITE_URL`, which `wrangler.toml` hard-codes to `https://wagmi.photos` (prod). So
-by default `dev_link` points at the prod domain and is useless locally. Override it:
+by default `dev_link` points at the prod domain and is useless locally.
+`.dev.vars.example` already sets `PUBLIC_SITE_URL=http://localhost:8787`, so copying it
+handles this; the `--var` flag remains an equivalent alternative:
 
 ```bash
 npx wrangler dev --local --port 8787 --ip 127.0.0.1 \
@@ -92,8 +99,9 @@ curl -s -X POST http://127.0.0.1:8787/v1/auth/login \
 ```
 
 Open the `dev_link` in a browser → it sets the `wagmi_session` cookie (no `Secure` flag
-on http localhost) and 302-redirects to `#/playground`, logged in. `MASTER_API_KEY`
-unset keeps the **API** lane dev-open for keyless `curl` of `/v1/library` etc.; the SPA
+on http localhost) and 302-redirects to `#/playground`, logged in. `DEV_MODE=true` also
+keeps the **API** lane dev-open — keyless `curl` of `/v1/library` etc. acts as the
+`usr_dev` user (a missing `MASTER_API_KEY` alone no longer opens the API); the SPA
 gating (redirect to `#/login`) is cookie-based via `GET /v1/me` and applies regardless.
 
 ## Drive & verify (don't just boot it)
@@ -101,7 +109,7 @@ gating (redirect to `#/login`) is cookie-based via `GET /v1/me` and applies rega
 Smoke the working paths, then look at the UI:
 
 ```bash
-curl -s "http://127.0.0.1:8787/v1/library?limit=4"     # 4 demo images (dev-open API when MASTER unset)
+curl -s "http://127.0.0.1:8787/v1/library?limit=4"     # 4 demo images (dev-open API via DEV_MODE=true)
 curl -s -X POST http://127.0.0.1:8787/v1/keys/generate # → 401: keygen now needs a session cookie (log in — see Auth above)
 ```
 
@@ -110,10 +118,13 @@ Then open **http://127.0.0.1:8787/#/library** in a browser — you'll be redirec
 images render — they're served from the Worker's own `public/assets/*.webp`, so a
 blank grid means the seed didn't land, not a network problem. `/#/playground` renders
 the full generator UI (prompt, tolerance slider, generate-on-miss toggle) once
-logged in; clicking **Generate image** will 502 as above.
+logged in; clicking **Generate image** will 500 as above.
 
 ## Common mistakes
 
+- **Skipping the `.dev.vars` copy** → without `DEV_MODE=true`, login has no `dev_link`
+  (fails closed) and keyless API `curl`s 401. Run `cp .dev.vars.example .dev.vars` and
+  restart `wrangler dev`.
 - **Empty library / blank grid** → the seed step was skipped or hit a fresh
   `.wrangler/` state. Re-run the `d1 execute … seed-demo.sql` line; it's idempotent.
 - **Serving on a non-8787 port** → the seed's image URLs are absolute to `:8787`, so

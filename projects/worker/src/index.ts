@@ -6,6 +6,7 @@ import { handleGenerate, handleKeygen, type GenBody } from "./handler";
 import { handleLibrarySearch, handleLibraryDownload } from "./library";
 import { rewritePublicUrls } from "./rewrite";
 import { numEnv } from "./config";
+import { FLOOR_SIM_MAX, FLOOR_SIM_MIN } from "./floor";
 import { makeEmailSender } from "./email";
 import { resolveApiPrincipal, resolveSession } from "./session";
 import { handleLoginRequest, handleVerify, handleMe, handleLogout, handleListKeys, handleDeleteKey } from "./auth-routes";
@@ -54,8 +55,7 @@ async function handleStars(env: Env): Promise<Response> {
       if (typeof data?.stargazers_count === "number") stars = data.stargazers_count;
     }
     const res = Response.json({ stars }, { headers: { "Cache-Control": "public, max-age=600" } });
-    const cache2 = (globalThis as any).caches?.default;
-    if (cache2 && stars != null) await cache2.put(cacheKey, res.clone());
+    if (cache && stars != null) await cache.put(cacheKey, res.clone());
     return res;
   } catch (e) {
     console.error("stars fetch failed", e);
@@ -69,6 +69,7 @@ export default {
       const url = new URL(request.url);
       const verifyBase = env.PUBLIC_SITE_URL || "https://wagmi.photos";
       const authCfg = { verifyBase };
+      const services = buildServices(env);
       if (url.pathname === "/healthz") {
         if (request.method !== "GET") return new Response("Not found", { status: 404 });
         return Response.json({ status: "ok" });
@@ -80,31 +81,29 @@ export default {
       }
 
       if (url.pathname === "/v1/auth/login" && request.method === "POST")
-        return await handleLoginRequest(request, env, buildServices(env), authCfg);
+        return await handleLoginRequest(request, env, services, authCfg);
       if (url.pathname === "/v1/auth/verify" && request.method === "GET")
-        return await handleVerify(url, request, env, buildServices(env), authCfg);
+        return await handleVerify(url, request, env, services, authCfg);
       if (url.pathname === "/v1/me" && request.method === "GET")
-        return await handleMe(request, env, buildServices(env));
+        return await handleMe(request, env, services);
       if (url.pathname === "/v1/auth/logout" && request.method === "POST")
-        return await handleLogout(request, env, buildServices(env));
+        return await handleLogout(request, env, services);
       if (url.pathname === "/v1/keys" && request.method === "GET")
-        return await handleListKeys(request, env, buildServices(env));
+        return await handleListKeys(request, env, services);
       const keyDel = url.pathname.match(/^\/v1\/keys\/([^/]+)$/);
       if (keyDel && request.method === "DELETE") {
         let id: string;
         try { id = decodeURIComponent(keyDel[1]); } catch { return new Response("Not found", { status: 404 }); }
-        return await handleDeleteKey(id, request, env, buildServices(env));
+        return await handleDeleteKey(id, request, env, services);
       }
 
       if (url.pathname === "/v1/library" && request.method === "GET") {
-        const services = buildServices(env);
         if (!(await resolveApiPrincipal(request, env, services))) return Response.json({ error: "login required" }, { status: 401 });
         return await handleLibrarySearch(url, services);
       }
 
       const dl = url.pathname.match(/^\/v1\/library\/([^/]+)\/download$/);
       if (dl && request.method === "GET") {
-        const services = buildServices(env);
         if (!(await resolveApiPrincipal(request, env, services))) return Response.json({ error: "login required" }, { status: 401 });
         let id: string;
         try {
@@ -116,14 +115,12 @@ export default {
       }
 
       if (url.pathname === "/v1/keys/generate" && request.method === "POST") {
-        const services = buildServices(env);
         const principal = await resolveSession(request, env, services.sessions);
         if (!principal) return Response.json({ error: "login required" }, { status: 401 });
         return await handleKeygen(request, services, genKey, principal.userId);
       }
 
       if (url.pathname === "/v1/images/generations" && request.method === "POST") {
-        const services = buildServices(env);
         const principal = await resolveApiPrincipal(request, env, services);
         if (!principal) return Response.json({ error: "Invalid API Key" }, { status: 401 });
         // Throttle the expensive path (embed + Vectorize) per authenticated
@@ -138,8 +135,8 @@ export default {
           return Response.json({ error: "body must be a JSON object" }, { status: 400 });
         }
         const cfg = {
-          floorSimMax: numEnv(env.FLOOR_SIM_MAX, 0.90),
-          floorSimMin: numEnv(env.FLOOR_SIM_MIN, 0.72),
+          floorSimMax: numEnv(env.FLOOR_SIM_MAX, FLOOR_SIM_MAX),
+          floorSimMin: numEnv(env.FLOOR_SIM_MIN, FLOOR_SIM_MIN),
           imagePrice: numEnv(env.IMAGE_PRICE_USD, 0.04),
           now: () => Math.floor(Date.now() / 1000),
         };
@@ -151,8 +148,9 @@ export default {
       }
       return await rewritePublicUrls(await env.ASSETS.fetch(request), env);
     } catch (err) {
+      // Full detail to the log only; the client gets a generic body.
       console.error(err);
-      return Response.json({ error: "upstream error", detail: String(err) }, { status: 502 });
+      return Response.json({ error: "internal error" }, { status: 500 });
     }
   },
 };

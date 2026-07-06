@@ -1,7 +1,7 @@
 # SharedCache — Handoff / Resume Here
 
 _Last updated: 2026-07-07. Everything below is merged to `main`, green
-(Python **46 passed**, Worker **113 passed**), and pushed to
+(both offline test suites pass), and pushed to
 `github.com/wagmiphotos/wagmiphotos`. **Start here to resume:**
 [`docs/HANDOFF-2026-07-07.md`](docs/HANDOFF-2026-07-07.md) — magic-link auth + BGE
 edge embeddings shipped; deploy (BGE live provisioning) and the sharedcache→wagmiphotos
@@ -19,8 +19,10 @@ generated **asynchronously** by a background worker — the request path never b
 Two deployables over three shared stores:
 
 - **Cloudflare Worker** (`projects/worker/`, TypeScript) — the edge request path **and** the static UI.
-  Handles `POST /v1/images/generations`, `POST /v1/keys/generate`, `GET /healthz`; serves the playground SPA
-  for every other path via **Workers Static Assets**. It authenticates, embeds the prompt with **Cloudflare
+  Handles `POST /v1/images/generations`, `GET /v1/library`, `GET /v1/library/:id/download`,
+  `POST /v1/auth/login`, `GET /v1/auth/verify`, `POST /v1/auth/logout`, `GET /v1/me`,
+  `GET /v1/keys`, `DELETE /v1/keys/:id`, `POST /v1/keys/generate`, `GET /v1/meta/stars`,
+  and `GET /healthz`; serves the playground SPA for every other path via **Workers Static Assets**. It authenticates, embeds the prompt with **Cloudflare
   Workers AI (`@cf/baai/bge-base-en-v1.5`, text-to-text, 768d)**, queries Vectorize for the nearest asset,
   reads/logs the query to D1, and returns the image URL. **It never generates.**
   Branch outcomes: `hit` (≥ floor), `approximate` (< floor, nearest served anyway), `pending` (`202`, empty pool).
@@ -30,7 +32,7 @@ Two deployables over three shared stores:
   images to B2 in 3 webp sizes. Embeds asset prompts/captions with a **local** `BAAI/bge-base-en-v1.5`
   (in-process, `model` extra) — no external embedder or tunnel. Runs locally or in a GMI Cloud Hermes
   agentbox (Dockerfile included).
-- **Shared stores:** **D1** (query log + asset metadata + hashed api keys), **Vectorize** (768-dim BGE
+- **Shared stores:** **D1** (query log + asset metadata + hashed api keys + users/sessions/login_tokens), **Vectorize** (768-dim BGE
   `wagmiphotos-bge` index — prompt/caption text vectors), **Backblaze B2** (image bytes).
 
 Data flow: Worker logs demand → backfill builds top misses → Vectorize/D1 updated → next identical/similar
@@ -53,11 +55,11 @@ Python dep graph: `common ← generation ← backfill`. Imports are `sharedcache
 ## How to run / test / build
 
 ```bash
-# Python (offline, fakes for D1/Vectorize/BGE/B2)
-uv sync && uv run pytest -q                      # 52 passed
+# Python (offline, fakes for D1/Vectorize/BGE/B2) — all tests should pass
+uv sync && uv run pytest -q
 
-# Worker (offline, faked bindings — no Miniflare)
-cd projects/worker && npm install && npm test    # 69 passed
+# Worker (offline, faked bindings — no Miniflare) — all tests should pass
+cd projects/worker && npm install && npm test
 
 # Build each Python package into a wheel
 uv build --package sharedcache-{common,generation,backfill}
@@ -111,10 +113,10 @@ This is the biggest open item: everything is verified offline with fakes; nothin
   prompts/captions with a local `BAAI/bge-base-en-v1.5` (see `deploy/gmi`).
 - Seed: `uv run python -m sharedcache.backfill.seed_pd12m --limit 100`.
 - **Tune `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN`** against the seeded pool (BGE text-to-text cosines run high, ~0.7–0.95).
-- **Deploy order dependency:** this branch requires `cd projects/worker && npx wrangler d1 migrations apply
-  sharedcache` (remote) to run **before** `npm run deploy` — migrations `0002` (`queries.generate`, backfill
-  demand tracking) and `0003` (assets browse index) must be live first. Deploying the Worker ahead of these
-  migrations breaks demand tracking and hard-errors the Python backfill.
+- **Deploy order dependency:** `cd projects/worker && npx wrangler d1 migrations apply
+  sharedcache` (remote) must run **before** `npm run deploy` — all migrations through `0006` must be live
+  first (see `DEPLOY.md` step 3 for the per-migration notes, including `0004`'s breaking anonymous-key
+  wipe). Deploying the Worker ahead of them breaks demand tracking and hard-errors the Python backfill.
 - Deploy the Worker: `cd projects/worker && npm run deploy`; **confirm `wrangler deploy --dry-run` lists the
   `RATE_LIMITER` binding**; then check a request returns a nearest image and the SPA loads at `/`.
 - Verify the Vectorize v2 upsert/insert ndjson framing against one live call.
@@ -134,7 +136,8 @@ Most items are now closed — see `docs/HANDOFF-2026-07-04.md` → "Addressed si
 ### 4. Nice-to-haves
 - The SPA has no automated test harness (verified by inspection + live). A tiny Playwright smoke test could
   cover the hit/approximate/pending render states.
-- `web/index.html` uses `sizes.thumb/medium` are available but unused; could show responsive/thumbnail images.
+- `projects/worker/public/index.html`: the API returns `sizes.thumb/medium`, but the SPA doesn't use them —
+  it could serve responsive/thumbnail images instead of the full-size URL.
 
 ## Ground truth
 
