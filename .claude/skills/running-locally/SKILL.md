@@ -41,9 +41,11 @@ curl -s --retry 30 --retry-delay 1 --retry-connrefused http://127.0.0.1:8787/hea
 
 | Surface | Route / endpoint | Local? |
 |---|---|---|
-| Landing page + playground SPA | `/`, `/#/playground`, `/#/pricing` | ✅ |
-| Library browse (renders seeded images) | `/#/library`, `GET /v1/library` | ✅ (needs the seed) |
-| API-key issue | `POST /v1/keys/generate` | ✅ |
+| Landing page (public) | `/`, `/#/pricing`, `/#/docs`, `/#/faq` | ✅ |
+| Magic-link login (dev) | `POST /v1/auth/login` → `dev_link` | ✅ (see Auth below) |
+| Playground / Library / Account | `/#/playground`, `/#/library`, `/#/account` | ✅ **after dev login** (gated → redirect to `#/login`) |
+| Library browse (renders seeded images) | `GET /v1/library` | ✅ (needs the seed; login-gated) |
+| API-key issue | `POST /v1/keys/generate` | ✅ **requires a session cookie** (log in first) |
 | Health | `GET /healthz` | ✅ |
 | GitHub star badge | `GET /v1/meta/stars` | ✅ (returns `{"stars":null}` offline) |
 | **Image generation / semantic match** | `POST /v1/images/generations` | ❌ **502** |
@@ -59,6 +61,37 @@ To exercise generation you need the deployed backend, not local mode: either fol
 `DEPLOY.md`, or `wrangler dev --remote --experimental-vectorize-bind-to-prod` after
 setting a real `database_id` in `wrangler.toml`, a live+seeded Vectorize index, and a
 reachable `CLIP_TEXT_EMBED_URL` + `CLIP_EMBED_TOKEN` secret.
+
+## Auth in local dev (magic-link login)
+
+The product is gated: `#/playground`, `#/library`, `#/account`, and the API require a
+logged-in user. Login is passwordless — an email magic link sent via Resend. Locally
+you have neither Resend nor real email, so the Worker runs in **dev auth mode** when
+`RESEND_API_KEY` is unset: instead of emailing, `POST /v1/auth/login` logs the link to
+the Worker console **and returns it as `dev_link` in the JSON response** (the login card
+also shows a "Dev mode — open your login link" affordance).
+
+**Gotcha — the link must point at localhost.** The verify link is built from
+`PUBLIC_SITE_URL`, which `wrangler.toml` hard-codes to `https://wagmi.photos` (prod). So
+by default `dev_link` points at the prod domain and is useless locally. Override it:
+
+```bash
+npx wrangler dev --local --port 8787 --ip 127.0.0.1 \
+  --var PUBLIC_SITE_URL:http://127.0.0.1:8787
+```
+
+Then the dev login flow works end-to-end:
+
+```bash
+curl -s -X POST http://127.0.0.1:8787/v1/auth/login \
+  -H 'Content-Type: application/json' -d '{"email":"you@example.com"}'
+# → {"status":"sent","dev_link":"http://127.0.0.1:8787/v1/auth/verify?token=…"}
+```
+
+Open the `dev_link` in a browser → it sets the `wagmi_session` cookie (no `Secure` flag
+on http localhost) and 302-redirects to `#/playground`, logged in. `MASTER_API_KEY`
+unset keeps the **API** lane dev-open for keyless `curl` of `/v1/library` etc.; the SPA
+gating (redirect to `#/login`) is cookie-based via `GET /v1/me` and applies regardless.
 
 ## Drive & verify (don't just boot it)
 
