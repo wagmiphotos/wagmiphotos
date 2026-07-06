@@ -225,6 +225,22 @@ The Worker is the request path for production image-generation calls. The Python
 
 ---
 
+## Authentication
+
+The playground, library, and API all require login via **magic-link authentication**. Each user receives a unique API key after verifying their email address. The Worker validates keys on every request to the `/v1/images/generations` endpoint and logs queries to D1 keyed by user.
+
+**Local development** (no Resend API key set): Magic links are logged to stdout and returned in the login response as `dev_link` so you can click them without external email.
+
+**Deploy** (production): Set the `RESEND_API_KEY` secret before deploying:
+```bash
+wrangler secret put RESEND_API_KEY
+# (paste your Resend API key)
+```
+
+The `EMAIL_FROM` sender address is configured in `projects/worker/wrangler.toml` as `login@wagmi.photos` (a verified Resend sending domain).
+
+---
+
 ## Running tests
 
 ```bash

@@ -22,12 +22,13 @@ simple = { limit = 10, period = 60 }
 
 [vars]
 CLIP_TEXT_EMBED_URL = "https://embed.wagmi.photos/embed/text"  # GMI box via Cloudflare Tunnel (deploy/gmi)
+EMAIL_FROM = "login@wagmi.photos"   # verified Resend sending address
 FLOOR_SIM_MAX = "0.35"
 FLOOR_SIM_MIN = "0.18"
 IMAGE_PRICE_USD = "0.04"
 PUBLIC_SITE_URL = "https://wagmi.photos"           # canonical site origin (override per environment / .dev.vars)
 PUBLIC_API_BASE_URL = "https://api.wagmi.photos/v1"  # documented API base rendered into docs/examples
-# Secrets (set with `wrangler secret put`): MASTER_API_KEY, CLIP_EMBED_TOKEN
+# Secrets (set with `wrangler secret put`): MASTER_API_KEY, CLIP_EMBED_TOKEN, RESEND_API_KEY
 
 [assets]
 directory = "./public"
