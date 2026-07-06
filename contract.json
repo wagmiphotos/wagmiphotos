@@ -1,9 +1,26 @@
 {
-  "_comment": "Cross-language contract shared by the edge worker (TypeScript) and the backfill (Python). Both test suites pin their constants against this file (projects/worker/test/contract.test.ts, projects/common/tests/test_contract.py). Change values HERE first; a mismatch on either side must fail tests. The two BGE ids must name the same base model so edge queries and backfill upserts live in one embedding space.",
+  "_comment": "Cross-language contract shared by the edge worker (TypeScript) and the backfill (Python). Both test suites pin their constants against this file (projects/worker/test/contract.test.ts, projects/common/tests/test_contract.py). Change values HERE first; a mismatch on either side must fail tests. The two BGE ids must name the same base model so edge queries and backfill upserts live in one embedding space. Vectorize shard routing uses fnv1a32(id) % vectorize_shards; shard_fixtures pins the hash on both sides.",
   "floor_sim_max": 0.9,
   "floor_sim_min": 0.72,
   "default_cache_tolerance": 0.15,
   "bge_model_workers_ai": "@cf/baai/bge-base-en-v1.5",
   "bge_model_sentence_transformers": "BAAI/bge-base-en-v1.5",
-  "embedding_dims": 768
+  "embedding_dims": 768,
+  "vectorize_index_prefix": "wagmiphotos-bge-",
+  "vectorize_shards": 3,
+  "shard_fixtures": {
+    "demo-1": 0,
+    "demo-2": 0,
+    "demo-3": 1,
+    "demo-4": 1,
+    "0f7e2f6a-9d0e-4a3b-8c1d-2e5f6a7b8c9d": 1,
+    "c0ffee00-cafe-4bad-a555-000000000001": 0,
+    "pd12m-8492731": 2
+  },
+  "asset_paths": {
+    "large": "assets/{id}/image.webp",
+    "medium": "assets/{id}/medium.webp",
+    "thumb": "assets/{id}/thumb.webp",
+    "manifest": "assets/{id}/manifest.json"
+  }
 }
