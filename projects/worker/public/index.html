@@ -327,6 +327,31 @@
     .nav-cta.active { background: var(--red); }
     .nav-cta.active:hover { background: var(--red-deep); }
 
+    .auth-nav {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8125rem;
+      color: var(--muted);
+    }
+
+    .auth-nav a {
+      color: var(--ink-soft);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .auth-nav a:hover { color: var(--red); }
+
+    .auth-email {
+      font-family: var(--font-mono);
+      color: var(--ink);
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     /* ---- Hamburger + mobile ---- */
     .nav-toggle {
       display: none;
@@ -2320,6 +2345,7 @@
               <span id="gh-stars">Star</span>
             </span>
           </a>
+          <span id="auth-nav" class="auth-nav"></span>
           <a href="#/playground" id="nav-playground" class="nav-cta">Launch playground</a>
         </div>
       </div>
@@ -3059,6 +3085,12 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
       <div class="glass-card">
         <h2 class="card-title">Credentials &amp; authentication</h2>
 
+        <!-- Signed-in identity -->
+        <div class="form-group">
+          <label>Signed in as</label>
+          <div id="account-email" style="font-family: var(--font-mono); font-size: 0.9375rem; color: var(--ink);">—</div>
+        </div>
+
         <!-- wagmi.photos API Key Manager -->
         <div class="form-group">
           <label for="api-key">wagmi.photos API key</label>
@@ -3069,6 +3101,12 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
           <span style="font-size: 0.75rem; color: var(--muted); margin-top: 6px; display: block;">
             Generate a new, secure client key from the server or input your existing key. Requests must present this token in the Authorization header.
           </span>
+        </div>
+
+        <!-- Saved keys list -->
+        <div class="form-group">
+          <label>Your keys</label>
+          <div id="account-keys-list" style="font-size: 0.8125rem; color: var(--muted);">No keys yet.</div>
         </div>
 
         <!-- Hugging Face Token -->
@@ -3091,6 +3129,30 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
           Reset browser settings &amp; telemetry
         </button>
       </div>
+
+      </div>
+    </div>
+
+    <!-- VIEW: LOGIN -->
+    <div id="view-login" class="spa-view" style="display:none;">
+      <div class="view-pad">
+
+        <!-- Login Card -->
+        <div class="glass-card" style="max-width: 420px; margin: 0 auto;">
+          <h2 class="card-title">Log in</h2>
+          <p style="font-size: 0.875rem; color: var(--muted); margin-bottom: 20px;">
+            Enter your email and we'll send you a magic link — no password required.
+          </p>
+
+          <div class="form-group">
+            <label for="login-email">Email address</label>
+            <input id="login-email" type="email" class="api-key-input" placeholder="you@example.com">
+          </div>
+
+          <button class="btn btn-primary" onclick="requestMagicLink()">Send me a login link</button>
+
+          <div id="login-status" style="font-size: 0.8125rem; color: var(--muted); margin-top: 16px; text-align: center;"></div>
+        </div>
 
       </div>
     </div>
@@ -3626,12 +3688,18 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       '#/pricing':    { view: 'view-pricing', link: 'nav-pricing' },
       '#/library':    { view: 'view-library', link: 'nav-library', onShow: initLibrary },
       '#/playground': { view: 'view-playground', link: 'nav-playground' },
-      '#/account':    { view: 'view-account', onShow: updateStats },
+      '#/account':    { view: 'view-account', onShow: () => {
+        const emailEl = document.getElementById('account-email');
+        if (emailEl) emailEl.textContent = currentUser ? currentUser.email : '—';
+        updateStats();
+        loadKeys();
+      } },
       '#/legal':      { view: 'view-legal' },
       '#/docs':       { view: 'view-docs', link: 'nav-docs' },
       '#/openai':     { view: 'view-openai', link: 'nav-openai' },
       '#/clip':       { view: 'view-clip', link: 'nav-clip' },
       '#/agents':     { view: 'view-agents', link: 'nav-agents' },
+      '#/login':      { view: 'view-login' },
     };
     const PATH_TO_HASH = {
       '/playground': '#/playground', '/docs': '#/docs', '/pricing': '#/pricing',
@@ -3654,7 +3722,15 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     }
     function closeMenus() { closeDropdowns(); closeMobile(); }
 
+    const GATED = new Set(['#/playground', '#/library', '#/account']);
+    let currentUser = null;
+
     function showRoute(route) {
+      if (GATED.has(route) && !currentUser) {
+        sessionStorage.setItem('wagmi_return', route);
+        route = '#/login';
+      }
+
       document.querySelectorAll('.spa-view').forEach(v => {
         v.classList.remove('active');
         v.style.display = 'none';
@@ -3697,8 +3773,45 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       window.scrollTo(0, 0);
     }
 
+    // ---- Auth ----
+    async function fetchMe() {
+      try {
+        const r = await fetch('/v1/me', { credentials: 'same-origin' });
+        currentUser = r.ok ? (await r.json()).user : null;
+      } catch { currentUser = null; }
+      renderAuthNav();
+    }
+    function renderAuthNav() {
+      // Toggle a nav element: show currentUser.email + Log out when logged in, else a Log in link.
+      const el = document.getElementById('auth-nav');
+      if (!el) return;
+      el.innerHTML = currentUser
+        ? `<span class="auth-email">${currentUser.email}</span><a href="#" onclick="logout();return false">Log out</a>`
+        : `<a href="#/login">Log in</a>`;
+    }
+    async function requestMagicLink() {
+      const email = document.getElementById('login-email').value.trim();
+      const status = document.getElementById('login-status');
+      const r = await fetch('/v1/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin', body: JSON.stringify({ email }),
+      });
+      if (r.status === 400) { status.textContent = 'Please enter a valid email.'; return; }
+      const j = await r.json().catch(() => ({}));
+      status.innerHTML = j.dev_link
+        ? `Dev mode — <a href="${j.dev_link}">open your login link</a>`
+        : 'Check your email for a login link.';
+    }
+    async function logout() {
+      await fetch('/v1/auth/logout', { method: 'POST', credentials: 'same-origin' });
+      currentUser = null; renderAuthNav(); location.hash = '#/';
+    }
+
     window.addEventListener('hashchange', () => navigateTo(window.location.hash));
-    window.addEventListener('DOMContentLoaded', () => navigateTo(window.location.hash));
+    window.addEventListener('DOMContentLoaded', async () => {
+      await fetchMe();
+      navigateTo(window.location.hash);
+    });
 
     // ---- Header interactions ----
     (function initNav() {
@@ -3946,8 +4059,13 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     async function generateWagmiPhotosKey() {
       try {
         const response = await fetch('/v1/keys/generate', {
-          method: 'POST'
+          method: 'POST',
+          credentials: 'same-origin',
         });
+        if (response.status === 401) {
+          location.hash = '#/login';
+          return;
+        }
         if (!response.ok) {
           throw new Error("Failed to generate API Key from server");
         }
@@ -3955,8 +4073,38 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         keyInput.value = data.key;
         saveApiKey();
         showToast("New API Key generated & active!", "success");
+        loadKeys();
       } catch (err) {
         showToast(err.message || "Could not generate key", "error");
+      }
+    }
+
+    function formatKeyDate(raw) {
+      const d = new Date(String(raw).replace(' ', 'T') + 'Z');
+      return isNaN(d.getTime()) ? raw : d.toLocaleString();
+    }
+
+    async function loadKeys() {
+      const list = document.getElementById('account-keys-list');
+      if (!list) return;
+      try {
+        const r = await fetch('/v1/keys', { credentials: 'same-origin' });
+        if (r.status === 401) { location.hash = '#/login'; return; }
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const data = await r.json();
+        if (!data.keys || !data.keys.length) {
+          list.textContent = 'No keys yet.';
+          return;
+        }
+        list.innerHTML = data.keys.map(k => {
+          const label = k.label ? escapeHtml(k.label) : '(unlabeled)';
+          return `<div style="display:flex; justify-content:space-between; gap:12px; padding:6px 0; border-bottom:1px solid var(--line);">
+            <span>${label}</span>
+            <span style="color:var(--muted); font-size:0.75rem; white-space:nowrap;">${escapeHtml(formatKeyDate(k.created_at))}</span>
+          </div>`;
+        }).join('');
+      } catch {
+        list.textContent = 'Could not load keys.';
       }
     }
 
