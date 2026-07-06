@@ -33,3 +33,15 @@ def test_config_defaults_match_contract():
 
 def test_bge_model_matches_contract():
     assert bge.BGE_MODEL == CONTRACT["bge_model_sentence_transformers"]
+
+
+from wagmiphotos.common.shard import fnv1a32, shard_for
+
+
+def test_shard_routing_matches_contract_fixtures():
+    for asset_id, shard in CONTRACT["shard_fixtures"].items():
+        assert shard_for(asset_id, CONTRACT["vectorize_shards"]) == shard
+
+
+def test_fnv1a32_reference_value():
+    assert fnv1a32("demo-1") == 207613968
