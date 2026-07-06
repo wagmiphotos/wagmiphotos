@@ -343,14 +343,27 @@
 
     .auth-nav a:hover { color: var(--red); }
 
-    .auth-email {
-      font-family: var(--font-mono);
-      color: var(--ink);
-      max-width: 160px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    .avatar-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px; padding: 0;
+      border-radius: 50%; border: 1px solid var(--line);
+      background: var(--red-tint); cursor: pointer;
+      transition: border-color 0.15s ease;
     }
+    .avatar-btn:hover, .nav-item.open .avatar-btn { border-color: var(--red); }
+    .avatar {
+      font-family: var(--font-display); font-weight: 700; font-size: 0.8125rem;
+      line-height: 1; color: var(--red-deep); text-transform: uppercase;
+    }
+    .account-menu { right: 0; left: auto; min-width: 210px; }
+    .account-head { padding: 11px 15px 10px; border-bottom: 1px solid var(--line); font-size: 0.75rem; color: var(--muted); }
+    .account-email {
+      display: block; margin-top: 2px;
+      font-family: var(--font-mono); font-size: 0.8125rem; color: var(--ink);
+      word-break: break-all;
+    }
+    .nav-login-link { color: var(--ink-soft); text-decoration: none; font-weight: 600; font-size: 0.875rem; }
+    .nav-login-link:hover { color: var(--red); }
 
     /* ---- Hamburger + mobile ---- */
     .nav-toggle {
@@ -2342,11 +2355,28 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.523 2 12 2z"/></svg>
             <span class="star-count">
               <svg class="star-ic" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-              <span id="gh-stars">Star</span>
+              <span id="gh-stars">—</span>
             </span>
           </a>
-          <span id="auth-nav" class="auth-nav"></span>
-          <a href="#/playground" id="nav-playground" class="nav-cta">Launch playground</a>
+          <div id="auth-nav" class="auth-nav">
+            <a href="#/login" id="auth-login" class="nav-login-link">Log in</a>
+            <div id="auth-menu" class="nav-item" hidden>
+              <button type="button" class="nav-trigger avatar-btn" aria-expanded="false" aria-haspopup="menu" aria-label="Account menu">
+                <span class="avatar" id="avatar-initial">·</span>
+              </button>
+              <div class="nav-dropdown nav-list account-menu" role="menu">
+                <div class="account-head">Signed in as<span class="account-email" id="account-email"></span></div>
+                <a href="#/account" class="nav-drop-item" role="menuitem" onclick="closeMenus()">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                  <span><span class="nav-drop-title">Account</span><span class="nav-drop-sub">Keys &amp; usage.</span></span>
+                </a>
+                <a href="#" class="nav-drop-item" role="menuitem" onclick="logout();return false">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg></span>
+                  <span><span class="nav-drop-title">Log out</span></span>
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -3790,12 +3820,18 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       renderAuthNav();
     }
     function renderAuthNav() {
-      // Toggle a nav element: show currentUser.email + Log out when logged in, else a Log in link.
-      const el = document.getElementById('auth-nav');
-      if (!el) return;
-      el.innerHTML = currentUser
-        ? `<span class="auth-email">${escapeHtml(currentUser.email)}</span><a href="#" onclick="logout();return false">Log out</a>`
-        : `<a href="#/login">Log in</a>`;
+      // Logged in: avatar button with an Account/Log out dropdown. Logged out: a Log in link.
+      const login = document.getElementById('auth-login');
+      const menu = document.getElementById('auth-menu');
+      if (!login || !menu) return;
+      if (currentUser) {
+        login.hidden = true; menu.hidden = false;
+        const initial = ((currentUser.email || '').trim().charAt(0) || '?').toUpperCase();
+        document.getElementById('avatar-initial').textContent = initial;   // textContent = no XSS
+        document.getElementById('account-email').textContent = currentUser.email;
+      } else {
+        login.hidden = false; menu.hidden = true;
+      }
     }
     async function requestMagicLink() {
       const email = document.getElementById('login-email').value.trim();
@@ -3811,6 +3847,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         : 'Check your email for a login link.';
     }
     async function logout() {
+      closeMenus();
       await fetch('/v1/auth/logout', { method: 'POST', credentials: 'same-origin' });
       currentUser = null; renderAuthNav(); location.hash = '#/';
     }
