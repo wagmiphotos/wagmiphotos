@@ -32,7 +32,7 @@ class BgeEmbedder:
         except ImportError as e:
             raise ImportError(
                 "sentence-transformers is not installed — real BGE embeddings need "
-                "the model extra: pip install 'sharedcache-backfill[model]'") from e
+                "the model extra: pip install 'wagmiphotos-backfill[model]'") from e
 
         model = SentenceTransformer(model_name)
 

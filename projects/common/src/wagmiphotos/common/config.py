@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from sharedcache.common.bge import BGE_MODEL
+from wagmiphotos.common.bge import BGE_MODEL
 
 
 class Settings(BaseSettings):

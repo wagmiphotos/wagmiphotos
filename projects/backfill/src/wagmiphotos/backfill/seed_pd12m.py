@@ -5,15 +5,15 @@ Fetches rows from the Hugging Face dataset-viewer, embeds the captions with
 BGE, and inserts rows + vectors into D1 and Vectorize page by page.
 
 Usage:
-    uv run python -m sharedcache.backfill.seed_pd12m --limit 100
+    uv run python -m wagmiphotos.backfill.seed_pd12m --limit 100
 """
 import argparse
 import logging
 import sys
 import uuid
 
-from sharedcache.common.config import Settings
-from sharedcache.common.models import AssetRecord
+from wagmiphotos.common.config import Settings
+from wagmiphotos.common.models import AssetRecord
 
 logger = logging.getLogger(__name__)
 
@@ -124,9 +124,9 @@ def build_clients(settings: Settings) -> tuple:
     catch attribute-name/kwarg drift between Settings and the client
     constructors without needing to run the whole script.
     """
-    from sharedcache.common.d1_client import D1Client
-    from sharedcache.common.vectorize_client import VectorizeClient
-    from sharedcache.common.bge import BgeEmbedder
+    from wagmiphotos.common.d1_client import D1Client
+    from wagmiphotos.common.vectorize_client import VectorizeClient
+    from wagmiphotos.common.bge import BgeEmbedder
 
     d1 = D1Client(
         account_id=settings.cf_account_id,

@@ -6,8 +6,8 @@ import inspect
 import json
 import pathlib
 
-from sharedcache.common import bge, floor
-from sharedcache.common.config import Settings
+from wagmiphotos.common import bge, floor
+from wagmiphotos.common.config import Settings
 
 CONTRACT = json.loads(
     (pathlib.Path(__file__).resolve().parents[3] / "contract.json").read_text())

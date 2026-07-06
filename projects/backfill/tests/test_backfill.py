@@ -1,10 +1,10 @@
 import io, logging, pytest
 from PIL import Image
-from sharedcache.backfill.worker import SPEND_META_KEY, BackfillWorker
-from sharedcache.common.d1_client import QueryRow
-from sharedcache.common.models import AssetRecord
-from sharedcache.generation.storage import InMemoryStorage
-from sharedcache.generation.generator import StubGenerator, build_model_id
+from wagmiphotos.backfill.worker import SPEND_META_KEY, BackfillWorker
+from wagmiphotos.common.d1_client import QueryRow
+from wagmiphotos.common.models import AssetRecord
+from wagmiphotos.generation.storage import InMemoryStorage
+from wagmiphotos.generation.generator import StubGenerator, build_model_id
 from fakes import FakeD1, FakeVectorize
 
 TEST_MODEL = build_model_id("gmicloud", "gpt-image-1")
@@ -265,9 +265,9 @@ async def test_rehost_pass_failure_increments_attempts_and_logs(monkeypatch, cap
     assert any("pd1" in r.getMessage() and r.exc_info for r in caplog.records)
 
 def test_build_worker_from_settings_warns_on_stub_fallback(caplog, monkeypatch):
-    from sharedcache.backfill.worker import build_worker_from_settings
-    from sharedcache.common.bge import BgeEmbedder
-    from sharedcache.common.config import Settings
+    from wagmiphotos.backfill.worker import build_worker_from_settings
+    from wagmiphotos.common.bge import BgeEmbedder
+    from wagmiphotos.common.config import Settings
     monkeypatch.setattr(BgeEmbedder, "from_pretrained", classmethod(lambda cls, model_name: FakeEmbedder()))
     s = Settings(_env_file=None, gmicloud_api_key=None, openai_api_key=None,
                  gemini_api_key=None, b2_bucket=None, b2_key_id=None, b2_app_key=None)
@@ -276,19 +276,19 @@ def test_build_worker_from_settings_warns_on_stub_fallback(caplog, monkeypatch):
     assert any("stub" in r.getMessage().lower() for r in caplog.records)
 
 def test_build_worker_from_settings_model_comes_from_config(monkeypatch):
-    from sharedcache.backfill.worker import build_worker_from_settings
-    from sharedcache.common.bge import BgeEmbedder
-    from sharedcache.common.config import Settings
+    from wagmiphotos.backfill.worker import build_worker_from_settings
+    from wagmiphotos.common.bge import BgeEmbedder
+    from wagmiphotos.common.config import Settings
     monkeypatch.setattr(BgeEmbedder, "from_pretrained", classmethod(lambda cls, model_name: FakeEmbedder()))
     s = Settings(_env_file=None, default_provider="openai", default_image_model="dall-e-3",
                  b2_bucket=None, b2_key_id=None, b2_app_key=None)
     w = build_worker_from_settings(s)
-    assert w._model == "shared-cache-openai-dall-e-3"
+    assert w._model == "wagmiphotos-openai-dall-e-3"
 
 def test_build_worker_from_settings_rejects_partial_b2(monkeypatch):
-    from sharedcache.backfill.worker import build_worker_from_settings
-    from sharedcache.common.bge import BgeEmbedder
-    from sharedcache.common.config import Settings
+    from wagmiphotos.backfill.worker import build_worker_from_settings
+    from wagmiphotos.common.bge import BgeEmbedder
+    from wagmiphotos.common.config import Settings
     monkeypatch.setattr(BgeEmbedder, "from_pretrained", classmethod(lambda cls, model_name: FakeEmbedder()))
     s = Settings(_env_file=None, b2_bucket="bucket", b2_key_id=None, b2_app_key=None)
     with pytest.raises(ValueError) as e:
@@ -296,10 +296,10 @@ def test_build_worker_from_settings_rejects_partial_b2(monkeypatch):
     assert "B2_KEY_ID" in str(e.value) and "B2_APP_KEY" in str(e.value)
 
 def test_build_worker_from_settings_preflights_provider(monkeypatch):
-    from sharedcache.backfill.worker import build_worker_from_settings
-    from sharedcache.common.bge import BgeEmbedder
-    from sharedcache.common.config import Settings
-    import sharedcache.generation.storage as storage_mod
+    from wagmiphotos.backfill.worker import build_worker_from_settings
+    from wagmiphotos.common.bge import BgeEmbedder
+    from wagmiphotos.common.config import Settings
+    import wagmiphotos.generation.storage as storage_mod
     monkeypatch.setattr(BgeEmbedder, "from_pretrained", classmethod(lambda cls, model_name: FakeEmbedder()))
     monkeypatch.setattr(storage_mod, "GenblazeS3Storage",
                         lambda *a, **k: InMemoryStorage())

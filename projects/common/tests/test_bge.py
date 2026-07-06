@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-from sharedcache.common.bge import BgeEmbedder
+from wagmiphotos.common.bge import BgeEmbedder
 
 class FakeEncoder:
     def encode(self, texts): return [[3.0, 4.0] for _ in texts]  # un-normalized
@@ -25,4 +25,4 @@ def test_from_pretrained_missing_dependency_names_the_extra(monkeypatch):
     monkeypatch.setitem(sys.modules, "sentence_transformers", None)  # simulate not installed
     with pytest.raises(ImportError) as e:
         BgeEmbedder.from_pretrained()
-    assert "sharedcache-backfill[model]" in str(e.value)
+    assert "wagmiphotos-backfill[model]" in str(e.value)

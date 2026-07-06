@@ -1,4 +1,4 @@
-from sharedcache.common.floor import similarity_floor
+from wagmiphotos.common.floor import similarity_floor
 
 def test_floor_uses_bge_calibrated_defaults():
     sim_max, sim_min = 0.90, 0.72

@@ -1,5 +1,5 @@
 import sys
-from sharedcache.generation.storage import InMemoryStorage, GenblazeS3Storage, Storage
+from wagmiphotos.generation.storage import InMemoryStorage, GenblazeS3Storage, Storage
 
 def test_put_returns_url_and_get_roundtrips():
     s = InMemoryStorage()
@@ -15,5 +15,5 @@ def test_genblaze_storage_has_protocol_methods():
         assert callable(getattr(GenblazeS3Storage, m, None))
 
 def test_genblaze_s3_import_is_lazy():
-    import sharedcache.generation.storage  # noqa: F401
+    import wagmiphotos.generation.storage  # noqa: F401
     assert "genblaze_s3" not in sys.modules

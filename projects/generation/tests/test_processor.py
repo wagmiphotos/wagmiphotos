@@ -1,7 +1,7 @@
 import io
 from PIL import Image
-from sharedcache.generation import processor
-from sharedcache.generation.processor import derive_sizes, dimensions
+from wagmiphotos.generation import processor
+from wagmiphotos.generation.processor import derive_sizes, dimensions
 
 def _png(w, h):
     buf = io.BytesIO()

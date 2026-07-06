@@ -1,5 +1,5 @@
 import json, httpx, pytest
-from sharedcache.common.vectorize_client import VectorizeClient
+from wagmiphotos.common.vectorize_client import VectorizeClient
 
 class _Resp:
     def __init__(self, data, status=200):
@@ -79,7 +79,7 @@ def test_insert_many_multiline_ndjson(monkeypatch):
     assert all(len(p["values"]) == 768 for p in parsed)
 
 def test_query_non_200_raises_runtime_error(monkeypatch):
-    from sharedcache.common import cf_api
+    from wagmiphotos.common import cf_api
     monkeypatch.setattr(cf_api.time, "sleep", lambda s: None)  # 500s are retried
     v, fake = _vectorize(monkeypatch, [_Resp({"error": "Internal Server Error"}, status=500)] * 3)
     with pytest.raises(RuntimeError):

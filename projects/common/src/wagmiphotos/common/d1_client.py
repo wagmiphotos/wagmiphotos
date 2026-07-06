@@ -2,8 +2,8 @@ from dataclasses import dataclass
 
 import httpx
 
-from sharedcache.common.cf_api import API_BASE, post_with_retry
-from sharedcache.common.models import AssetRecord
+from wagmiphotos.common.cf_api import API_BASE, post_with_retry
+from wagmiphotos.common.models import AssetRecord
 
 
 @dataclass

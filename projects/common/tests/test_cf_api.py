@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from sharedcache.common import cf_api
+from wagmiphotos.common import cf_api
 
 
 class _Resp:

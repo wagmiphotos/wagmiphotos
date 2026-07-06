@@ -1,22 +1,22 @@
 import asyncio
 import pytest
-from sharedcache.generation.generator import (
+from wagmiphotos.generation.generator import (
     GenblazeGenerator,
     StubGenerator,
     build_model_id,
     parse_model_id,
     resolve_provider,
 )
-from sharedcache.generation.storage import InMemoryStorage
+from wagmiphotos.generation.storage import InMemoryStorage
 
 
 def test_build_model_id():
-    assert build_model_id("gmicloud", "gpt-image-1") == "shared-cache-gmicloud-gpt-image-1"
+    assert build_model_id("gmicloud", "gpt-image-1") == "wagmiphotos-gmicloud-gpt-image-1"
 
 
 def test_parse_model_id_extracts_provider_and_inner_model():
-    assert parse_model_id("shared-cache-openai-gpt-image-1") == ("openai", "gpt-image-1")
-    assert parse_model_id("shared-cache-gmicloud-flux") == ("gmicloud", "flux")
+    assert parse_model_id("wagmiphotos-openai-gpt-image-1") == ("openai", "gpt-image-1")
+    assert parse_model_id("wagmiphotos-gmicloud-flux") == ("gmicloud", "flux")
 
 
 def test_parse_model_id_roundtrips_build():
@@ -29,53 +29,53 @@ def test_parse_model_id_passthrough_uses_default_provider():
 
 
 def test_parse_model_id_short_prefixed_string_passes_through():
-    # "shared-cache-x" has no inner model; treat the whole string as the model
-    assert parse_model_id("shared-cache-x") == ("gmicloud", "shared-cache-x")
+    # "wagmiphotos-x" has no inner model; treat the whole string as the model
+    assert parse_model_id("wagmiphotos-x") == ("gmicloud", "wagmiphotos-x")
 
 
 def test_resolve_provider_unknown_provider():
     with pytest.raises(ValueError) as e:
-        resolve_provider("acme", "key", model="shared-cache-acme-m1")
+        resolve_provider("acme", "key", model="wagmiphotos-acme-m1")
     assert "Unsupported provider" in str(e.value)
 
 
 def test_resolve_provider_not_installed_names_model_and_package():
     # genblaze_google is intentionally not a dependency of this workspace
     with pytest.raises(ValueError) as e:
-        resolve_provider("google", "key", model="shared-cache-google-imagen-3")
+        resolve_provider("google", "key", model="wagmiphotos-google-imagen-3")
     msg = str(e.value)
     assert "not installed" in msg
-    assert "google" in msg and "shared-cache-google-imagen-3" in msg
+    assert "google" in msg and "wagmiphotos-google-imagen-3" in msg
     assert "pip install" in msg
 
 
 def test_resolve_provider_requires_api_key():
     with pytest.raises(ValueError) as e:
-        resolve_provider("gmicloud", None, model="shared-cache-gmicloud-gpt-image-1")
+        resolve_provider("gmicloud", None, model="wagmiphotos-gmicloud-gpt-image-1")
     assert "GMICloud API Key is required" in str(e.value)
 
 
 def test_resolve_provider_returns_installed_provider_instance():
-    inst = resolve_provider("gmicloud", "k", model="shared-cache-gmicloud-gpt-image-1")
+    inst = resolve_provider("gmicloud", "k", model="wagmiphotos-gmicloud-gpt-image-1")
     assert type(inst).__name__ == "GMICloudImageProvider"
 
 
 def test_genblaze_preflight_raises_for_missing_provider_package():
     gen = GenblazeGenerator(storage=None, gemini_api_key="k")
     with pytest.raises(ValueError) as e:
-        gen.preflight("shared-cache-google-imagen-3")
+        gen.preflight("wagmiphotos-google-imagen-3")
     assert "not installed" in str(e.value)
 
 
 def test_genblaze_preflight_passes_for_installed_provider():
     GenblazeGenerator(storage=None, gmicloud_api_key="k").preflight(
-        "shared-cache-gmicloud-gpt-image-1")
+        "wagmiphotos-gmicloud-gpt-image-1")
 
 
 def test_genblaze_preflight_raises_for_missing_key():
     gen = GenblazeGenerator(storage=None)
     with pytest.raises(ValueError) as e:
-        gen.preflight("shared-cache-gmicloud-gpt-image-1")
+        gen.preflight("wagmiphotos-gmicloud-gpt-image-1")
     assert "GMICloud API Key is required" in str(e.value)
 
 
@@ -92,7 +92,7 @@ async def test_stub_generator_persists_bytes_and_returns_metadata():
 
 def test_stub_sets_model_used_and_source():
     g = asyncio.run(StubGenerator(InMemoryStorage()).generate(
-        "p", model="shared-cache-gmicloud-flux", size="8x8"))
+        "p", model="wagmiphotos-gmicloud-flux", size="8x8"))
     assert g.model_used == "flux"
     assert g.source == "stub"
 
@@ -111,5 +111,5 @@ async def test_genblaze_generator_requires_key_for_google(monkeypatch):
 
     gen = GenblazeGenerator(storage=None)
     with pytest.raises(ValueError) as exc:
-        await gen.generate("test", model="shared-cache-google-imagen-3")
+        await gen.generate("test", model="wagmiphotos-google-imagen-3")
     assert "Google Gemini API Key is required" in str(exc.value)

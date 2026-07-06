@@ -2,10 +2,10 @@ import sys
 
 import pytest
 
-from sharedcache.common.config import Settings
-from sharedcache.common.models import AssetRecord
+from wagmiphotos.common.config import Settings
+from wagmiphotos.common.models import AssetRecord
 from fakes import FakeD1, FakeVectorize
-from sharedcache.backfill import seed_pd12m
+from wagmiphotos.backfill import seed_pd12m
 
 
 class FakeEmbedder:
@@ -118,7 +118,7 @@ def test_default_repo_is_a_named_constant():
 
 
 def test_build_clients_uses_correct_settings_attrs_and_kwargs(monkeypatch):
-    from sharedcache.common.bge import BgeEmbedder
+    from wagmiphotos.common.bge import BgeEmbedder
 
     monkeypatch.setattr(BgeEmbedder, "from_pretrained", classmethod(lambda cls, model_name: FakeEmbedder()))
     settings = Settings(

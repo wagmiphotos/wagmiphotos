@@ -2,7 +2,7 @@ import json
 
 import httpx
 
-from sharedcache.common.cf_api import API_BASE, post_with_retry
+from wagmiphotos.common.cf_api import API_BASE, post_with_retry
 
 DEFAULT_EMBEDDING_DIMS = 768
 

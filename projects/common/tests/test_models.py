@@ -1,5 +1,5 @@
-from sharedcache.common import models
-from sharedcache.common.models import AssetRecord, Generated
+from wagmiphotos.common import models
+from wagmiphotos.common.models import AssetRecord, Generated
 
 def test_asset_record_fields():
     r = AssetRecord(id="1", prompt="p", url="u", thumb_url=None, medium_url=None,

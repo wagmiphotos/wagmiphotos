@@ -1,4 +1,4 @@
-from sharedcache.common.d1_client import QueryRow
+from wagmiphotos.common.d1_client import QueryRow
 
 class FakeD1:
     """In-memory stand-in mirroring D1Client semantics (claims, attempts,

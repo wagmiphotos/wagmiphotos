@@ -6,9 +6,9 @@ from typing import Protocol
 
 from PIL import Image
 
-from sharedcache.common.models import Generated
+from wagmiphotos.common.models import Generated
 
-MODEL_ID_PREFIX = "shared-cache"
+MODEL_ID_PREFIX = "wagmiphotos"
 
 # provider name -> (module, provider class, missing-key error message)
 _PROVIDERS: dict[str, tuple[str, str, str]] = {
@@ -22,19 +22,20 @@ _PROVIDERS: dict[str, tuple[str, str, str]] = {
 
 
 def build_model_id(provider: str, inner_model: str) -> str:
-    """Compose the public 'shared-cache-<provider>-<model>' model id."""
+    """Compose the public 'wagmiphotos-<provider>-<model>' model id."""
     return f"{MODEL_ID_PREFIX}-{provider}-{inner_model}"
 
 
 def parse_model_id(model: str, *, default_provider: str = "gmicloud") -> tuple[str, str]:
-    """Split 'shared-cache-<provider>-<model>' into (provider, inner_model).
+    """Split 'wagmiphotos-<provider>-<model>' into (provider, inner_model).
 
     Strings without the prefix (or too short to carry one) pass through
     unchanged with `default_provider`."""
     if model.startswith(f"{MODEL_ID_PREFIX}-"):
+        prefix_parts = MODEL_ID_PREFIX.count("-") + 1
         parts = model.split("-")
-        if len(parts) >= 4:
-            return parts[2], "-".join(parts[3:])
+        if len(parts) >= prefix_parts + 2:
+            return parts[prefix_parts], "-".join(parts[prefix_parts + 1:])
     return default_provider, model
 
 
@@ -117,7 +118,7 @@ class GenblazeGenerator:
     def __init__(self, storage, openai_api_key: str | None = None,
                  gemini_api_key: str | None = None,
                  gmicloud_api_key: str | None = None,
-                 project_id: str = "sharedcache") -> None:
+                 project_id: str = "wagmiphotos") -> None:
         self._storage = storage
         self._api_keys = {
             "openai": openai_api_key,
@@ -143,7 +144,7 @@ class GenblazeGenerator:
         sink = ObjectStorageSink(self._storage.backend, key_strategy=KeyStrategy.CONTENT_ADDRESSABLE)
 
         result = await (
-            Pipeline("sharedcache-gen", project_id=self._project_id, preflight=False)
+            Pipeline("wagmiphotos-gen", project_id=self._project_id, preflight=False)
             .step(
                 provider_inst,
                 model=inner_model,

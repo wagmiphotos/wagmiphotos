@@ -2,10 +2,10 @@ import json
 import logging
 import uuid
 
-from sharedcache.common.d1_client import QueryRow
-from sharedcache.common.floor import DEFAULT_CACHE_TOLERANCE, similarity_floor
-from sharedcache.common.models import AssetRecord
-from sharedcache.generation.processor import derive_sizes, dimensions
+from wagmiphotos.common.d1_client import QueryRow
+from wagmiphotos.common.floor import DEFAULT_CACHE_TOLERANCE, similarity_floor
+from wagmiphotos.common.models import AssetRecord
+from wagmiphotos.generation.processor import derive_sizes, dimensions
 
 logger = logging.getLogger(__name__)
 
@@ -185,11 +185,11 @@ class BackfillWorker:
 
 
 def build_worker_from_settings(s) -> "BackfillWorker":
-    from sharedcache.common.bge import BgeEmbedder
-    from sharedcache.common.d1_client import D1Client
-    from sharedcache.common.vectorize_client import VectorizeClient
-    from sharedcache.generation import storage as storage_mod
-    from sharedcache.generation.generator import GenblazeGenerator, StubGenerator, build_model_id
+    from wagmiphotos.common.bge import BgeEmbedder
+    from wagmiphotos.common.d1_client import D1Client
+    from wagmiphotos.common.vectorize_client import VectorizeClient
+    from wagmiphotos.generation import storage as storage_mod
+    from wagmiphotos.generation.generator import GenblazeGenerator, StubGenerator, build_model_id
 
     # The B2 triple is one unit: all set -> real storage, none -> in-memory
     # stub, a partial mix -> fail now (it used to fail at generation time).

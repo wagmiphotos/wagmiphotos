@@ -9,7 +9,7 @@ class Storage(Protocol):
 
 
 class InMemoryStorage:
-    BASE = "memory://sharedcache/"
+    BASE = "memory://wagmiphotos/"
 
     def __init__(self) -> None:
         self._blobs: dict[str, bytes] = {}

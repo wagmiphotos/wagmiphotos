@@ -6,7 +6,7 @@ import sqlite3
 
 import pytest
 
-from sharedcache.common import d1_client
+from wagmiphotos.common import d1_client
 
 MIGRATIONS_DIR = (pathlib.Path(__file__).resolve().parents[3]
                   / "projects" / "worker" / "migrations")
