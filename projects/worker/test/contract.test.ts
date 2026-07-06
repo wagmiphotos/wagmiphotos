@@ -19,3 +19,15 @@ it("default cache tolerance matches contract.json", () => {
 it("edge BGE model id matches contract.json (same embedding space as backfill)", () => {
   expect(BGE_MODEL).toBe(contract.bge_model_workers_ai);
 });
+
+import { fnv1a32, shardFor } from "../src/shard";
+
+it("shard routing matches the contract fixtures", () => {
+  for (const [id, shard] of Object.entries(contract.shard_fixtures)) {
+    expect(shardFor(id, contract.vectorize_shards)).toBe(shard);
+  }
+});
+
+it("fnv1a32 reference value", () => {
+  expect(fnv1a32("demo-1")).toBe(207613968);
+});
