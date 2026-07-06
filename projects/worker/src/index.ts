@@ -1,7 +1,7 @@
 import type { Env, Services, RateLimiter } from "./types";
 import { makeD1Stores } from "./d1";
 import { makeVectorize } from "./vectorize";
-import { clipTextEmbed } from "./embed";
+import { bgeTextEmbed } from "./embed";
 import { handleGenerate, handleKeygen, type GenBody } from "./handler";
 import { handleLibrarySearch, handleLibraryDownload } from "./library";
 import { rewritePublicUrls } from "./rewrite";
@@ -20,7 +20,7 @@ function buildServices(env: Env): Services {
     },
   };
   return {
-    clip: { textEmbed: (p) => clipTextEmbed(p, env) },
+    embedder: { textEmbed: (p) => bgeTextEmbed(p, env) },
     vectorize: makeVectorize(env.VECTORIZE),
     assets, queries, keys, rateLimiter,
     users, sessions, loginTokens, email: makeEmailSender(env),
@@ -126,7 +126,7 @@ export default {
         const services = buildServices(env);
         const principal = await resolveApiPrincipal(request, env, services);
         if (!principal) return Response.json({ error: "Invalid API Key" }, { status: 401 });
-        // Throttle the expensive path (CLIP embed + Vectorize) per authenticated
+        // Throttle the expensive path (embed + Vectorize) per authenticated
         // principal, namespaced so it doesn't share a bucket with keygen.
         if (!(await services.rateLimiter.limit(`gen:${principal.userId}`))) {
           return Response.json({ error: "Too many requests" }, { status: 429 });

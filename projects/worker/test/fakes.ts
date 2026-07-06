@@ -8,7 +8,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   const keyOwners = new Map<string, string>();
   const matches: Match[] = [];
   const base: Services = {
-    clip: { textEmbed: async () => [0.1, 0.2, 0.3] },
+    embedder: { textEmbed: async () => [0.1, 0.2, 0.3] },
     vectorize: { query: async () => matches },
     assets: {
       getAsset: async (id) => assets.get(id) ?? null,

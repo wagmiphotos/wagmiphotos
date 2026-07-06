@@ -19,7 +19,7 @@ export async function handleGenerate(body: GenBody, s: Services, cfg: GenCfg): P
   const floor = similarityFloor(tol, cfg.floorSimMax, cfg.floorSimMin);
   const normalized = normalizePrompt(prompt);
 
-  const vec = await s.clip.textEmbed(prompt);
+  const vec = await s.embedder.textEmbed(prompt);
   const matches = await s.vectorize.query(vec, 1);
   const best = matches[0] ?? null;
   const asset = best ? await s.assets.getAsset(best.id) : null;

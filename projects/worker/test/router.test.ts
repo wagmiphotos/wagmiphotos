@@ -11,7 +11,7 @@ function fakeEnv(over: any = {}) {
   return {
     DB: db,
     VECTORIZE: { query: async () => ({ matches: [] }) },
-    CLIP_TEXT_EMBED_URL: "https://clip",
+    AI: { run: async () => ({ shape: [1, 2], data: [[0.1, 0.2]] }) },
     ASSETS: { fetch: async () => new Response("<!doctype html><title>SPA</title>", { status: 200, headers: { "content-type": "text/html" } }) },
     ...over,
   };
@@ -46,8 +46,7 @@ it("generate: 401 when master key set and no bearer", async () => {
   expect(res.status).toBe(401);
 });
 
-it("generate: empty pool -> 202 (open dev, clip mocked)", async () => {
-  vi.stubGlobal("fetch", async () => new Response(JSON.stringify([[0.1, 0.2]]), { status: 200 }));
+it("generate: empty pool -> 202 (open dev, embedder mocked)", async () => {
   const res = await worker.fetch(
     new Request("https://x/v1/images/generations", { method: "POST", body: JSON.stringify({ prompt: "hi" }) }),
     fakeEnv()
@@ -99,7 +98,6 @@ it("stars: GitHub failure degrades to {stars: null}, still 200", async () => {
 });
 
 it("generate: upstream throw (vectorize.query throws) -> structured 502", async () => {
-  vi.stubGlobal("fetch", async () => new Response(JSON.stringify([[0.1, 0.2]]), { status: 200 }));
   const res = await worker.fetch(
     new Request("https://x/v1/images/generations", { method: "POST", body: JSON.stringify({ prompt: "hi" }) }),
     fakeEnv({ VECTORIZE: { query: async () => { throw new Error("boom"); } } })

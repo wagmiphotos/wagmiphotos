@@ -8,7 +8,7 @@ export interface AssetRow {
 }
 export interface LibraryAssetRow extends AssetRow { created_at: string; }
 export interface Match { id: string; score: number; }
-export interface Clip { textEmbed(prompt: string): Promise<number[]>; }
+export interface Embedder { textEmbed(prompt: string): Promise<number[]>; }
 export interface VectorizeStore { query(vector: number[], topK: number): Promise<Match[]>; }
 export interface AssetStore {
   getAsset(id: string): Promise<AssetRow | null>;
@@ -41,17 +41,17 @@ export interface KeyStore {
 }
 export interface RateLimiter { limit(key: string): Promise<boolean>; }
 export interface Services {
-  clip: Clip; vectorize: VectorizeStore; assets: AssetStore; queries: QueryStore;
+  embedder: Embedder; vectorize: VectorizeStore; assets: AssetStore; queries: QueryStore;
   keys: KeyStore; rateLimiter: RateLimiter;
   users: UserStore; sessions: SessionStore; loginTokens: LoginTokenStore;
   email: EmailSender;
 }
 export interface Env {
-  DB: any; VECTORIZE: any; RATE_LIMITER?: any;
+  DB: any; VECTORIZE: any; AI: any; RATE_LIMITER?: any;
   ASSETS: { fetch(request: Request): Promise<Response> };
-  MASTER_API_KEY?: string; CLIP_TEXT_EMBED_URL: string; CLIP_EMBED_TOKEN?: string;
+  MASTER_API_KEY?: string;
   IMAGE_PRICE_USD?: string; FLOOR_SIM_MAX?: string; FLOOR_SIM_MIN?: string;
   GITHUB_REPO?: string;
-  PUBLIC_SITE_URL?: string; PUBLIC_API_BASE_URL?: string;
   RESEND_API_KEY?: string; EMAIL_FROM?: string;
+  PUBLIC_SITE_URL?: string; PUBLIC_API_BASE_URL?: string;
 }

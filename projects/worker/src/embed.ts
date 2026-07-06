@@ -1,18 +1,21 @@
 import type { Env } from "./types";
 
-function flatten(data: any): number[] {
-  if (data && typeof data === "object" && "embedding" in data) data = data.embedding;
-  if (Array.isArray(data) && Array.isArray(data[0])) data = data[0];
-  if (!Array.isArray(data) || typeof data[0] !== "number") {
-    throw new Error(`Unexpected embedding response: ${JSON.stringify(data)}`);
-  }
-  return data as number[];
+export const BGE_MODEL = "@cf/baai/bge-base-en-v1.5";
+
+function l2normalize(vec: number[]): number[] {
+  let s = 0;
+  for (const x of vec) s += x * x;
+  const n = Math.sqrt(s) || 1;
+  return vec.map((x) => x / n);
 }
 
-export async function clipTextEmbed(prompt: string, env: Env): Promise<number[]> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (env.CLIP_EMBED_TOKEN) headers["Authorization"] = `Bearer ${env.CLIP_EMBED_TOKEN}`;
-  const res = await fetch(env.CLIP_TEXT_EMBED_URL, { method: "POST", headers, body: JSON.stringify({ inputs: prompt }) });
-  if (res.status !== 200) throw new Error(`CLIP text embed failed (${res.status}): ${await res.text()}`);
-  return flatten(await res.json());
+// Text-to-text prompt embedding via Workers AI. Raw text, NO instruction prefix
+// (symmetric similarity); output is L2-normalized to guarantee the shared contract.
+export async function bgeTextEmbed(prompt: string, env: Env): Promise<number[]> {
+  const out: any = await env.AI.run(BGE_MODEL, { text: prompt });
+  const vec = out?.data?.[0];
+  if (!Array.isArray(vec) || typeof vec[0] !== "number") {
+    throw new Error(`Unexpected embedding response: ${JSON.stringify(out)}`);
+  }
+  return l2normalize(vec as number[]);
 }

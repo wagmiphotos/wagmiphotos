@@ -3,7 +3,7 @@ import { rewritePublicUrls, DEFAULT_API_BASE_URL, DEFAULT_SITE_URL } from "../sr
 import type { Env } from "../src/types";
 
 function envWith(over: Partial<Env> = {}): Env {
-  return { DB: null, VECTORIZE: null, CLIP_TEXT_EMBED_URL: "", ASSETS: { fetch: async () => new Response("") }, ...over } as Env;
+  return { DB: null, VECTORIZE: null, AI: null, ASSETS: { fetch: async () => new Response("") }, ...over } as Env;
 }
 
 function htmlRes(body: string): Response {

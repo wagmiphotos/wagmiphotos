@@ -1,24 +1,24 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { clipTextEmbed } from "../src/embed";
+import { it, expect, vi } from "vitest";
+import { bgeTextEmbed } from "../src/embed";
 
-afterEach(() => vi.unstubAllGlobals());
+function fakeEnv(vec: number[]) {
+  return { AI: { run: vi.fn(async () => ({ shape: [1, vec.length], data: [vec] })) } } as any;
+}
 
-const env: any = { CLIP_TEXT_EMBED_URL: "https://clip/text", CLIP_EMBED_TOKEN: "tok" };
-
-it("posts inputs json with bearer and flattens", async () => {
-  const seen: any = {};
-  vi.stubGlobal("fetch", async (url: string, init: any) => {
-    seen.url = url; seen.body = JSON.parse(init.body); seen.auth = init.headers["Authorization"];
-    return new Response(JSON.stringify([[0.1, 0.2, 0.3]]), { status: 200 });
-  });
-  const v = await clipTextEmbed("a red fox", env);
-  expect(v).toEqual([0.1, 0.2, 0.3]);
-  expect(seen.url).toBe("https://clip/text");
-  expect(seen.body).toEqual({ inputs: "a red fox" });
-  expect(seen.auth).toBe("Bearer tok");
+it("bgeTextEmbed calls the bge model and returns the vector", async () => {
+  const env = fakeEnv([3, 4]); // un-normalized on purpose
+  const fetchSpy = vi.fn();
+  vi.stubGlobal("fetch", fetchSpy);
+  const v = await bgeTextEmbed("a red fox", env);
+  expect(env.AI.run).toHaveBeenCalledWith("@cf/baai/bge-base-en-v1.5", { text: "a red fox" });
+  expect(fetchSpy).not.toHaveBeenCalled();          // no external embed call
+  // L2-normalized: [3,4] -> [0.6, 0.8]
+  expect(v[0]).toBeCloseTo(0.6, 5);
+  expect(v[1]).toBeCloseTo(0.8, 5);
+  vi.unstubAllGlobals();
 });
 
-it("throws on non-200", async () => {
-  vi.stubGlobal("fetch", async () => new Response("boom", { status: 503 }));
-  await expect(clipTextEmbed("x", env)).rejects.toThrow();
+it("bgeTextEmbed throws on an unexpected response", async () => {
+  const env = { AI: { run: async () => ({ data: null }) } } as any;
+  await expect(bgeTextEmbed("x", env)).rejects.toThrow(/Unexpected/);
 });
