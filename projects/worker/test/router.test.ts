@@ -157,6 +157,11 @@ it("library: now gated -> 401 without a principal when master set", async () => 
   expect(res.status).toBe(401);
 });
 
+it("library download: now gated -> 401 without a principal when master set", async () => {
+  const res = await worker.fetch(new Request("https://x/v1/library/a1/download"), fakeEnv({ MASTER_API_KEY: "master" }));
+  expect(res.status).toBe(401);
+});
+
 it("library: open in dev (no master) -> 200", async () => {
   const res = await worker.fetch(new Request("https://x/v1/library"), fakeEnv());
   expect(res.status).toBe(200);
