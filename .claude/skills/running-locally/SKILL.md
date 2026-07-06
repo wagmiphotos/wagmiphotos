@@ -98,15 +98,16 @@ gating (redirect to `#/login`) is cookie-based via `GET /v1/me` and applies rega
 Smoke the working paths, then look at the UI:
 
 ```bash
-curl -s "http://127.0.0.1:8787/v1/library?limit=4"     # 4 demo images
-curl -s -X POST http://127.0.0.1:8787/v1/keys/generate # → {"key":"sc-…"}
+curl -s "http://127.0.0.1:8787/v1/library?limit=4"     # 4 demo images (dev-open API when MASTER unset)
+curl -s -X POST http://127.0.0.1:8787/v1/keys/generate # → 401: keygen now needs a session cookie (log in — see Auth above)
 ```
 
-Then open **http://127.0.0.1:8787/#/library** in a browser (or Playwright) and
-confirm the four demo images actually render — they're served from the Worker's
-own `public/assets/*.webp`, so a blank grid means the seed didn't land, not a
-network problem. `/#/playground` renders the full generator UI (prompt, tolerance
-slider, generate-on-miss toggle); clicking **Generate image** will 502 as above.
+Then open **http://127.0.0.1:8787/#/library** in a browser — you'll be redirected to
+`#/login` (gated). Complete the dev login (Auth section above), then the four demo
+images render — they're served from the Worker's own `public/assets/*.webp`, so a
+blank grid means the seed didn't land, not a network problem. `/#/playground` renders
+the full generator UI (prompt, tolerance slider, generate-on-miss toggle) once
+logged in; clicking **Generate image** will 502 as above.
 
 ## Common mistakes
 

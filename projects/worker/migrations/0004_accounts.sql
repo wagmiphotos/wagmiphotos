@@ -23,5 +23,8 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id);
 
 ALTER TABLE api_keys ADD COLUMN user_id TEXT;
 ALTER TABLE api_keys ADD COLUMN label   TEXT;
+-- Intentional, IRREVERSIBLE: anonymous key minting is removed — keys are now
+-- issued only to a logged-in user. This wipes ALL pre-existing (ownerless)
+-- api_keys. Breaking change for any live SDK key; see DEPLOY.md before applying.
 DELETE FROM api_keys WHERE user_id IS NULL;
 CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys (user_id);

@@ -159,3 +159,33 @@ loose ends to pick up when you resume. Full backlog + design trail: root
   pending render states (currently verified by inspection only).
 - **Branding:** the SPA reads `WagmiPhotos` / `wagmi.photos`; the repo/project
   is `SharedCache`. Pick one and reconcile (see `HANDOFF.md` §2).
+
+## Accounts + magic-link login (feat/accounts-magic-link-auth)
+
+New passwordless email-magic-link auth gates the product (playground/library/account
++ the API). Deploy steps:
+
+1. **Apply migration `0004` to remote D1 BEFORE deploying the Worker:**
+   `cd projects/worker && npx wrangler d1 migrations apply sharedcache`
+   ⚠️ **Breaking change:** `0004` runs `DELETE FROM api_keys WHERE user_id IS NULL`,
+   wiping **all pre-existing anonymous API keys**. Any live SDK integration using a
+   self-minted key stops working and must sign up + reissue a key from the dashboard.
+2. **Set the Resend secret + sender:** `npx wrangler secret put RESEND_API_KEY`;
+   confirm `EMAIL_FROM` in `wrangler.toml` (`login@wagmi.photos`) and **verify that
+   sending domain in Resend**. With `RESEND_API_KEY` unset the Worker runs in dev mode
+   (magic link logged/returned, not emailed) — never deploy prod without it.
+3. **Confirm** `wrangler deploy --dry-run` bundles; after deploy, a logged-out visit
+   to `#/playground` should redirect to `#/login`, and a real email should receive a
+   working magic link.
+
+### Security fast-follows (from final review — not blocking merge, do before real traffic)
+- **Login session-fixation:** the GET `/v1/auth/verify` sets the session cookie, and
+  `SameSite=Lax` gates cookie *send*, not *set* — an attacker can request a link to
+  their own inbox and induce a victim's browser to load the verify URL, logging the
+  victim into the attacker's account. Bind the login token to a nonce cookie set at
+  `/v1/auth/login` (or a POST-confirm interstitial).
+- **Email-scanner prefetch** (Safe Links/Proofpoint) GETs the link and consumes the
+  single-use token before the user clicks. A POST-confirm interstitial fixes both this
+  and the fixation vector in one change.
+- **Token/session GC:** `login_tokens`/`sessions` are never purged — add an
+  expired-row cleanup before the tables grow unbounded.
