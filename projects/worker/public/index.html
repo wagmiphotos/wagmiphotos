@@ -2248,6 +2248,42 @@
       font-family: var(--font-mono); font-size: 0.85em;
       background: var(--red-tint); color: var(--red-deep); padding: 1px 5px; border-radius: 5px;
     }
+
+    /* API key modal */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+      background: rgba(28, 28, 27, 0.45);
+      backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    }
+    .modal-overlay[hidden] { display: none; }
+    .modal-card {
+      width: 100%; max-width: 440px;
+      background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+      padding: 24px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+    }
+    .modal-title { font-family: var(--font-display); font-weight: 700; font-size: 1.125rem; color: var(--ink); }
+    .modal-sub { font-size: 0.875rem; color: var(--muted); margin-top: 4px; }
+    .modal-label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--ink-soft); margin: 18px 0 6px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+    .btn-ghost { background: transparent; border: 1px solid var(--line); color: var(--ink-soft); }
+    .btn-ghost:hover { border-color: var(--muted); }
+    .modal-warning {
+      display: flex; align-items: flex-start; gap: 8px; margin: 16px 0;
+      padding: 10px 12px; border-radius: 10px;
+      background: var(--warning-tint); color: var(--warning);
+      font-size: 0.8125rem; font-weight: 500; line-height: 1.4;
+    }
+    .modal-warning svg { flex: none; margin-top: 1px; }
+    .key-reveal-row { display: flex; gap: 10px; align-items: stretch; }
+    .key-reveal-value {
+      flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap;
+      font-family: var(--font-mono); font-size: 0.8125rem; color: var(--ink);
+      background: var(--paper); border: 1px solid var(--line); border-radius: 8px;
+      padding: 10px 12px; display: flex; align-items: center;
+    }
+    .key-reveal-row .btn { flex: none; width: auto; padding: 0 18px; }
+    #key-copy-btn.copied { background: var(--success); }
   </style>
 </head>
 <body>
@@ -2365,7 +2401,7 @@
                 <span class="avatar" id="avatar-initial">·</span>
               </button>
               <div class="nav-dropdown nav-list account-menu" role="menu">
-                <div class="account-head">Signed in as<span class="account-email" id="account-email"></span></div>
+                <div class="account-head">Signed in as<span class="account-email" id="nav-account-email"></span></div>
                 <a href="#/account" class="nav-drop-item" role="menuitem" onclick="closeMenus()">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
                   <span><span class="nav-drop-title">Account</span><span class="nav-drop-sub">Keys &amp; usage.</span></span>
@@ -3121,31 +3157,14 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
           <div id="account-email" style="font-family: var(--font-mono); font-size: 0.9375rem; color: var(--ink);">—</div>
         </div>
 
-        <!-- wagmi.photos API Key Manager -->
+        <!-- API keys -->
         <div class="form-group">
-          <label for="api-key">wagmi.photos API key</label>
-          <div style="display: flex; gap: 10px;">
-            <input id="api-key" type="password" class="api-key-input" placeholder="No API key active (default is dev-key)..." oninput="saveApiKey()">
-            <button class="btn btn-primary" style="height: 42px; width: auto; padding: 0 16px; font-size: 0.875rem; flex-shrink: 0; white-space: nowrap;" onclick="generateWagmiPhotosKey()">Generate key</button>
-          </div>
-          <span style="font-size: 0.75rem; color: var(--muted); margin-top: 6px; display: block;">
-            Generate a new, secure client key from the server or input your existing key. Requests must present this token in the Authorization header.
+          <label>API keys</label>
+          <span style="font-size: 0.75rem; color: var(--muted); margin: 2px 0 12px; display: block;">
+            For calling the wagmi.photos API from your own code (<code style="font-family: var(--font-mono);">Authorization: Bearer sc-…</code>). The playground here is already authenticated by your login.
           </span>
-        </div>
-
-        <!-- Saved keys list -->
-        <div class="form-group">
-          <label>Your keys</label>
-          <div id="account-keys-list" style="font-size: 0.8125rem; color: var(--muted);">No keys yet.</div>
-        </div>
-
-        <!-- Hugging Face Token -->
-        <div class="form-group">
-          <label for="hf-token-input">Hugging Face API token (optional)</label>
-          <input id="hf-token-input" type="password" class="api-key-input" placeholder="Enter hf_xxxx..." oninput="saveHFToken()">
-          <span style="font-size: 0.75rem; color: var(--muted); margin-top: 6px; display: block;">
-            Used to fetch public domain assets and compute CLIP embeddings from private Xet buckets. Stored only in your browser.
-          </span>
+          <button class="btn btn-primary" style="height: 40px; width: auto; padding: 0 18px; font-size: 0.875rem;" onclick="openCreateKey()">Create API key</button>
+          <div id="account-keys-list" style="font-size: 0.8125rem; color: var(--muted); margin-top: 16px;">No keys yet.</div>
         </div>
       </div>
 
@@ -3153,7 +3172,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
       <div class="glass-card" style="border-color: rgba(211, 28, 36, 0.25); background: rgba(211, 28, 36, 0.02);">
         <h2 class="card-title" style="color: var(--danger);">Advanced actions</h2>
         <p style="font-size: 0.875rem; color: var(--muted); margin-bottom: 16px;">
-          This clears your browser's local state, resetting the telemetry counters and wiping all saved API keys.
+          This clears your browser's local state — the telemetry counters, session history, and playground settings. Your account and API keys are stored server-side and are not affected.
         </p>
         <button class="btn" style="background: rgba(211, 28, 36, 0.06); border: 1px solid rgba(211, 28, 36, 0.3); color: var(--danger);" onclick="resetSession()">
           Reset browser settings &amp; telemetry
@@ -3684,6 +3703,36 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
   <!-- Toast Container -->
   <div id="toast" class="toast">Could not load image resource.</div>
 
+  <!-- Create API key modal -->
+  <div id="key-modal" class="modal-overlay" hidden onclick="if(event.target===this)closeCreateKey()">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="key-modal-title">
+      <div id="key-modal-create">
+        <h3 class="modal-title" id="key-modal-title">Create API key</h3>
+        <p class="modal-sub">Give it a name so you can recognize it later.</p>
+        <label class="modal-label" for="key-name">Key name (optional)</label>
+        <input id="key-name" class="api-key-input" type="text" placeholder="e.g. production, my-laptop, CI" maxlength="80" onkeydown="if(event.key==='Enter')submitCreateKey()">
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="closeCreateKey()">Cancel</button>
+          <button class="btn btn-primary" id="key-generate-btn" onclick="submitCreateKey()">Generate key</button>
+        </div>
+      </div>
+      <div id="key-modal-reveal" hidden>
+        <h3 class="modal-title">Your new API key</h3>
+        <div class="modal-warning">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          Copy it now — this is the only time it will be shown.
+        </div>
+        <div class="key-reveal-row">
+          <code id="key-reveal-value" class="key-reveal-value"></code>
+          <button class="btn btn-primary" id="key-copy-btn" onclick="copyGeneratedKey()">Copy</button>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-primary" onclick="closeCreateKey()">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Global Statistics
     let saved = parseFloat(localStorage.getItem('sharedcache_saved') || '0.00');
@@ -3691,22 +3740,6 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     let misses = parseInt(localStorage.getItem('sharedcache_misses') || '0');
     let history = JSON.parse(localStorage.getItem('sharedcache_history') || '[]');
     let currentManifest = null;
-
-    // API Bearer Key Loading
-    const keyInput = document.getElementById('api-key');
-    const savedKey = localStorage.getItem('sharedcache_apikey');
-    if (savedKey) {
-      keyInput.value = savedKey;
-    } else {
-      keyInput.value = 'dev-key';
-    }
-
-    // HF Token Loading
-    const hfInput = document.getElementById('hf-token-input');
-    const savedHF = localStorage.getItem('sharedcache_hf_token');
-    if (savedHF) {
-      hfInput.value = savedHF;
-    }
 
     // Load stats initially
     updateStats();
@@ -3828,7 +3861,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         login.hidden = true; menu.hidden = false;
         const initial = ((currentUser.email || '').trim().charAt(0) || '?').toUpperCase();
         document.getElementById('avatar-initial').textContent = initial;   // textContent = no XSS
-        document.getElementById('account-email').textContent = currentUser.email;
+        document.getElementById('nav-account-email').textContent = currentUser.email;
       } else {
         login.hidden = false; menu.hidden = true;
       }
@@ -3871,7 +3904,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         });
       });
       document.addEventListener('click', e => { if (!e.target.closest('.nav-item')) closeDropdowns(); });
-      document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenus(); });
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMenus(); closeCreateKey(); } });
 
       const tog = document.getElementById('nav-toggle');
       if (tog) tog.addEventListener('click', () => {
@@ -4092,36 +4125,52 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       win.document.close();
     }
 
-    // localStorage keys logic
-    function saveApiKey() {
-      localStorage.setItem('sharedcache_apikey', keyInput.value.trim());
+    // API key creation modal
+    let _lastGeneratedKey = '';
+    function openCreateKey() {
+      document.getElementById('key-modal-create').hidden = false;
+      document.getElementById('key-modal-reveal').hidden = true;
+      document.getElementById('key-name').value = '';
+      const btn = document.getElementById('key-generate-btn');
+      btn.disabled = false; btn.textContent = 'Generate key';
+      document.getElementById('key-modal').hidden = false;
+      document.getElementById('key-name').focus();
     }
-
-    function saveHFToken() {
-      localStorage.setItem('sharedcache_hf_token', hfInput.value.trim());
+    function closeCreateKey() {
+      document.getElementById('key-modal').hidden = true;
+      _lastGeneratedKey = '';
     }
-
-    async function generateWagmiPhotosKey() {
+    async function submitCreateKey() {
+      const name = document.getElementById('key-name').value.trim();
+      const btn = document.getElementById('key-generate-btn');
+      btn.disabled = true; btn.textContent = 'Generating…';
       try {
-        const response = await fetch('/v1/keys/generate', {
-          method: 'POST',
-          credentials: 'same-origin',
+        const r = await fetch('/v1/keys/generate', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(name ? { label: name } : {}),
         });
-        if (response.status === 401) {
-          location.hash = '#/login';
-          return;
-        }
-        if (!response.ok) {
-          throw new Error("Failed to generate API Key from server");
-        }
-        const data = await response.json();
-        keyInput.value = data.key;
-        saveApiKey();
-        showToast("New API Key generated & active!", "success");
+        if (r.status === 401) { closeCreateKey(); location.hash = '#/login'; return; }
+        if (!r.ok) throw new Error('Failed to create key');
+        const data = await r.json();
+        _lastGeneratedKey = data.key;
+        document.getElementById('key-reveal-value').textContent = data.key;   // textContent = no XSS
+        const copyBtn = document.getElementById('key-copy-btn');
+        copyBtn.classList.remove('copied'); copyBtn.textContent = 'Copy';
+        document.getElementById('key-modal-create').hidden = true;
+        document.getElementById('key-modal-reveal').hidden = false;
         loadKeys();
       } catch (err) {
-        showToast(err.message || "Could not generate key", "error");
+        btn.disabled = false; btn.textContent = 'Generate key';
+        showToast(err.message || 'Could not create key', 'error');
       }
+    }
+    async function copyGeneratedKey() {
+      try {
+        await navigator.clipboard.writeText(_lastGeneratedKey);
+        const b = document.getElementById('key-copy-btn');
+        b.classList.add('copied'); b.textContent = 'Copied';
+      } catch { showToast('Copy failed — select the key and copy manually', 'error'); }
     }
 
     function formatKeyDate(raw) {
@@ -4154,7 +4203,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     }
 
     function resetSession() {
-      if (confirm("Are you sure you want to reset all telemetry stats and wipe your saved keys?")) {
+      if (confirm("Reset local telemetry stats and playground state? Your account and API keys aren't affected.")) {
         localStorage.clear();
         saved = 0.00;
         hits = 0;
@@ -4162,8 +4211,6 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         history = [];
         currentManifest = null;
 
-        keyInput.value = 'dev-key';
-        hfInput.value = '';
         document.getElementById('prompt').value = '';
 
         // Reset viewport
@@ -4221,17 +4268,12 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       const startTime = performance.now();
 
       try {
-        const apiKey = keyInput.value.trim();
         const genOnMiss = document.getElementById('gen-on-miss').checked;
-
-        const headers = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        };
 
         const response = await fetch('/v1/images/generations', {
           method: 'POST',
-          headers: headers,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             prompt: promptVal,
             cache_tolerance: tolVal,
