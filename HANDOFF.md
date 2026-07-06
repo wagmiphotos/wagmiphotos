@@ -1,7 +1,11 @@
 # SharedCache — Handoff / Resume Here
 
-_Last updated: 2026-07-04. Everything below is merged to `main` and green
-(Python **58 passed**, Worker **75 passed**)._
+_Last updated: 2026-07-07. Everything below is merged to `main`, green
+(Python **46 passed**, Worker **113 passed**), and pushed to
+`github.com/wagmiphotos/wagmiphotos`. **Start here to resume:**
+[`docs/HANDOFF-2026-07-07.md`](docs/HANDOFF-2026-07-07.md) — magic-link auth + BGE
+edge embeddings shipped; deploy (BGE live provisioning) and the sharedcache→wagmiphotos
+rename are the next open items._
 
 ## What SharedCache is
 
