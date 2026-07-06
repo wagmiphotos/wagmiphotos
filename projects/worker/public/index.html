@@ -3699,7 +3699,14 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       '#/openai':     { view: 'view-openai', link: 'nav-openai' },
       '#/clip':       { view: 'view-clip', link: 'nav-clip' },
       '#/agents':     { view: 'view-agents', link: 'nav-agents' },
-      '#/login':      { view: 'view-login' },
+      '#/login':      { view: 'view-login', onShow: () => {
+        const status = document.getElementById('login-status');
+        if (!status) return;
+        const q = new URLSearchParams(location.hash.split('?')[1] || '');
+        status.textContent = q.get('error') === 'invalid_or_expired'
+          ? 'That login link was invalid or expired — request a new one.'
+          : '';
+      } },
     };
     const PATH_TO_HASH = {
       '/playground': '#/playground', '/docs': '#/docs', '/pricing': '#/pricing',
@@ -3726,8 +3733,9 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     let currentUser = null;
 
     function showRoute(route) {
-      if (GATED.has(route) && !currentUser) {
-        sessionStorage.setItem('wagmi_return', route);
+      const path = route.split('?')[0];
+      if (GATED.has(path) && !currentUser) {
+        sessionStorage.setItem('wagmi_return', path);
         route = '#/login';
       }
 
@@ -3737,7 +3745,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       });
       document.querySelectorAll('.nav-link, .nav-cta, .nav-drop-item').forEach(l => l.classList.remove('active'));
 
-      const r = ROUTES[route] || ROUTES['#/'];
+      const r = ROUTES[route.split('?')[0]] || ROUTES['#/'];
       const view = document.getElementById(r.view);
       if (view) {
         view.style.display = 'block';
@@ -3786,7 +3794,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       const el = document.getElementById('auth-nav');
       if (!el) return;
       el.innerHTML = currentUser
-        ? `<span class="auth-email">${currentUser.email}</span><a href="#" onclick="logout();return false">Log out</a>`
+        ? `<span class="auth-email">${escapeHtml(currentUser.email)}</span><a href="#" onclick="logout();return false">Log out</a>`
         : `<a href="#/login">Log in</a>`;
     }
     async function requestMagicLink() {
@@ -3799,7 +3807,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       if (r.status === 400) { status.textContent = 'Please enter a valid email.'; return; }
       const j = await r.json().catch(() => ({}));
       status.innerHTML = j.dev_link
-        ? `Dev mode — <a href="${j.dev_link}">open your login link</a>`
+        ? `Dev mode — <a href="${escapeHtml(j.dev_link)}">open your login link</a>`
         : 'Check your email for a login link.';
     }
     async function logout() {
