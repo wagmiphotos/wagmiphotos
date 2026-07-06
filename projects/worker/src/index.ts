@@ -138,8 +138,8 @@ export default {
           return Response.json({ error: "body must be a JSON object" }, { status: 400 });
         }
         const cfg = {
-          floorSimMax: numEnv(env.FLOOR_SIM_MAX, 0.35),
-          floorSimMin: numEnv(env.FLOOR_SIM_MIN, 0.18),
+          floorSimMax: numEnv(env.FLOOR_SIM_MAX, 0.90),
+          floorSimMin: numEnv(env.FLOOR_SIM_MIN, 0.72),
           imagePrice: numEnv(env.IMAGE_PRICE_USD, 0.04),
           now: () => Math.floor(Date.now() / 1000),
         };
