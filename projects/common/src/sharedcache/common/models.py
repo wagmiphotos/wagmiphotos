@@ -7,7 +7,7 @@ class AssetRecord:
     url: str                 # large webp
     thumb_url: str | None
     medium_url: str | None
-    model_used: str
+    model_used: str | None
     source: str              # "pd12m" | "generated" | "stub"
     source_id: str | None
     content_hash: str

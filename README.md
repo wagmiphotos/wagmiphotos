@@ -71,10 +71,11 @@ When no API keys are set, the system falls back to `StubGenerator` (returns a de
 ## Architecture
 
 SharedCache is two deployables over three shared stores (**Cloudflare D1** for the query log + asset
-metadata, **Cloudflare Vectorize** for CLIP vectors, **Backblaze B2** for image bytes):
+metadata, **Cloudflare Vectorize** for BGE vectors, **Backblaze B2** for image bytes):
 
-- **Cloudflare Worker** (`projects/worker/`, TypeScript) — the edge request path. Authenticates, CLIP-embeds the
-  prompt, queries Vectorize for the nearest cached image, logs the query to D1, and returns an image URL.
+- **Cloudflare Worker** (`projects/worker/`, TypeScript) — the edge request path. Authenticates, embeds the
+  prompt with **Cloudflare Workers AI (`@cf/baai/bge-base-en-v1.5`, text-to-text, 768d)**, queries Vectorize
+  for the nearest cached image, logs the query to D1, and returns an image URL.
   It **never generates**. See **[Cloudflare Worker](#cloudflare-worker-edge-request-path)** below.
 - **Python backfill worker** (`projects/backfill/`, `python -m sharedcache.backfill`) — demand-ranked
   generation for cache-misses (via Genblaze/GMI Cloud) plus PD12M→B2 rehosting. Runs locally or in a GMI
@@ -118,8 +119,8 @@ This is a uv monorepo with the following project structure:
 | `B2_PUBLIC_URL_BASE` | For image rendering | Public-read URL base (e.g. `https://f004.backblazeb2.com/file/<bucket>`). Required for the playground and API responses to serve accessible image URLs from a public-read bucket. |
 | `MASTER_API_KEY` | Optional | Bearer token protecting the Worker's endpoints (unset = open dev mode). Set via `wrangler secret put`. |
 
-The persistent cache now lives in **Cloudflare D1 + Vectorize** (768-dim CLIP, fixed), not Postgres/pgvector.
-The full Cloudflare/CLIP variable list is in **[Backfill worker](#backfill-worker)** and
+The persistent cache now lives in **Cloudflare D1 + Vectorize** (768-dim BGE, fixed), not Postgres/pgvector.
+The full Cloudflare/BGE variable list is in **[Backfill worker](#backfill-worker)** and
 **[Cloudflare Worker](#cloudflare-worker-edge-request-path)** below and in `.env.example`.
 
 Without any env vars set, SharedCache runs fully offline with stub components — useful for local development and CI.
@@ -134,18 +135,18 @@ Without any env vars set, SharedCache runs fully offline with stub components �
 
 ## Backfill worker
 
-The backfill worker is a long-running process that continuously re-ranks cached images in the Cloudflare D1 database, using CLIP embeddings to detect stale or unverified cache entries and re-check their similarity. It runs in the GMI Hermes agentbox.
+The backfill worker is a long-running process that continuously re-ranks cached images in the Cloudflare D1 database, using BGE embeddings to detect stale or unverified cache entries and re-check their similarity. It runs in the GMI Hermes agentbox.
 
 ### Setup
 
-1. **Apply the D1 migration** (creates the asset table with CLIP-vector columns):
+1. **Apply the D1 migration** (creates the asset table with BGE-vector columns):
    ```bash
    wrangler d1 migrations apply sharedcache-prod
    ```
 
-2. **Create the Vectorize index** (CLIP embeddings, 768 dimensions, cosine similarity):
+2. **Create the Vectorize index** (BGE embeddings, 768 dimensions, cosine similarity):
    ```bash
-   wrangler vectorize create sharedcache-clip --dimensions=768 --metric=cosine
+   wrangler vectorize create wagmiphotos-bge --dimensions=768 --metric=cosine
    ```
 
 3. **Seed the cache pool** (populates D1 with initial assets and embeddings):
@@ -166,9 +167,11 @@ The backfill worker is a long-running process that continuously re-ranks cached 
 
 ### Requirements
 
-- **CLIP embedding endpoints**: Set `CLIP_TEXT_EMBED_URL` and `CLIP_IMAGE_EMBED_URL` (e.g., Hugging Face Inference API endpoints) — required for re-embedding and re-ranking.
-- **Cloudflare credentials**: `CF_ACCOUNT_ID`, `CF_API_TOKEN`, `D1_DATABASE_ID`, `VECTORIZE_INDEX_NAME`.
-- **Similarity floor**: Tune `FLOOR_SIM_MAX` and `FLOOR_SIM_MIN` against the seeded pool (default: 0.35 / 0.18).
+- **Local BGE embedding**: the backfill loads `BAAI/bge-base-en-v1.5` in-process (via `sentence-transformers`,
+  the `model` extra) to embed asset prompts/captions — no external embedding endpoint or tunnel required.
+- **Cloudflare credentials**: `CF_ACCOUNT_ID`, `CF_API_TOKEN`, `D1_DATABASE_ID`, `VECTORIZE_INDEX_NAME` (must
+  match the Worker's index, `wagmiphotos-bge`).
+- **Similarity floor**: Tune `FLOOR_SIM_MAX` and `FLOOR_SIM_MIN` against the seeded pool (default: 0.90 / 0.72).
 
 ---
 
@@ -189,34 +192,29 @@ The Worker handles incoming image-generation requests at the edge, routing them 
    ```
    Copy the returned `database_id` and set it in `projects/worker/wrangler.toml` (replace `REPLACE_WITH_D1_DATABASE_ID`).
 
-3. **Apply the D1 migration** (creates the asset table with CLIP-vector columns):
+3. **Apply the D1 migration** (creates the asset table with BGE-vector columns):
    ```bash
    wrangler d1 migrations apply sharedcache
    ```
 
-4. **Create the Vectorize index** (CLIP embeddings, 768 dimensions, cosine similarity):
+4. **Create the Vectorize index** (BGE embeddings, 768 dimensions, cosine similarity):
    ```bash
-   wrangler vectorize create sharedcache-clip --dimensions=768 --metric=cosine
+   wrangler vectorize create wagmiphotos-bge --dimensions=768 --metric=cosine
    ```
 
 5. **Set secrets** (one-time; Cloudflare stores these securely):
    ```bash
    wrangler secret put MASTER_API_KEY       # Your API key for request validation
-   wrangler secret put CLIP_EMBED_TOKEN      # Token for the CLIP text-embedding endpoint
    ```
+   Query-prompt embedding uses the `[ai] binding = "AI"` Workers AI binding already declared in
+   `wrangler.toml` — no external embedding endpoint or token to configure.
 
-6. **Set the CLIP text-embedding endpoint** in `projects/worker/wrangler.toml`:
-   ```toml
-   [vars]
-   CLIP_TEXT_EMBED_URL = "https://your-clip-endpoint/embed"
-   ```
-
-7. **Run tests**:
+6. **Run tests**:
    ```bash
    npm test
    ```
 
-8. **Deploy to Cloudflare**:
+7. **Deploy to Cloudflare**:
    ```bash
    npm run deploy
    ```
@@ -244,7 +242,7 @@ The `EMAIL_FROM` sender address is configured in `projects/worker/wrangler.toml`
 ## Running tests
 
 ```bash
-# Python backfill worker (offline, fakes for D1/Vectorize/CLIP/B2)
+# Python backfill worker (offline, fakes for D1/Vectorize/BGE/B2)
 uv run pytest -q          # 42 passed
 
 # Cloudflare Worker (offline, faked bindings — no Miniflare)
@@ -256,12 +254,12 @@ cd projects/worker && npx vitest run   # 32 passed
 ## Live verification (pending — requires real keys)
 
 Everything above is verified offline with fakes. Before a real deploy, validate end-to-end with live
-Cloudflare/Backblaze/GMI/CLIP credentials:
+Cloudflare/Backblaze/GMI credentials:
 
 1. **Provision stores + seed** — follow **[Backfill worker → Setup](#setup)**: `wrangler d1 migrations apply`,
-   `wrangler vectorize create sharedcache-clip --dimensions=768 --metric=cosine`, then
-   `uv run python -m sharedcache.backfill.seed_pd12m` (confirm PD12M's precomputed CLIP image vectors load, not zeros).
-2. **Tune the floor** — CLIP cross-modal cosine scores are low; tune `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN` against
+   `wrangler vectorize create wagmiphotos-bge --dimensions=768 --metric=cosine`, then
+   `uv run python -m sharedcache.backfill.seed_pd12m` (confirm the local-BGE caption embeddings load, not zeros).
+2. **Tune the floor** — BGE text-to-text cosine scores run high; tune `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN` against
    the seeded pool so hits land in the intended range.
 3. **Deploy the Worker** — follow **[Cloudflare Worker → Deploy runbook](#deploy-runbook)**; confirm
    `wrangler deploy --dry-run` lists the `RATE_LIMITER` binding, then a first request returns a nearest

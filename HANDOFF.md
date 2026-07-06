@@ -5,10 +5,10 @@ _Last updated: 2026-07-04. Everything below is merged to `main` and green
 
 ## What SharedCache is
 
-An **OpenAI-compatible image-generation cache**. A prompt is CLIP-embedded and matched (cosine, cross-modal
-text→image) against a pool of images in **Cloudflare Vectorize**; a near match is served instantly from
-**Backblaze B2** (a cache HIT saves a real generation). Novel prompts are logged and generated **asynchronously**
-by a background worker — the request path never blocks on generation.
+An **OpenAI-compatible image-generation cache**. A prompt is BGE-embedded (text-to-text) and matched (cosine)
+against a pool of prompts/captions for already-generated images in **Cloudflare Vectorize**; a near match is
+served instantly from **Backblaze B2** (a cache HIT saves a real generation). Novel prompts are logged and
+generated **asynchronously** by a background worker — the request path never blocks on generation.
 
 ## Architecture (current)
 
@@ -16,26 +16,29 @@ Two deployables over three shared stores:
 
 - **Cloudflare Worker** (`projects/worker/`, TypeScript) — the edge request path **and** the static UI.
   Handles `POST /v1/images/generations`, `POST /v1/keys/generate`, `GET /healthz`; serves the playground SPA
-  for every other path via **Workers Static Assets**. It authenticates, CLIP-embeds the prompt, queries
-  Vectorize for the nearest asset, reads/logs the query to D1, and returns the image URL. **It never generates.**
+  for every other path via **Workers Static Assets**. It authenticates, embeds the prompt with **Cloudflare
+  Workers AI (`@cf/baai/bge-base-en-v1.5`, text-to-text, 768d)**, queries Vectorize for the nearest asset,
+  reads/logs the query to D1, and returns the image URL. **It never generates.**
   Branch outcomes: `hit` (≥ floor), `approximate` (< floor, nearest served anyway), `pending` (`202`, empty pool).
 - **Python backfill worker** (`projects/backfill/`, `python -m sharedcache.backfill`) — the "Hermes runner".
   Polls D1 for pending queries (ranked by demand) and generates the most-requested missing images via
   Genblaze/GMI Cloud, **re-checking Vectorize first** so nothing is built twice; also rehosts seeded PD12M
-  images to B2 in 3 webp sizes. Runs locally or in a GMI Cloud Hermes agentbox (Dockerfile included).
-- **Shared stores:** **D1** (query log + asset metadata + hashed api keys), **Vectorize** (768-dim CLIP
-  ViT-L/14 vectors — reuses PD12M's precomputed image vectors), **Backblaze B2** (image bytes).
+  images to B2 in 3 webp sizes. Embeds asset prompts/captions with a **local** `BAAI/bge-base-en-v1.5`
+  (in-process, `model` extra) — no external embedder or tunnel. Runs locally or in a GMI Cloud Hermes
+  agentbox (Dockerfile included).
+- **Shared stores:** **D1** (query log + asset metadata + hashed api keys), **Vectorize** (768-dim BGE
+  `wagmiphotos-bge` index — prompt/caption text vectors), **Backblaze B2** (image bytes).
 
 Data flow: Worker logs demand → backfill builds top misses → Vectorize/D1 updated → next identical/similar
-request is a HIT. Similarity floor is **CLIP-cross-modal-calibrated** (`FLOOR_SIM_MAX/MIN` default 0.35/0.18 —
-CLIP cosines are low; tune against the real pool).
+request is a HIT. Similarity floor is **BGE text-to-text-calibrated** (`FLOOR_SIM_MAX/MIN` default 0.90/0.72 —
+BGE text-to-text cosines run high; these are placeholders, tune against the real pool).
 
 ## Repo layout (uv workspace monorepo)
 
 ```
 projects/
 ├── worker/        # Cloudflare Worker (TS) + public/index.html (the SPA)   — `npm test`, `npm run deploy`
-├── common/        # sharedcache-common     — models, config, floor, clip, D1/Vectorize REST clients
+├── common/        # sharedcache-common     — models, config, floor, bge, D1/Vectorize REST clients
 ├── generation/    # sharedcache-generation — Genblaze/GMI + Backblaze B2 + image processing
 └── backfill/      # sharedcache-backfill   — demand-ranked runner (worker.py, seed_pd12m, __main__, Dockerfile)
 docs/superpowers/  # specs + plans (the full design/decision trail)
@@ -46,7 +49,7 @@ Python dep graph: `common ← generation ← backfill`. Imports are `sharedcache
 ## How to run / test / build
 
 ```bash
-# Python (offline, fakes for D1/Vectorize/CLIP/B2)
+# Python (offline, fakes for D1/Vectorize/BGE/B2)
 uv sync && uv run pytest -q                      # 52 passed
 
 # Worker (offline, faked bindings — no Miniflare)
@@ -73,17 +76,16 @@ cd projects/worker && npx wrangler dev
 - Local overrides go in `projects/worker/.dev.vars` (git-ignored). The SPA's
   own requests are origin-relative, so local dev needs no configuration.
 
-## GMI box (embedder + backfill)
+## GMI box (backfill)
 
-- One CPU GMI instance runs `deploy/gmi/docker-compose.yml`: the CLIP
-  ViT-L/14 embedding service (`projects/embedder/`), the backfill worker,
-  and a Cloudflare Tunnel publishing the embedder as `embed.wagmi.photos`.
-- The Worker's `CLIP_TEXT_EMBED_URL` points at that hostname; its bearer
-  token is the `CLIP_EMBED_TOKEN` secret (`wrangler secret put`). The
-  backfill reaches the embedder in-network (`http://embedder:8000`).
-- Full runbook: `deploy/gmi/README.md`. Local dev without a tunnel: run the
-  embedder locally and point `projects/worker/.dev.vars`
-  `CLIP_TEXT_EMBED_URL` at it.
+- One CPU GMI instance runs `deploy/gmi/docker-compose.yml`: just the backfill
+  worker container. It loads `BAAI/bge-base-en-v1.5` in-process
+  (`sentence-transformers`) to embed asset prompts/captions — there is no
+  separate embedding service and no tunnel to stand up.
+- The Worker embeds query prompts independently, at the edge, via the
+  Cloudflare Workers AI binding (`env.AI.run('@cf/baai/bge-base-en-v1.5', …)`,
+  `projects/worker/src/embed.ts`) — no HTTP call to the GMI box.
+- Full runbook: `deploy/gmi/README.md`.
 
 ## Design trail
 
@@ -95,16 +97,16 @@ cd projects/worker && npx wrangler dev
 
 ## Next steps (prioritized)
 
-### 1. Live verification — needs real Cloudflare / Backblaze / GMI / CLIP credentials
+### 1. Live verification — needs real Cloudflare / Backblaze / GMI credentials
 This is the biggest open item: everything is verified offline with fakes; nothing has run against live infra.
 - Provision + migrate D1: `cd projects/worker && npx wrangler d1 create sharedcache`, set `database_id` in
   `wrangler.toml`, `npx wrangler d1 migrations apply sharedcache`.
-- Create the Vectorize index: `npx wrangler vectorize create sharedcache-clip --dimensions=768 --metric=cosine`.
-- Wire the CLIP endpoints (`CLIP_TEXT_EMBED_URL` for the Worker; `CLIP_TEXT_EMBED_URL` + `CLIP_IMAGE_EMBED_URL`
-  for the backfill). **Confirm PD12M actually exposes precomputed CLIP _image_ vectors** — if not, the seeder
-  falls back to CLIP-embedding captions (it refuses to seed zero vectors).
+- Create the Vectorize index: `npx wrangler vectorize create wagmiphotos-bge --dimensions=768 --metric=cosine`.
+- The Worker's query-prompt embedding uses the `[ai] binding = "AI"` Workers AI binding already declared in
+  `wrangler.toml` (`@cf/baai/bge-base-en-v1.5`) — no external endpoint to wire. The backfill embeds
+  prompts/captions with a local `BAAI/bge-base-en-v1.5` (see `deploy/gmi`).
 - Seed: `uv run python -m sharedcache.backfill.seed_pd12m --limit 100`.
-- **Tune `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN`** against the seeded pool (CLIP cross-modal cosines are low, ~0.2–0.35).
+- **Tune `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN`** against the seeded pool (BGE text-to-text cosines run high, ~0.7–0.95).
 - **Deploy order dependency:** this branch requires `cd projects/worker && npx wrangler d1 migrations apply
   sharedcache` (remote) to run **before** `npm run deploy` — migrations `0002` (`queries.generate`, backfill
   demand tracking) and `0003` (assets browse index) must be live first. Deploying the Worker ahead of these
@@ -122,7 +124,7 @@ Most items are now closed — see `docs/HANDOFF-2026-07-04.md` → "Addressed si
 - **Backfill:** rehost now has a 25 MB size cap, but still no host allowlist — add one _once user
   input can set `source_url`_ (today it's trusted PD12M seed data only).
 - **Deploy:** the non-root Dockerfiles pass `docker build --check` but haven't been built end-to-end
-  here (torch/CLIP weights) — do a `docker compose up --build` smoke check on the GMI box.
+  here (torch/BGE weights) — do a `docker compose up --build` smoke check on the GMI box.
 - **Tooling:** dev-only `npm audit` findings in wrangler/vitest/esbuild transitive deps.
 
 ### 4. Nice-to-haves

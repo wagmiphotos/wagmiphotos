@@ -14,15 +14,15 @@ embedding service or tunnel to run.
    CF_ACCOUNT_ID=
    CF_API_TOKEN=
    D1_DATABASE_ID=
-   VECTORIZE_INDEX_NAME=sharedcache-clip
+   VECTORIZE_INDEX_NAME=wagmiphotos-bge
    GMICLOUD_API_KEY=
    B2_KEY_ID=
    B2_APP_KEY=
    B2_BUCKET=
    B2_REGION=us-west-004
    B2_PUBLIC_URL_BASE=
-   FLOOR_SIM_MAX=0.35
-   FLOOR_SIM_MIN=0.18
+   FLOOR_SIM_MAX=0.90
+   FLOOR_SIM_MIN=0.72
    ```
 
 3. `cd deploy/gmi && docker compose up -d --build`

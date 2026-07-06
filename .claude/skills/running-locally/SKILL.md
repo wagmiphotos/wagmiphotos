@@ -53,14 +53,17 @@ curl -s --retry 30 --retry-delay 1 --retry-connrefused http://127.0.0.1:8787/hea
 **Why generation 502s locally** — two infra deps with no local substitute:
 1. **Cloudflare Vectorize has no local emulation.** wrangler prints *"Vectorize local
    bindings are not supported yet"*; `s.vectorize.query()` fails.
-2. **The CLIP embedder isn't reachable.** `clipTextEmbed` fetches
-   `CLIP_TEXT_EMBED_URL` (`embed.wagmi.photos`); offline / pre-deploy that's a DNS
-   failure. The Worker maps both to a 502 `{"error":"upstream error","detail":"…"}`.
+2. **Cloudflare Workers AI has no local emulation either.** `bgeTextEmbed` calls
+   `env.AI.run('@cf/baai/bge-base-en-v1.5', …)`; the `[ai]` binding always talks to
+   your live Cloudflare account (there is no external embedder or tunnel — inference
+   simply requires real infra). The Worker maps both failures to a 502
+   `{"error":"upstream error","detail":"…"}`.
 
 To exercise generation you need the deployed backend, not local mode: either follow
 `DEPLOY.md`, or `wrangler dev --remote --experimental-vectorize-bind-to-prod` after
-setting a real `database_id` in `wrangler.toml`, a live+seeded Vectorize index, and a
-reachable `CLIP_TEXT_EMBED_URL` + `CLIP_EMBED_TOKEN` secret.
+setting a real `database_id` in `wrangler.toml`, a live+seeded `wagmiphotos-bge`
+Vectorize index, and a Cloudflare account with Workers AI enabled (the `[ai]` binding
+needs no separate secret).
 
 ## Auth in local dev (magic-link login)
 
