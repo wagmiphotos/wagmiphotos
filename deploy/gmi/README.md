@@ -1,22 +1,15 @@
-# GMI box — embedder + backfill
+# GMI box — backfill worker
 
-One CPU instance runs three containers: the CLIP ViT-L/14 embedding service,
-the demand-ranked backfill worker, and a Cloudflare Tunnel that publishes the
-embedder as `embed.wagmi.photos` (no open ports on the box).
+One CPU instance runs the demand-ranked backfill worker. It loads the BGE
+text embedding model (`BAAI/bge-base-en-v1.5`) in-process — no separate
+embedding service or tunnel to run.
 
 ## One-time setup
 
 1. Provision a CPU-capable GMI instance with Docker + Docker Compose.
-2. Cloudflare dashboard → Zero Trust → Networks → Tunnels → create a tunnel,
-   copy its token. Add a public hostname: `embed.wagmi.photos` →
-   `http://embedder:8000`.
-3. Clone the repo on the box and create `deploy/gmi/.env`:
+2. Clone the repo on the box and create `deploy/gmi/.env`:
 
    ```
-   # embedder auth (any long random string; also set as the Worker secret)
-   EMBED_TOKEN=
-   # cloudflare tunnel token from step 2
-   TUNNEL_TOKEN=
    # backfill needs the same variables as the repo-root .env.example:
    CF_ACCOUNT_ID=
    CF_API_TOKEN=
@@ -32,30 +25,18 @@ embedder as `embed.wagmi.photos` (no open ports on the box).
    FLOOR_SIM_MIN=0.18
    ```
 
-4. `cd deploy/gmi && docker compose up -d --build`
-   (first build downloads CPU torch + ~1.7 GB of CLIP weights — one time).
-
-## Point the Worker at it
-
-```
-cd projects/worker
-npx wrangler secret put CLIP_EMBED_TOKEN   # paste EMBED_TOKEN
-npm run deploy                             # picks up CLIP_TEXT_EMBED_URL from wrangler.toml
-```
+3. `cd deploy/gmi && docker compose up -d --build`
+   (first build downloads CPU torch + the BGE model weights — one time).
 
 ## Verify
 
 ```
-curl https://embed.wagmi.photos/healthz
-curl -s -X POST https://embed.wagmi.photos/embed/text \
-  -H "Authorization: Bearer $EMBED_TOKEN" -H "Content-Type: application/json" \
-  -d '{"inputs":"a fox"}' | head -c 80        # -> [[0.123, ...   (768 floats)
 docker compose logs backfill --tail 20        # polling loop ticking
 ```
 
 ## Day 2
 
-- `docker compose logs -f embedder|backfill|cloudflared`
+- `docker compose logs -f backfill`
 - Update: `git pull && docker compose up -d --build`
 - The backfill runs in loop mode; one-shot debugging:
   `docker compose run --rm backfill --once`

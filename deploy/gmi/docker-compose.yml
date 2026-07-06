@@ -1,38 +1,10 @@
-# One-box GMI deployment: CLIP embedder + backfill worker + Cloudflare Tunnel.
+# One-box GMI deployment: backfill worker (in-process BGE).
 # Secrets/config come from deploy/gmi/.env (git-ignored); see README.md here.
 services:
-  embedder:
-    build:
-      context: ../..
-      dockerfile: projects/embedder/Dockerfile
-    environment:
-      - EMBED_TOKEN=${EMBED_TOKEN}
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 60s
-    restart: unless-stopped
-
   backfill:
     build:
       context: ../..
       dockerfile: projects/backfill/Dockerfile
     env_file:
       - .env
-    environment:
-      - CLIP_TEXT_EMBED_URL=http://embedder:8000/embed/text
-      - CLIP_IMAGE_EMBED_URL=http://embedder:8000/embed/image
-      - CLIP_EMBED_TOKEN=${EMBED_TOKEN}
-    depends_on:
-      embedder:
-        condition: service_healthy
-    restart: unless-stopped
-
-  cloudflared:
-    image: cloudflare/cloudflared:2026.6.1
-    command: tunnel run --token ${TUNNEL_TOKEN}
-    depends_on:
-      - embedder
     restart: unless-stopped
