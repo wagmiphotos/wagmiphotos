@@ -3697,11 +3697,22 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
   <script>
     // Global Statistics (guard against corrupted localStorage values)
     const finiteOrZero = (x) => Number.isFinite(x) ? x : 0;
-    let saved = finiteOrZero(parseFloat(localStorage.getItem('sharedcache_saved') || '0.00'));
-    let hits = finiteOrZero(parseInt(localStorage.getItem('sharedcache_hits') || '0', 10));
-    let misses = finiteOrZero(parseInt(localStorage.getItem('sharedcache_misses') || '0', 10));
+    function lsGet(name) {
+      // one-time legacy fallback: read old sharedcache_* keys, migrate, delete
+      const v = localStorage.getItem('wagmiphotos_' + name);
+      if (v !== null) return v;
+      const old = localStorage.getItem('sharedcache_' + name);
+      if (old !== null) {
+        localStorage.setItem('wagmiphotos_' + name, old);
+        localStorage.removeItem('sharedcache_' + name);
+      }
+      return old;
+    }
+    let saved = finiteOrZero(parseFloat(lsGet('saved') || '0.00'));
+    let hits = finiteOrZero(parseInt(lsGet('hits') || '0', 10));
+    let misses = finiteOrZero(parseInt(lsGet('misses') || '0', 10));
     let runHistory;
-    try { runHistory = JSON.parse(localStorage.getItem('sharedcache_history') || '[]'); } catch { runHistory = []; }
+    try { runHistory = JSON.parse(lsGet('history') || '[]'); } catch { runHistory = []; }
     if (!Array.isArray(runHistory)) runHistory = [];
     const HISTORY_MAX = 50;
     let currentManifest = null;
@@ -4012,9 +4023,9 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       document.getElementById('hit-rate').textContent = `${rate}%`;
 
       // Persist Stats
-      localStorage.setItem('sharedcache_saved', saved.toString());
-      localStorage.setItem('sharedcache_hits', hits.toString());
-      localStorage.setItem('sharedcache_misses', misses.toString());
+      localStorage.setItem('wagmiphotos_saved', saved.toString());
+      localStorage.setItem('wagmiphotos_hits', hits.toString());
+      localStorage.setItem('wagmiphotos_misses', misses.toString());
     }
 
     function renderHistory() {
@@ -4373,7 +4384,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
           result: sc.result
         });
         if (runHistory.length > HISTORY_MAX) runHistory.length = HISTORY_MAX;
-        localStorage.setItem('sharedcache_history', JSON.stringify(runHistory));
+        localStorage.setItem('wagmiphotos_history', JSON.stringify(runHistory));
         renderHistory();
 
       } catch (err) {
