@@ -37,7 +37,7 @@ function genKey(): string {
 // hit GitHub's unauthenticated rate limit per visitor. Always 200s with {stars}
 // (null when unavailable) so the frontend can degrade gracefully.
 async function handleStars(env: Env): Promise<Response> {
-  const repo = env.GITHUB_REPO || "sharedcache/sharedcache";
+  const repo = env.GITHUB_REPO || "wagmiphotos/wagmiphotos";
   const cacheKey = new Request(`https://wagmiphotos.internal/meta/stars/${repo}`);
   try {
     const cache = (globalThis as any).caches?.default;
