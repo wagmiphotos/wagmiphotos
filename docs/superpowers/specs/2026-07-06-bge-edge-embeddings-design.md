@@ -90,26 +90,28 @@ it is a live step, not an offline unit test.
 - Backfill keeps its Cloudflare creds (`CF_ACCOUNT_ID`, `CF_API_TOKEN`, `D1_DATABASE_ID`,
   Vectorize index) — it still writes D1 + Vectorize.
 
-## Re-index & cutover
+## Index provisioning (greenfield — nothing is deployed yet)
 
-1. Create the new Vectorize index: `wrangler vectorize create wagmiphotos-bge
-   --dimensions=768 --metric=cosine`.
-2. Re-index existing assets: iterate all D1 `assets`, BGE-embed each `prompt`, upsert into
-   `wagmiphotos-bge` (a one-shot backfill pass/script).
-3. Re-run `seed_pd12m` (BGE captions) for the initial pool if needed.
-4. Point the Worker + backfill at `wagmiphotos-bge`, deploy, verify, then delete the old
-   `sharedcache-clip` index.
+Nothing has been deployed, so there is **no production CLIP index, no live vectors, and no
+cutover to manage**. Provisioning is a clean first-time setup:
 
-Because the vector space changes, this is a hard cutover — the old CLIP index cannot be
-queried with BGE vectors. Sequence: reseed the new index → deploy Worker → delete old.
+1. Create the index: `wrangler vectorize create wagmiphotos-bge --dimensions=768 --metric=cosine`.
+2. Seed the pool: run `seed_pd12m` (BGE captions) to populate `wagmiphotos-bge`.
+3. Point the Worker + backfill at `wagmiphotos-bge` and deploy.
+
+No re-index of existing assets and no old-index deletion are needed — those would only
+apply if a CLIP index had already shipped with data. Local dev's demo D1 assets are just
+re-seeded from scratch against the new index.
 
 ## Retire the CLIP embedder
 
-Nothing calls it after cutover:
+Nothing calls it, and it was never deployed — so this is **code/config removal, not
+decommissioning live infra**:
 - Delete `projects/embedder` (the open_clip HTTP service) and its tests.
 - Remove the `embedder` + `cloudflared` (embed tunnel) services from `deploy/gmi`.
-- Remove `EMBED_TOKEN`, the embedder `TUNNEL_TOKEN`, and `embed.wagmi.photos` DNS/tunnel.
-- The GMI box still runs the backfill (generation), now with in-process BGE.
+- Remove `EMBED_TOKEN`, the embedder `TUNNEL_TOKEN`, and the `embed.wagmi.photos` tunnel
+  config (the DNS/tunnel was never provisioned).
+- The GMI box will run the backfill (generation) with in-process BGE.
 
 ## Config / secrets summary
 
@@ -140,5 +142,6 @@ bands. These placeholders are starting points, not final values.
 
 1. Worker → BGE (Workers AI, `embedder` rename, new index binding, floor placeholders).
 2. Backfill/seed → local BGE (shared contract module).
-3. Create `wagmiphotos-bge`, reseed/re-index, run the drift check + floor tune.
-4. Deploy Worker, cut over, delete the old CLIP index, retire the embedder service.
+3. Retire the CLIP embedder code/config (`projects/embedder`, `deploy/gmi` services).
+4. Live (greenfield): create `wagmiphotos-bge`, seed the pool, run the drift check +
+   floor tune, deploy the Worker.
