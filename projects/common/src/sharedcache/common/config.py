@@ -30,8 +30,6 @@ class Settings(BaseSettings):
     cf_api_token: str | None = None
     d1_database_id: str | None = None
     vectorize_index_name: str | None = None
-    clip_text_embed_url: str | None = None
-    clip_image_embed_url: str | None = None
-    clip_embed_token: str | None = None
-    floor_sim_max: float = 0.35
-    floor_sim_min: float = 0.18
+    bge_model_name: str = "BAAI/bge-base-en-v1.5"
+    floor_sim_max: float = 0.90
+    floor_sim_min: float = 0.72
