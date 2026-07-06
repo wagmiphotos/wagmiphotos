@@ -34,6 +34,20 @@ export function clearSessionCookie(secure: boolean): string {
   return parts.join("; ");
 }
 
+export const LOGIN_NONCE_COOKIE = "wagmi_login";
+export const LOGIN_NONCE_TTL_SECONDS = 60 * 15; // matches the login-token 15-min TTL
+
+export function serializeLoginNonceCookie(nonce: string, secure: boolean): string {
+  const parts = [`${LOGIN_NONCE_COOKIE}=${nonce}`, "HttpOnly", "SameSite=Lax", "Path=/", `Max-Age=${LOGIN_NONCE_TTL_SECONDS}`];
+  if (secure) parts.push("Secure");
+  return parts.join("; ");
+}
+export function clearLoginNonceCookie(secure: boolean): string {
+  const parts = [`${LOGIN_NONCE_COOKIE}=`, "HttpOnly", "SameSite=Lax", "Path=/", "Max-Age=0"];
+  if (secure) parts.push("Secure");
+  return parts.join("; ");
+}
+
 import type { Env, SessionStore, KeyStore } from "./types";
 import { sha256Hex, constantTimeEqual, bearer } from "./auth";
 

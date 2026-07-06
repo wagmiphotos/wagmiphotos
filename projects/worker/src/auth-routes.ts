@@ -3,10 +3,11 @@ import { sha256Hex } from "./auth";
 import {
   randomToken, resolveSession, serializeSessionCookie, clearSessionCookie,
   isSecureRequest, parseCookies, SESSION_COOKIE,
+  serializeLoginNonceCookie, clearLoginNonceCookie, LOGIN_NONCE_COOKIE,
 } from "./session";
 import { emailIsDevMode } from "./email";
 
-export interface AuthCfg { token?: () => string; verifyBase: string; now?: () => number; }
+export interface AuthCfg { token?: () => string; nonce?: () => string; verifyBase: string; now?: () => number; }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function normalizeEmail(raw: string): string { return raw.trim().toLowerCase(); }
@@ -27,20 +28,23 @@ export async function handleLoginRequest(request: Request, env: Env, s: Services
   if (!okIp || !okEmail) return genGeneric();
 
   const token = (cfg.token ?? randomToken)();
-  await s.loginTokens.create(await sha256Hex(token), email);
+  const nonce = (cfg.nonce ?? randomToken)();
+  await s.loginTokens.create(await sha256Hex(token), email, await sha256Hex(nonce));
   const link = `${cfg.verifyBase}/v1/auth/verify?token=${token}`;
   try { await s.email.sendMagicLink(email, link); } catch (e) { console.error("sendMagicLink failed", e); }
 
   // In dev (no email provider) return the link so local testing works.
-  if (emailIsDevMode(env)) return Response.json({ status: "sent", dev_link: link });
-  return genGeneric();
+  const cookie = serializeLoginNonceCookie(nonce, isSecureRequest(request));
+  const resBody = emailIsDevMode(env) ? { status: "sent", dev_link: link } : { status: "sent" };
+  return Response.json(resBody, { headers: { "Set-Cookie": cookie } });
 }
 
 export async function handleVerify(url: URL, request: Request, env: Env, s: Services, cfg: AuthCfg): Promise<Response> {
   const loginFail = Response.redirect(`${cfg.verifyBase}/#/login?error=invalid_or_expired`, 302);
-  const raw = url.searchParams.get("token");
-  if (!raw) return loginFail;
-  const consumed = await s.loginTokens.consume(await sha256Hex(raw));
+  const rawToken = url.searchParams.get("token");
+  const nonce = parseCookies(request.headers.get("Cookie"))[LOGIN_NONCE_COOKIE];
+  if (!rawToken || !nonce) return loginFail;
+  const consumed = await s.loginTokens.consume(await sha256Hex(rawToken), await sha256Hex(nonce));
   if (!consumed) return loginFail;
 
   const id = `usr_${randomToken(12)}`;
@@ -48,13 +52,11 @@ export async function handleVerify(url: URL, request: Request, env: Env, s: Serv
   const sessionToken = (cfg.token ?? randomToken)();
   await s.sessions.create(user.id, await sha256Hex(sessionToken));
 
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: `${cfg.verifyBase}/#/playground`,
-      "Set-Cookie": serializeSessionCookie(sessionToken, isSecureRequest(request)),
-    },
-  });
+  const secure = isSecureRequest(request);
+  const headers = new Headers({ Location: `${cfg.verifyBase}/#/playground` });
+  headers.append("Set-Cookie", serializeSessionCookie(sessionToken, secure));
+  headers.append("Set-Cookie", clearLoginNonceCookie(secure));
+  return new Response(null, { status: 302, headers });
 }
 
 export async function handleMe(request: Request, env: Env, s: Services): Promise<Response> {

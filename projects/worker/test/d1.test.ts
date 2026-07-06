@@ -165,16 +165,20 @@ it("sessions.create/resolve/touch/delete hit sessions with TTL and expiry guard"
   expect(calls[3].sql).toContain("DELETE FROM sessions");
 });
 
-it("loginTokens.create sets 15-min TTL; consume is single-use + expiry-guarded", async () => {
+it("loginTokens.create sets 15-min TTL + nonce_hash; consume is nonce-guarded, single-use + expiry-guarded", async () => {
   const { db, calls } = fakeDb({ email: "a@b.co" });
   const { loginTokens } = makeD1Stores(db);
-  await loginTokens.create("h1", "a@b.co");
+  await loginTokens.create("h1", "a@b.co", "n1");
   expect(calls[0].sql).toContain("INSERT INTO login_tokens");
+  expect(calls[0].sql).toContain("nonce_hash");
   expect(calls[0].sql).toContain("+15 minutes");
-  const c = await loginTokens.consume("h1");
+  expect(calls[0].args).toEqual(["h1", "a@b.co", "n1"]);
+  const c = await loginTokens.consume("h1", "n1");
   expect(c).toEqual({ email: "a@b.co" });
   expect(calls[1].sql).toContain("UPDATE login_tokens SET used_at");
+  expect(calls[1].sql).toContain("nonce_hash = ?"); // atomic guard: wrong/absent nonce never consumes
   expect(calls[1].sql).toContain("used_at IS NULL");
   expect(calls[1].sql).toContain("expires_at > datetime('now')");
   expect(calls[1].sql).toContain("RETURNING email");
+  expect(calls[1].args).toEqual(["h1", "n1"]);
 });

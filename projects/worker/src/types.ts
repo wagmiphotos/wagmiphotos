@@ -30,8 +30,8 @@ export interface SessionStore {
   delete(tokenHash: string): Promise<void>;
 }
 export interface LoginTokenStore {
-  create(tokenHash: string, email: string): Promise<void>;
-  consume(tokenHash: string): Promise<{ email: string } | null>;
+  create(tokenHash: string, email: string, nonceHash: string): Promise<void>;
+  consume(tokenHash: string, nonceHash: string): Promise<{ email: string } | null>;
 }
 export interface KeyStore {
   getKeyOwner(hash: string): Promise<string | null>;

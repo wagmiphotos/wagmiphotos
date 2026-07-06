@@ -104,17 +104,17 @@ export function makeD1Stores(db: any): {
   };
 
   const loginTokens: LoginTokenStore = {
-    async create(tokenHash, email) {
+    async create(tokenHash, email, nonceHash) {
       await db.prepare(
-        "INSERT INTO login_tokens (token_hash, email, expires_at) VALUES (?, ?, datetime('now', '+15 minutes'))"
-      ).bind(tokenHash, email).run();
+        "INSERT INTO login_tokens (token_hash, email, nonce_hash, expires_at) VALUES (?, ?, ?, datetime('now', '+15 minutes'))"
+      ).bind(tokenHash, email, nonceHash).run();
     },
-    async consume(tokenHash) {
+    async consume(tokenHash, nonceHash) {
       const row = await db.prepare(
         `UPDATE login_tokens SET used_at = datetime('now')
-         WHERE token_hash = ? AND used_at IS NULL AND expires_at > datetime('now')
+         WHERE token_hash = ? AND nonce_hash = ? AND used_at IS NULL AND expires_at > datetime('now')
          RETURNING email`
-      ).bind(tokenHash).first();
+      ).bind(tokenHash, nonceHash).first();
       return row ? { email: row.email as string } : null;
     },
   };

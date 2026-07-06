@@ -1,6 +1,7 @@
 import { it, expect } from "vitest";
 import { randomToken, parseCookies, serializeSessionCookie, clearSessionCookie, isSecureRequest, SESSION_COOKIE } from "../src/session";
 import { resolveSession, resolveApiPrincipal, MASTER_USER_ID, DEV_USER_ID } from "../src/session";
+import { serializeLoginNonceCookie, clearLoginNonceCookie, LOGIN_NONCE_COOKIE } from "../src/session";
 import { sha256Hex } from "../src/auth";
 
 it("randomToken is url-safe and unique", () => {
@@ -28,6 +29,20 @@ it("serializeSessionCookie sets HttpOnly, SameSite=Lax, Path, and Secure only wh
 
 it("clearSessionCookie expires the cookie", () => {
   expect(clearSessionCookie(true)).toContain("Max-Age=0");
+});
+
+it("serializeLoginNonceCookie sets HttpOnly, SameSite=Lax, Path, and Secure only when asked", () => {
+  const secure = serializeLoginNonceCookie("non", true);
+  expect(secure).toContain(`${LOGIN_NONCE_COOKIE}=non`);
+  expect(secure).toContain("HttpOnly");
+  expect(secure).toContain("SameSite=Lax");
+  expect(secure).toContain("Path=/");
+  expect(secure).toContain("Secure");
+  expect(serializeLoginNonceCookie("non", false)).not.toContain("Secure");
+});
+
+it("clearLoginNonceCookie expires the cookie", () => {
+  expect(clearLoginNonceCookie(true)).toContain("Max-Age=0");
 });
 
 it("isSecureRequest reflects the URL scheme", () => {

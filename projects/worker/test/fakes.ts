@@ -23,7 +23,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
     rateLimiter: { limit: async () => true },
     users: { upsertByEmail: async (id, email) => ({ id, email }), getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null }) },
     sessions: { create: async () => {}, resolve: async () => null, touch: async () => {}, delete: async () => {} },
-    loginTokens: { create: async () => {}, consume: async () => null },
+    loginTokens: { create: async (_hash: string, _email: string, _nonceHash: string) => {}, consume: async (_hash: string, _nonceHash: string) => null },
     email: { sendMagicLink: async () => {} },
   };
   // expose internals for assertions
