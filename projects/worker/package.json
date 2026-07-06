@@ -1,5 +1,5 @@
 {
-  "name": "sharedcache-worker",
+  "name": "wagmiphotos-worker",
   "private": true,
   "type": "module",
   "scripts": {

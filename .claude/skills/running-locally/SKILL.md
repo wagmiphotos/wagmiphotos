@@ -26,8 +26,8 @@ them again is harmless (and required on a fresh checkout — `.wrangler/` is git
 cd projects/worker
 npm install                                            # only if node_modules/ is missing
 cp .dev.vars.example .dev.vars                         # DEV_MODE=true — required for dev login + dev-open API
-npx wrangler d1 migrations apply sharedcache --local   # creates the D1 schema
-npx wrangler d1 execute sharedcache --local \          # seed the demo library
+npx wrangler d1 migrations apply wagmiphotos --local   # creates the D1 schema
+npx wrangler d1 execute wagmiphotos --local \          # seed the demo library
   --file ../../.claude/skills/running-locally/seed-demo.sql
 npx wrangler dev --local --port 8787 --ip 127.0.0.1    # long-running; start in background
 ```
