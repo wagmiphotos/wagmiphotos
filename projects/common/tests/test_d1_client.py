@@ -68,9 +68,12 @@ def test_insert_asset_binds_all_columns(monkeypatch):
     sql, params = calls[0]
     assert "INSERT INTO assets" in sql and "source_url" in sql
     assert params[0] == "i1" and 1 in params and "generated" in params
-    # 0007: no stored-URL columns are bound (source_url is the only survivor)
     columns = {c.strip() for c in sql.split("(", 1)[1].split(")", 1)[0].split(",")}
+    # 0007: no stored-URL columns are bound (source_url is the only survivor)
     assert not (columns & {"url", "thumb_url", "medium_url", "manifest_url"})
+    # model_used survives the slimming — the worker serves it (shared_cache
+    # + library publicAsset), so inserts must keep populating it.
+    assert "model_used" in columns and "m" in params
 
 def test_asset_exists(monkeypatch):
     c, calls = _client(monkeypatch, [[{"1": 1}], []])

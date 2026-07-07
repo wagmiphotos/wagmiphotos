@@ -193,6 +193,9 @@ async def test_generate_pass_writes_provenance_manifest():
     assert manifest["id"] == rec.id
     assert manifest["prompt"] == "popular"
     assert manifest["source"] == "generated"
+    # model_used flows from the generator into the inserted record (the worker
+    # serves it via shared_cache.model_used / library publicAsset)
+    assert rec.model_used and rec.model_used == manifest["model_used"]
     # the manifest still embeds the real URL returned by storage.put (ground truth)
     assert manifest["sizes"]["large"] == InMemoryStorage.BASE + asset_key("large", rec.id)
 

@@ -55,7 +55,9 @@ def _seed_query(conn, prompt="a fox", **overrides):
          row["generate"], row["attempts"], row["claimed_at"]])
 
 
-ASSET_PARAMS = ["a1", "a fox", "generated", None, "hash", 1024, 1024, "image/webp", None, 1]
+ASSET_PARAMS = ["a1", "a fox", "generated", None, "gpt-image-1", "hash", 1024, 1024,
+                "image/webp", None, 1]
+LOCALLY_CACHED_IDX = 10  # position of locally_cached in ASSET_PARAMS
 
 
 def test_pending_queries_sql_selects_and_filters(conn):
@@ -122,8 +124,11 @@ def test_insert_asset_and_asset_exists_sql(conn):
     conn.execute(d1_client.INSERT_ASSET_SQL, ASSET_PARAMS)
     assert conn.execute(d1_client.ASSET_EXISTS_SQL, ["a1"]).fetchall()
     assert not conn.execute(d1_client.ASSET_EXISTS_SQL, ["missing"]).fetchall()
-    row = conn.execute("SELECT source, locally_cached FROM assets WHERE id='a1'").fetchone()
-    assert row == ("generated", 1)
+    # model_used round-trips: the worker serves it (shared_cache.model_used,
+    # library publicAsset), so slim inserts must still populate it.
+    row = conn.execute("SELECT source, locally_cached, model_used FROM assets "
+                       "WHERE id='a1'").fetchone()
+    assert row == ("generated", 1, "gpt-image-1")
 
 
 def test_old_insert_asset_sql_with_url_fails_after_0007(conn):
@@ -139,7 +144,7 @@ def test_old_insert_asset_sql_with_url_fails_after_0007(conn):
 
 def test_rehost_sql_filters_attempts_and_increments(conn):
     params = list(ASSET_PARAMS)
-    params[9] = 0                                                 # locally_cached = 0
+    params[LOCALLY_CACHED_IDX] = 0
     conn.execute(d1_client.INSERT_ASSET_SQL, params)
     rows = conn.execute(d1_client.ASSETS_NEEDING_REHOST_SQL, [5]).fetchall()
     assert len(rows) == 1
@@ -150,7 +155,7 @@ def test_rehost_sql_filters_attempts_and_increments(conn):
 
 def test_mark_asset_rehosted_sql(conn):
     params = list(ASSET_PARAMS)
-    params[9] = 0
+    params[LOCALLY_CACHED_IDX] = 0
     conn.execute(d1_client.INSERT_ASSET_SQL, params)
     conn.execute(d1_client.MARK_ASSET_REHOSTED_SQL, [512, 512, "image/webp", "a1"])
     row = conn.execute("SELECT width, height, mime, locally_cached FROM assets "
