@@ -215,20 +215,23 @@ the loose ends to pick up when you resume. Full backlog + design trail: root
 Shards created (`wagmiphotos-bge-0/1/2`), drift check PASSED at cosine 1.0000
 (after forcing mean pooling — see the Resolved note in step 6), 1k PD12M rows
 seeded from the local parquet download (`seed_pd12m --metadata-dir`, shard
-balance 333/343/324), floors tuned 0.87/0.75 and deployed. Still owed from this
-task: a real `docker build` of the backfill image with `--extra model` on the
-GMI box (pulls CPU torch + BGE weights) — so far only verified via `uv sync`.
+balance 333/343/324), floors tuned 0.87/0.75 and deployed. The backfill image
+`docker build` with `--extra model` is now verified locally (2026-07-08): builds
+clean, runs as non-root `uid=10001`, and loads BGE + embeds a 768-d vector with
+no model-cache permission errors. That build first surfaced (and this session
+fixed) torch resolving to the full CUDA stack — `torch` is now pinned to the
+PyTorch CPU wheel index, cutting the image from 10.8GB to 2.71GB.
 
 ### During / right after deploy
 - **Re-probe the floor at scale**: 0.87/0.75 were tuned against the 1k seed;
   coincidental similarity creeps up as the pool grows toward 12.5M — re-run the
   probe after each big seed batch.
-- **Build-verify the non-root images** — they pass `docker build --check` but
-  were never built here (torch/BGE weights). On the box:
-  `cd deploy/gmi && docker compose up -d --build`, then
-  `docker compose exec backfill id` should print a non-root uid, and
-  `docker compose logs backfill` should show BGE weights loaded (no permission
-  errors on the model cache), using `uv run --no-sync`.
+- **Build-verify the non-root images** — ✅ DONE 2026-07-08. Built locally
+  (`docker build -f projects/backfill/Dockerfile`, image 2.71GB after the CPU
+  torch pin): runs as `uid=10001(appuser)`, and BGE loads + embeds a 768-d
+  vector via `uv run --no-sync` with no model-cache permission errors. Still
+  worth a smoke run on the box itself via `cd deploy/gmi && docker compose up
+  -d --build` to confirm the compose env_file + restart policy under real infra.
 
 ### Deferred hardening (none blocking; triage before real traffic)
 - **Backfill rehost:** 25 MB size cap is in; add a **host allowlist** once
