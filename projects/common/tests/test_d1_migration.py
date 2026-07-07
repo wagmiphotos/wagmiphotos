@@ -55,6 +55,19 @@ def _seed_query(conn, prompt="a fox", **overrides):
          row["generate"], row["attempts"], row["claimed_at"]])
 
 
+def _seed_uncached_asset(conn, asset_id):
+    params = list(ASSET_PARAMS)
+    params[0] = asset_id
+    params[LOCALLY_CACHED_IDX] = 0
+    conn.execute(d1_client.INSERT_ASSET_SQL, params)
+
+
+def _seed_demand(conn, prompt, asset_id, count):
+    _seed_query(conn, prompt, count=count)
+    conn.execute("UPDATE queries SET last_asset_id=? WHERE normalized_prompt=?",
+                 [asset_id, prompt])
+
+
 ASSET_PARAMS = ["a1", "a fox", "generated", None, "gpt-image-1", "hash", 1024, 1024,
                 "image/webp", None, 1]
 LOCALLY_CACHED_IDX = 10  # position of locally_cached in ASSET_PARAMS
@@ -143,14 +156,13 @@ def test_old_insert_asset_sql_with_url_fails_after_0007(conn):
 
 
 def test_rehost_sql_filters_attempts_and_increments(conn):
-    params = list(ASSET_PARAMS)
-    params[LOCALLY_CACHED_IDX] = 0
-    conn.execute(d1_client.INSERT_ASSET_SQL, params)
-    rows = conn.execute(d1_client.ASSETS_NEEDING_REHOST_SQL, [5]).fetchall()
+    _seed_uncached_asset(conn, "a1")
+    rows = conn.execute(d1_client.trickle_rehosts_sql(0), [5]).fetchall()
     assert len(rows) == 1
-    for _ in range(5):
-        conn.execute(d1_client.INCREMENT_REHOST_ATTEMPTS_SQL, ["a1"])
-    assert conn.execute(d1_client.ASSETS_NEEDING_REHOST_SQL, [5]).fetchall() == []
+    for i in range(5):
+        n = conn.execute(d1_client.INCREMENT_REHOST_ATTEMPTS_SQL, ["a1"]).fetchone()[0]
+        assert n == i + 1                    # RETURNING reports the new count
+    assert conn.execute(d1_client.trickle_rehosts_sql(0), [5]).fetchall() == []
 
 
 def test_mark_asset_rehosted_sql(conn):
@@ -190,3 +202,40 @@ def test_0008_view_and_index(conn):
     assert conn.execute("SELECT id FROM live_assets").fetchall() == [("a1",)]
     conn.execute("UPDATE assets SET dead_at=datetime('now') WHERE id='a1'")
     assert conn.execute("SELECT id FROM live_assets").fetchall() == []
+
+
+def test_demanded_rehosts_orders_by_summed_count(conn):
+    for aid in ("cold", "warm", "hot"):
+        _seed_uncached_asset(conn, aid)
+    _seed_demand(conn, "p1", "hot", 9)
+    _seed_demand(conn, "p2", "hot", 4)       # SUM(hot)=13
+    _seed_demand(conn, "p3", "warm", 5)
+    rows = conn.execute(d1_client.DEMANDED_REHOSTS_SQL, [5]).fetchall()
+    assert [r[0] for r in rows] == ["hot", "warm"]   # demand DESC; cold has none
+
+
+def test_trickle_sql_excludes_picked_ids(conn):
+    _seed_uncached_asset(conn, "a")
+    _seed_uncached_asset(conn, "b")
+    rows = conn.execute(d1_client.trickle_rehosts_sql(1), ["a", 5]).fetchall()
+    assert [r[0] for r in rows] == ["b"]
+
+
+def test_dead_assets_excluded_everywhere(conn):
+    _seed_uncached_asset(conn, "a1")
+    _seed_demand(conn, "p1", "a1", 5)
+    conn.execute(d1_client.MARK_ASSET_DEAD_SQL, ["http 404", "a1"])
+    assert conn.execute(d1_client.DEMANDED_REHOSTS_SQL, [5]).fetchall() == []
+    assert conn.execute(d1_client.trickle_rehosts_sql(0), [5]).fetchall() == []
+    assert conn.execute(d1_client.ASSET_EXISTS_SQL, ["a1"]).fetchall() == []
+    dead_at, reason = conn.execute(
+        "SELECT dead_at, dead_reason FROM assets WHERE id='a1'").fetchone()
+    assert dead_at is not None and reason == "http 404"
+
+
+def test_mark_asset_dead_idempotent_first_reason_wins(conn):
+    _seed_uncached_asset(conn, "a1")
+    conn.execute(d1_client.MARK_ASSET_DEAD_SQL, ["http 404", "a1"])
+    conn.execute(d1_client.MARK_ASSET_DEAD_SQL, ["retries exhausted", "a1"])
+    assert conn.execute(
+        "SELECT dead_reason FROM assets WHERE id='a1'").fetchone()[0] == "http 404"

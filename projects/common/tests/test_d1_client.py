@@ -80,23 +80,38 @@ def test_asset_exists(monkeypatch):
     assert c.asset_exists("i1") is True
     assert c.asset_exists("i2") is False
     sql, params = calls[0]
-    assert "FROM assets" in sql and params == ["i1"]
+    assert "FROM live_assets" in sql and params == ["i1"]
 
-def test_assets_needing_rehost_maps(monkeypatch):
-    rows = [[{"id": "i1", "prompt": "p", "source": "pd12m", "source_id": "7",
-              "model_used": "clip-vit-l-14", "content_hash": "pd12m-7", "width": 10, "height": 20,
-              "mime": "image/jpeg", "source_url": "https://ext/x.jpg", "locally_cached": 0}]]
-    c, calls = _client(monkeypatch, rows)
-    out = c.assets_needing_rehost(5)
-    assert len(out) == 1 and out[0].id == "i1" and out[0].locally_cached is False
-    assert out[0].source_url == "https://ext/x.jpg"
-    assert "rehost_attempts < 5" in calls[0][0]  # failing sources stop starving the queue
 
-def test_increment_rehost_attempts(monkeypatch):
-    c, calls = _client(monkeypatch, [[]])
-    c.increment_rehost_attempts("i1")
+def _rehost_row(id):
+    return {"id": id, "prompt": "p", "source": "pd12m", "source_id": "7",
+            "model_used": None, "content_hash": None, "width": 1, "height": 2,
+            "mime": "image/jpeg", "source_url": "https://ext/x.jpg", "locally_cached": 0}
+
+def test_assets_needing_rehost_demand_then_trickle(monkeypatch):
+    c, calls = _client(monkeypatch, [[_rehost_row("hot")], [_rehost_row("cold")]])
+    out = c.assets_needing_rehost(2)
+    assert [a.id for a in out] == ["hot", "cold"]
+    sql1, params1 = calls[0]
+    assert "ORDER BY q.demand DESC" in sql1 and "live_assets" in sql1 and params1 == [2]
+    sql2, params2 = calls[1]
+    assert "NOT IN (?)" in sql2 and "live_assets" in sql2 and params2 == ["hot", 1]
+
+def test_assets_needing_rehost_skips_trickle_when_demand_fills_batch(monkeypatch):
+    c, calls = _client(monkeypatch, [[_rehost_row("h1"), _rehost_row("h2")]])
+    out = c.assets_needing_rehost(2)
+    assert [a.id for a in out] == ["h1", "h2"]
+    assert len(calls) == 1                      # no trickle query issued
+
+def test_increment_rehost_attempts_returns_new_count(monkeypatch):
+    c, calls = _client(monkeypatch, [[{"rehost_attempts": 3}]])
+    assert c.increment_rehost_attempts("i1") == 3
     sql, params = calls[0]
-    assert "rehost_attempts=rehost_attempts+1" in sql and params == ["i1"]
+    assert "RETURNING rehost_attempts" in sql and params == ["i1"]
+
+def test_increment_rehost_attempts_missing_row_returns_zero(monkeypatch):
+    c, calls = _client(monkeypatch, [[]])
+    assert c.increment_rehost_attempts("ghost") == 0
 
 def test_mark_asset_rehosted_binds(monkeypatch):
     c, calls = _client(monkeypatch, [[]])
@@ -141,3 +156,10 @@ def test_existing_source_ids_chunks_under_d1_param_cap(monkeypatch):
     for sql, params in calls:
         assert len(params) <= 100                   # source + <=99 ids
     assert [p for _, params in calls for p in params if p != "pd12m"] == ids  # all ids queried once
+
+def test_mark_asset_dead_binds(monkeypatch):
+    c, calls = _client(monkeypatch, [[]])
+    c.mark_asset_dead("a1", "http 404")
+    sql, params = calls[0]
+    assert "dead_at=datetime('now')" in sql and "dead_at IS NULL" in sql
+    assert params == ["http 404", "a1"]

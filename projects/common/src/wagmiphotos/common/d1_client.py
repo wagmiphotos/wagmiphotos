@@ -52,15 +52,37 @@ INSERT_ASSET_SQL = (
     "INSERT INTO assets (id, prompt, source, source_id, model_used, content_hash, width, "
     "height, mime, source_url, locally_cached) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
 
-ASSET_EXISTS_SQL = "SELECT 1 FROM assets WHERE id=? LIMIT 1"
+ASSET_EXISTS_SQL = "SELECT 1 FROM live_assets WHERE id=? LIMIT 1"
 
-ASSETS_NEEDING_REHOST_SQL = (
-    "SELECT id, prompt, source, source_id, model_used, content_hash, width, height, mime, "
-    "source_url, locally_cached FROM assets "
-    f"WHERE locally_cached=0 AND rehost_attempts < {MAX_REHOST_ATTEMPTS} LIMIT ?")
+_REHOST_COLS = ("id, prompt, source, source_id, model_used, content_hash, width, height, "
+                "mime, source_url, locally_cached")
+
+# Demand-ranked rehost selection: start from the queries aggregate (one row per
+# unique prompt — small), join into live assets; never scans the assets table.
+DEMANDED_REHOSTS_SQL = (
+    "SELECT " + ", ".join(f"a.{c.strip()}" for c in _REHOST_COLS.split(",")) + " FROM ("
+    "SELECT last_asset_id AS id, SUM(count) AS demand FROM queries "
+    "WHERE last_asset_id IS NOT NULL GROUP BY last_asset_id) q "
+    "JOIN live_assets a ON a.id = q.id "
+    f"WHERE a.locally_cached=0 AND a.rehost_attempts < {MAX_REHOST_ATTEMPTS} "
+    "ORDER BY q.demand DESC LIMIT ?")
+
+
+def trickle_rehosts_sql(n_exclude: int) -> str:
+    """FIFO fallback for leftover batch slots; excludes already-picked ids."""
+    exclude = f" AND id NOT IN ({','.join('?' * n_exclude)})" if n_exclude else ""
+    return (f"SELECT {_REHOST_COLS} FROM live_assets "
+            f"WHERE locally_cached=0 AND rehost_attempts < {MAX_REHOST_ATTEMPTS}"
+            f"{exclude} LIMIT ?")
+
 
 INCREMENT_REHOST_ATTEMPTS_SQL = (
-    "UPDATE assets SET rehost_attempts=rehost_attempts+1 WHERE id=?")
+    "UPDATE assets SET rehost_attempts=rehost_attempts+1 WHERE id=? "
+    "RETURNING rehost_attempts")
+
+MARK_ASSET_DEAD_SQL = (
+    "UPDATE assets SET dead_at=datetime('now'), dead_reason=? "
+    "WHERE id=? AND dead_at IS NULL")
 
 MARK_ASSET_REHOSTED_SQL = (
     "UPDATE assets SET width=?, height=?, mime=?, locally_cached=1 WHERE id=?")
@@ -129,15 +151,25 @@ class D1Client:
         return bool(self._query(ASSET_EXISTS_SQL, [asset_id]))
 
     def assets_needing_rehost(self, limit: int) -> list[AssetRecord]:
-        rows = self._query(ASSETS_NEEDING_REHOST_SQL, [limit])
+        rows = self._query(DEMANDED_REHOSTS_SQL, [limit])
+        if len(rows) < limit:
+            picked = [r["id"] for r in rows]
+            rows += self._query(trickle_rehosts_sql(len(picked)),
+                                [*picked, limit - len(rows)])
         return [AssetRecord(
             id=r["id"], prompt=r["prompt"], model_used=r["model_used"], source=r["source"],
             source_id=r["source_id"], content_hash=r["content_hash"], width=r["width"],
             height=r["height"], mime=r["mime"], created_at="",
             source_url=r["source_url"], locally_cached=bool(r["locally_cached"])) for r in rows]
 
-    def increment_rehost_attempts(self, asset_id: str) -> None:
-        self._query(INCREMENT_REHOST_ATTEMPTS_SQL, [asset_id])
+    def increment_rehost_attempts(self, asset_id: str) -> int:
+        """Returns the post-increment attempt count (0 if the row is missing)."""
+        rows = self._query(INCREMENT_REHOST_ATTEMPTS_SQL, [asset_id])
+        return int(rows[0]["rehost_attempts"]) if rows else 0
+
+    def mark_asset_dead(self, asset_id: str, reason: str) -> None:
+        """Tombstone: idempotent, first reason wins (guarded by dead_at IS NULL)."""
+        self._query(MARK_ASSET_DEAD_SQL, [reason, asset_id])
 
     def mark_asset_rehosted(self, asset_id: str, *, width: int, height: int, mime: str) -> None:
         self._query(MARK_ASSET_REHOSTED_SQL, [width, height, mime, asset_id])
