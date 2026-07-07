@@ -43,7 +43,7 @@ IMAGE_PRICE_USD = "0.04"
 PUBLIC_SITE_URL = "https://wagmi.photos"           # canonical site origin (override per environment / .dev.vars)
 PUBLIC_API_BASE_URL = "https://api.wagmi.photos/v1"  # documented API base rendered into docs/examples
 GITHUB_REPO = "wagmiphotos/wagmiphotos"            # repo for the header star-count badge
-ASSET_BASE_URL = "https://f005.backblazeb2.com/file/wagmi-photos-library"  # B2 friendly-URL base; MUST equal backfill B2_PUBLIC_URL_BASE (bucket must be public-read)
+ASSET_BASE_URL = "https://images.wagmi.photos/file/wagmi-photos-library"  # CF-proxied B2 (free egress + cache rule); MUST equal backfill B2_PUBLIC_URL_BASE
 # Secrets (set with `wrangler secret put`): MASTER_API_KEY, RESEND_API_KEY
 
 [assets]
