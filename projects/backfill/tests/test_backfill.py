@@ -270,12 +270,13 @@ async def test_rehost_pass_skips_source_over_size_cap(monkeypatch):
 async def test_rehost_pass_failure_increments_attempts_and_logs(monkeypatch, caplog):
     d1, vec = FakeD1(), FakeVectorize()
     d1.rehost = [_rehost_rec()]
-    _patch_httpx(monkeypatch, status_code=404, chunks=[])
+    _patch_httpx(monkeypatch, status_code=500, chunks=[])
     with caplog.at_level(logging.ERROR):
         done = await _worker(d1, vec).rehost_pass()
     assert done == 0 and d1.rehost_marks == []
     assert d1.rehost_attempts["pd1"] == 1
     assert any("pd1" in r.getMessage() and r.exc_info for r in caplog.records)
+    assert d1.dead == {} and vec.deleted == []     # below budget: retry, don't tombstone
 
 def test_build_worker_from_settings_warns_on_stub_fallback(caplog, monkeypatch):
     from wagmiphotos.backfill.worker import build_worker_from_settings
@@ -346,3 +347,48 @@ async def test_run_once_logs_tick_failure(caplog):
     with caplog.at_level(logging.ERROR):
         await w.run(interval_seconds=0, once=True)
     assert any(r.exc_info for r in caplog.records)
+
+@pytest.mark.asyncio
+async def test_rehost_pass_tombstones_on_404(monkeypatch):
+    d1, vec = FakeD1(), FakeVectorize()
+    d1.rehost = [_rehost_rec()]
+    _patch_httpx(monkeypatch, status_code=404)
+    done = await _worker(d1, vec, batch_size=5).rehost_pass()
+    assert done == 0
+    assert d1.dead == {"pd1": "http 404"}
+    assert d1.rehost_attempts == {}                # gone-signal spends no attempt
+    assert vec.deleted == [["pd1"]]
+
+@pytest.mark.asyncio
+async def test_rehost_pass_tombstones_on_410(monkeypatch):
+    d1, vec = FakeD1(), FakeVectorize()
+    d1.rehost = [_rehost_rec()]
+    _patch_httpx(monkeypatch, status_code=410)
+    await _worker(d1, vec, batch_size=5).rehost_pass()
+    assert d1.dead == {"pd1": "http 410"}
+
+@pytest.mark.asyncio
+async def test_rehost_pass_tombstones_after_exhausted_retries(monkeypatch):
+    d1, vec = FakeD1(), FakeVectorize()
+    d1.rehost = [_rehost_rec()]
+    d1.rehost_attempts["pd1"] = 4                   # one failure away from the budget
+    _patch_httpx(monkeypatch, status_code=500)
+    done = await _worker(d1, vec, batch_size=5).rehost_pass()
+    assert done == 0
+    assert d1.rehost_attempts["pd1"] == 5
+    assert d1.dead == {"pd1": "retries exhausted"}
+    assert vec.deleted == [["pd1"]]
+
+@pytest.mark.asyncio
+async def test_vector_delete_failure_keeps_asset_dead_and_pass_alive(monkeypatch, caplog):
+    class ExplodingVec(FakeVectorize):
+        def delete(self, ids):
+            raise RuntimeError("vectorize down")
+    d1, vec = FakeD1(), ExplodingVec()
+    d1.rehost = [_rehost_rec(), _rehost_rec("pd2")]
+    _patch_httpx(monkeypatch, status_code=404)
+    with caplog.at_level(logging.ERROR):
+        done = await _worker(d1, vec, batch_size=5).rehost_pass()
+    assert done == 0
+    assert set(d1.dead) == {"pd1", "pd2"}           # D1-first: death sticks
+    assert "vector delete failed" in caplog.text

@@ -18,6 +18,7 @@ class FakeD1:
         self.claims: dict[str, str] = {}
         self.rehost_attempts: dict[str, int] = {}
         self.meta: dict[str, str] = {}
+        self.dead: dict[str, str] = {}
 
     # -- queries ----------------------------------------------------------
     def pending_queries(self, limit):
@@ -52,14 +53,20 @@ class FakeD1:
         self.inserted.append(rec); self.assets[rec.id] = rec
 
     def asset_exists(self, asset_id):
-        return asset_id in self.assets
+        return asset_id in self.assets and asset_id not in self.dead
 
     def assets_needing_rehost(self, limit):
-        out = [a for a in self.rehost if self.rehost_attempts.get(a.id, 0) < 5]
+        out = [a for a in self.rehost
+               if self.rehost_attempts.get(a.id, 0) < 5 and a.id not in self.dead]
         return out[:limit]
 
     def increment_rehost_attempts(self, asset_id):
         self.rehost_attempts[asset_id] = self.rehost_attempts.get(asset_id, 0) + 1
+        return self.rehost_attempts[asset_id]
+
+    def mark_asset_dead(self, asset_id, reason):
+        self.dead.setdefault(asset_id, reason)      # idempotent, first reason wins
+        self.rehost = [a for a in self.rehost if a.id != asset_id]
 
     def mark_asset_rehosted(self, asset_id, *, width, height, mime):
         self.rehost_marks.append((asset_id, {"width": width, "height": height, "mime": mime}))
@@ -83,6 +90,7 @@ class FakeVectorize:
         self.vectors: dict[str, dict] = {}   # id -> {"values","metadata"}
         self._forced: dict[str, float] = {}   # id -> score for next query
         self.insert_calls = 0
+        self.deleted: list[list[str]] = []
     def set_score(self, id: str, score: float):
         self._forced[id] = score
     def query(self, values, top_k=1):
@@ -96,3 +104,7 @@ class FakeVectorize:
         self.insert_calls += 1
         for v in vectors:
             self.vectors[v["id"]] = {"values": v["values"], "metadata": v.get("metadata", {})}
+    def delete(self, ids):
+        self.deleted.append(list(ids))
+        for id in ids:
+            self.vectors.pop(id, None)

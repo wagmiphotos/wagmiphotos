@@ -3,7 +3,7 @@ import logging
 import uuid
 
 from wagmiphotos.common.asset_paths import asset_key
-from wagmiphotos.common.d1_client import QueryRow
+from wagmiphotos.common.d1_client import MAX_REHOST_ATTEMPTS, QueryRow
 from wagmiphotos.common.floor import DEFAULT_CACHE_TOLERANCE, similarity_floor
 from wagmiphotos.common.models import AssetRecord
 from wagmiphotos.generation.processor import derive_sizes, dimensions
@@ -19,6 +19,10 @@ SPEND_META_KEY = "backfill_lifetime_spend_usd"
 
 # Keep last_error readable: a stack-trace-sized blob helps nobody in a TEXT column.
 _MAX_ERROR_CHARS = 500
+
+
+class SourceGone(Exception):
+    """The rehost source returned a definitive gone-signal (HTTP 404/410)."""
 
 
 def _error_text(e: Exception) -> str:
@@ -137,6 +141,8 @@ class BackfillWorker:
         """Stream a download, aborting once it exceeds the rehost size cap."""
         buf = bytearray()
         async with client.stream("GET", url, follow_redirects=True, timeout=20.0) as resp:
+            if resp.status_code in (404, 410):
+                raise SourceGone(f"http {resp.status_code}")
             if resp.status_code != 200:
                 raise RuntimeError(f"download {resp.status_code}")
             async for chunk in resp.aiter_bytes():
@@ -162,12 +168,26 @@ class BackfillWorker:
                     self._storage.put(asset_key("thumb", rec.id), sizes["thumb"], "image/webp")
                     self._d1.mark_asset_rehosted(rec.id, width=w, height=h, mime="image/webp")
                     done += 1
+                except SourceGone as e:
+                    # Definitive gone-signal: tombstone now, spend no retry budget.
+                    logger.warning("source gone for asset %s (%s)", rec.id, e)
+                    self._tombstone(rec.id, str(e))
                 except Exception:
                     logger.exception("rehost failed for asset %s", rec.id)
                     # Budgeted retries: a permanently failing source stops
                     # blocking the head of the rehost queue.
-                    self._d1.increment_rehost_attempts(rec.id)
+                    if self._d1.increment_rehost_attempts(rec.id) >= MAX_REHOST_ATTEMPTS:
+                        self._tombstone(rec.id, "retries exhausted")
         return done
+
+    def _tombstone(self, asset_id: str, reason: str) -> None:
+        # D1 first: the asset stops being served/matched even if the vector
+        # delete fails — the Worker match path skips orphan vectors.
+        self._d1.mark_asset_dead(asset_id, reason)
+        try:
+            self._vec.delete([asset_id])
+        except Exception:
+            logger.exception("vector delete failed for dead asset %s", asset_id)
 
     async def tick(self) -> dict:
         return {"generated": await self.generate_pass(), "rehosted": await self.rehost_pass()}
