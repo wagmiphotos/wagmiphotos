@@ -1781,6 +1781,9 @@
       background: var(--card);
     }
 
+    .view-original-link { display: inline-block; margin-bottom: 12px; font-size: 0.8125rem; color: var(--muted); text-decoration: underline; }
+    .view-original-link:hover { color: var(--ink); }
+
     .details-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -3019,6 +3022,8 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
                 </div>
               </div>
 
+              <a id="view-original" class="view-original-link" target="_blank" rel="noopener" hidden>View original ↗</a>
+
               <button class="btn" style="height: 38px; font-size: 0.8125rem; background: var(--paper); border: 1px solid var(--line); color: var(--ink);" onclick="viewProvenance()">
                 View provenance manifest
               </button>
@@ -3245,7 +3250,8 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
     <span class="tk-key">"cost_saved_usd"</span>: <span class="tk-num">0.04</span>,
     <span class="tk-key">"model_used"</span>: <span class="tk-str">"flux-schnell"</span>,
     <span class="tk-key">"source"</span>: <span class="tk-str">"pd12m"</span>,
-    <span class="tk-key">"sizes"</span>: { <span class="tk-key">"thumb"</span>: <span class="tk-str">"…"</span>, <span class="tk-key">"medium"</span>: <span class="tk-str">"…"</span>, <span class="tk-key">"large"</span>: <span class="tk-str">"…"</span> }
+    <span class="tk-key">"sizes"</span>: { <span class="tk-key">"thumb"</span>: <span class="tk-str">"…"</span>, <span class="tk-key">"medium"</span>: <span class="tk-str">"…"</span>, <span class="tk-key">"large"</span>: <span class="tk-str">"…"</span> },
+    <span class="tk-key">"original_url"</span>: <span class="tk-str">"https://pd12m.s3.us-west-2.amazonaws.com/…"</span>
   }
 }</pre>
 
@@ -4111,12 +4117,15 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       const thumb = img.thumb_url || img.medium_url || img.url;
       const tags = [img.model_used, img.source].filter(Boolean)
         .map(t => '<span class="library-tag">' + escapeHtml(t) + '</span>').join('');
+      const original = img.original_url
+        ? '<a class="library-download" href="' + escapeHtml(img.original_url) + '" target="_blank" rel="noopener">Original ↗</a>'
+        : '';
       return '<div class="library-card">' +
         '<img class="library-thumb" loading="lazy" src="' + escapeHtml(thumb) + '" alt="' + escapeHtml(img.prompt) + '">' +
         '<div class="library-meta">' +
           '<p class="library-prompt" title="' + escapeHtml(img.prompt) + '">' + escapeHtml(img.prompt) + '</p>' +
           '<div class="library-tags">' + tags + '</div>' +
-          '<a class="library-download" href="/v1/library/' + encodeURIComponent(img.id) + '/download">Download</a>' +
+          '<a class="library-download" href="/v1/library/' + encodeURIComponent(img.id) + '/download">Download</a>' + original +
         '</div></div>';
     }
 
@@ -4370,6 +4379,15 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         document.getElementById('val-model').textContent = sc.model_used ?? '—';
         document.getElementById('val-provider').textContent = sc.source ?? '—';
         document.getElementById('val-latency').textContent = `${latency}ms`;
+
+        const viewOriginal = document.getElementById('view-original');
+        if (sc.original_url) {
+          viewOriginal.href = sc.original_url;
+          viewOriginal.hidden = false;
+        } else {
+          viewOriginal.hidden = true;
+          viewOriginal.removeAttribute('href');
+        }
 
         currentManifest = {
           client_prompt: promptVal,
