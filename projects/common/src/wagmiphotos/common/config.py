@@ -26,7 +26,8 @@ class Settings(BaseSettings):
     cf_account_id: str | None = None
     cf_api_token: str | None = None
     d1_database_id: str | None = None
-    vectorize_index_name: str | None = None
+    vectorize_index_prefix: str = "wagmiphotos-bge-"
+    vectorize_shards: int = 3
     bge_model_name: str = BGE_MODEL
     floor_sim_max: float = 0.90
     floor_sim_min: float = 0.72

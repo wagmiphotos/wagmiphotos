@@ -31,6 +31,14 @@ def test_config_defaults_match_contract():
     assert s.bge_model_name == CONTRACT["bge_model_sentence_transformers"]
 
 
+def test_vectorize_config_matches_contract():
+    # Explicit _env_file=None isolation per test_config.py convention: these
+    # fields must reflect the shipped defaults, not a developer's local .env.
+    s = Settings(_env_file=None)
+    assert s.vectorize_index_prefix == CONTRACT["vectorize_index_prefix"]
+    assert s.vectorize_shards == CONTRACT["vectorize_shards"]
+
+
 def test_bge_model_matches_contract():
     assert bge.BGE_MODEL == CONTRACT["bge_model_sentence_transformers"]
 

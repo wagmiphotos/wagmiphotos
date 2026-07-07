@@ -136,7 +136,8 @@ def build_clients(settings: Settings) -> tuple:
 
     vectorize = VectorizeClient(
         account_id=settings.cf_account_id,
-        index_name=settings.vectorize_index_name,
+        index_prefix=settings.vectorize_index_prefix,
+        shards=settings.vectorize_shards,
         api_token=settings.cf_api_token,
         dims=settings.embedding_dims,
     )

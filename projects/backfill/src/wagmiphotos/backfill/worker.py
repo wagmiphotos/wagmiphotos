@@ -215,7 +215,7 @@ def build_worker_from_settings(s) -> "BackfillWorker":
         generator = StubGenerator(storage)
     embedder = BgeEmbedder.from_pretrained(s.bge_model_name)
     d1 = D1Client(s.cf_account_id, s.d1_database_id, s.cf_api_token)
-    vec = VectorizeClient(s.cf_account_id, s.vectorize_index_name, s.cf_api_token,
+    vec = VectorizeClient(s.cf_account_id, s.vectorize_index_prefix, s.vectorize_shards, s.cf_api_token,
                           dims=s.embedding_dims)
     return BackfillWorker(d1, vec, embedder, generator, storage, model=model,
                           floor_sim_max=s.floor_sim_max, floor_sim_min=s.floor_sim_min,

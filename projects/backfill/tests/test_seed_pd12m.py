@@ -122,7 +122,7 @@ def test_build_clients_uses_correct_settings_attrs_and_kwargs(monkeypatch):
 
     monkeypatch.setattr(BgeEmbedder, "from_pretrained", classmethod(lambda cls, model_name: FakeEmbedder()))
     settings = Settings(
-        cf_account_id="a", d1_database_id="d", vectorize_index_name="i",
-        cf_api_token="t")
+        cf_account_id="a", d1_database_id="d", vectorize_index_prefix="wagmiphotos-bge-",
+        vectorize_shards=3, cf_api_token="t")
     d1, vectorize, embedder = seed_pd12m.build_clients(settings)
     assert d1 is not None and vectorize is not None and embedder is not None

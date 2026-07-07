@@ -17,10 +17,13 @@ class _FakeClient:
     def close(self):
         self.closed = True
 
-def _vectorize(monkeypatch, responses, **kw):
+def _vectorize(monkeypatch, responses, shards=1, **kw):
     fake = _FakeClient(responses)
     monkeypatch.setattr(httpx, "Client", lambda *a, **k: fake)
-    return VectorizeClient("acct", "idx", "tok", **kw), fake
+    return VectorizeClient("acct", "wagmiphotos-bge-", shards, "tok", **kw), fake
+
+def _ok(result=None):
+    return _Resp({"success": True, "result": result or {}})
 
 def test_query_posts_vector_and_parses(monkeypatch):
     v, fake = _vectorize(monkeypatch, [_Resp({"success": True, "result": {"matches": [
@@ -28,7 +31,7 @@ def test_query_posts_vector_and_parses(monkeypatch):
     out = v.query([0.1] * 768, top_k=1)
     assert out == [{"id": "a1", "score": 0.31}]
     url, kw = fake.calls[0]
-    assert "idx/query" in url and kw["json"]["topK"] == 1
+    assert "wagmiphotos-bge-0/query" in url and kw["json"]["topK"] == 1
     assert kw["json"]["returnMetadata"] == "none"  # only id/score are consumed
 
 def test_client_is_shared_across_requests(monkeypatch):
@@ -94,3 +97,61 @@ def test_close_closes_shared_client(monkeypatch):
     v, fake = _vectorize(monkeypatch, [])
     v.close()
     assert fake.closed is True
+
+# -- sharding: routing, grouping, fan-out + merge ---------------------------
+# Shard assignments below (demo-1 -> 0, demo-3 -> 1, pd12m-8492731 -> 2) are
+# pinned by contract.json shard_fixtures / test_contract.py, not re-derived here.
+
+def test_upsert_routes_by_shard(monkeypatch):
+    v, fake = _vectorize(monkeypatch, [_ok(), _ok()], shards=3)
+    v.upsert("demo-1", [0.0] * 768, {})          # fnv1a32 % 3 == 0
+    v.upsert("pd12m-8492731", [0.0] * 768, {})   # fnv1a32 % 3 == 2
+    assert "wagmiphotos-bge-0/upsert" in fake.calls[0][0]
+    assert "wagmiphotos-bge-2/upsert" in fake.calls[1][0]
+
+def test_insert_many_groups_per_shard(monkeypatch):
+    v, fake = _vectorize(monkeypatch, [_ok(), _ok()], shards=3)
+    v.insert_many([
+        {"id": "demo-1", "values": [0.0] * 768, "metadata": {}},  # shard 0
+        {"id": "demo-3", "values": [0.0] * 768, "metadata": {}},  # shard 1
+    ])
+    assert len(fake.calls) == 2  # exactly one REST call per non-empty shard
+
+    shard0_call = next(c for c in fake.calls if "wagmiphotos-bge-0" in c[0])
+    shard1_call = next(c for c in fake.calls if "wagmiphotos-bge-1" in c[0])
+    assert json.loads(shard0_call[1]["content"].decode().strip())["id"] == "demo-1"
+    assert json.loads(shard1_call[1]["content"].decode().strip())["id"] == "demo-3"
+
+def test_insert_many_skips_empty_shards(monkeypatch):
+    # All items route to the same shard -> only that shard gets a REST call.
+    v, fake = _vectorize(monkeypatch, [_ok()], shards=3)
+    v.insert_many([
+        {"id": "demo-1", "values": [0.0] * 768, "metadata": {}},
+        {"id": "demo-2", "values": [0.0] * 768, "metadata": {}},  # also shard 0
+    ])
+    assert len(fake.calls) == 1
+    assert "wagmiphotos-bge-0" in fake.calls[0][0]
+
+def test_query_fans_out_to_every_shard_and_merges_desc(monkeypatch):
+    responses = [
+        _ok({"matches": [{"id": "a", "score": 0.91}]}),   # shard 0
+        _ok({"matches": [{"id": "c", "score": 0.95}]}),   # shard 1
+        _ok({"matches": [{"id": "d", "score": 0.80}]}),   # shard 2
+    ]
+    v, fake = _vectorize(monkeypatch, responses, shards=3)
+    out = v.query([0.0] * 768, top_k=2)
+    assert len(fake.calls) == 3  # every shard queried, full top_k each
+    assert [m["id"] for m in out] == ["c", "a"]  # merged, sorted desc, sliced to top_k
+
+def test_query_merge_keeps_max_score_when_earlier_shard_scores_higher(monkeypatch):
+    # Same id returned by two shards with different scores. The higher score
+    # comes from the EARLIER shard (0), the lower one from a LATER shard (1).
+    # A last-write-wins merge would wrongly clobber 0.95 with 0.40; max-score
+    # merge must keep 0.95.
+    responses = [
+        _ok({"matches": [{"id": "a", "score": 0.95}]}),   # shard 0: higher
+        _ok({"matches": [{"id": "a", "score": 0.40}]}),   # shard 1: lower, same id
+    ]
+    v, fake = _vectorize(monkeypatch, responses, shards=2)
+    out = v.query([0.0] * 768, top_k=1)
+    assert out == [{"id": "a", "score": 0.95}]

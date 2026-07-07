@@ -33,11 +33,13 @@ def test_bge_model_name_default_is_the_bge_module_constant():
     assert Settings(_env_file=None).bge_model_name == BGE_MODEL
 
 def test_cf_and_floor_defaults(monkeypatch):
-    for k in ("CF_ACCOUNT_ID","CF_API_TOKEN","D1_DATABASE_ID","VECTORIZE_INDEX_NAME",
+    for k in ("CF_ACCOUNT_ID","CF_API_TOKEN","D1_DATABASE_ID",
+              "VECTORIZE_INDEX_PREFIX","VECTORIZE_SHARDS",
               "FLOOR_SIM_MAX","FLOOR_SIM_MIN"):
         monkeypatch.delenv(k, raising=False)
     from wagmiphotos.common.config import Settings
     s = Settings(_env_file=None)
     assert s.cf_account_id is None and s.d1_database_id is None
-    assert s.vectorize_index_name is None
+    assert s.vectorize_index_prefix == "wagmiphotos-bge-"
+    assert s.vectorize_shards == 3
     assert s.floor_sim_max == 0.90 and s.floor_sim_min == 0.72
