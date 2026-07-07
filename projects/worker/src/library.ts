@@ -1,18 +1,23 @@
 import type { Services, LibraryAssetRow } from "./types";
+import { assetUrls } from "./asset-urls";
+
+export interface LibraryCfg { assetBaseUrl?: string; }
 
 // The documented public shape for a library image (spec §GET /v1/library).
-// Internal columns (source_id, source_url, locally_cached) are intentionally dropped.
-function publicAsset(r: LibraryAssetRow) {
+// Internal columns (source_id, source_url, locally_cached) are intentionally dropped;
+// the URL fields are derived (Task 10 / migration 0007).
+function publicAsset(r: LibraryAssetRow, baseUrl: string | undefined) {
+  const u = assetUrls(r, baseUrl);
   return {
-    id: r.id, prompt: r.prompt, thumb_url: r.thumb_url, medium_url: r.medium_url,
-    url: r.url, width: r.width, height: r.height, mime: r.mime,
+    id: r.id, prompt: r.prompt, thumb_url: u.thumb_url, medium_url: u.medium_url,
+    url: u.url, width: r.width, height: r.height, mime: r.mime,
     model_used: r.model_used, source: r.source, created_at: r.created_at,
   };
 }
 
 const MAX_Q_LEN = 200;
 
-export async function handleLibrarySearch(url: URL, s: Services): Promise<Response> {
+export async function handleLibrarySearch(url: URL, s: Services, cfg: LibraryCfg): Promise<Response> {
   const q = url.searchParams.get("q") ?? "";
   if (q.length > MAX_Q_LEN) {
     return Response.json({ error: `q must be at most ${MAX_Q_LEN} characters` }, { status: 400 });
@@ -37,7 +42,7 @@ export async function handleLibrarySearch(url: URL, s: Services): Promise<Respon
 
   const rows = await s.assets.searchAssets({ q, limit: limit + 1, offset });
   const has_more = rows.length > limit;
-  return Response.json({ images: rows.slice(0, limit).map(publicAsset), has_more });
+  return Response.json({ images: rows.slice(0, limit).map((r) => publicAsset(r, cfg.assetBaseUrl)), has_more });
 }
 
 const MIME_EXT: Record<string, string> = {
@@ -65,14 +70,16 @@ export function assetFilename(
 export async function handleLibraryDownload(
   id: string,
   s: Services,
+  cfg: LibraryCfg,
   fetchFn: (url: string) => Promise<Response>
 ): Promise<Response> {
   const asset = await s.assets.getAsset(id);
   if (!asset) return Response.json({ error: "not found" }, { status: 404 });
 
+  const u = assetUrls(asset, cfg.assetBaseUrl);
   let upstream: Response;
   try {
-    upstream = await fetchFn(asset.url);
+    upstream = await fetchFn(u.url);
   } catch {
     return Response.json({ error: "upstream fetch failed" }, { status: 502 });
   }

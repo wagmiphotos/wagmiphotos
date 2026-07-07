@@ -2,9 +2,10 @@ import type { Services, AssetRow, Match } from "./types";
 import { similarityFloor } from "./floor";
 import { normalizePrompt } from "./normalize";
 import { sha256Hex } from "./auth";
+import { assetUrls } from "./asset-urls";
 
 export interface GenBody { prompt: string; n?: number; size?: string; cache_tolerance?: number; generate_on_miss?: boolean; }
-export interface GenCfg { floorSimMax: number; floorSimMin: number; imagePrice: number; now: () => number; }
+export interface GenCfg { floorSimMax: number; floorSimMin: number; imagePrice: number; now: () => number; assetBaseUrl?: string; }
 
 /** Default cache_tolerance (contract.json: default_cache_tolerance). */
 export const DEFAULT_CACHE_TOLERANCE = 0.15;
@@ -70,9 +71,10 @@ export async function handleGenerate(body: GenBody, s: Services, cfg: GenCfg): P
       normalized, original: prompt, assetId: asset.id, similarity: best.score, built: isHit, generate: generateOnMiss,
     });
   } catch (e) { console.error("recordQuery failed", e); } // demand write failed: nothing queued
+  const u = assetUrls(asset, cfg.assetBaseUrl);
   return Response.json({
     created: cfg.now(),
-    data: [{ url: asset.url }],
+    data: [{ url: u.url }],
     shared_cache: {
       result,
       similarity: best.score,
@@ -80,7 +82,7 @@ export async function handleGenerate(body: GenBody, s: Services, cfg: GenCfg): P
       cost_saved_usd: isHit ? cfg.imagePrice : 0,
       model_used: asset.model_used,
       source: asset.source,
-      sizes: { thumb: asset.thumb_url, medium: asset.medium_url, large: asset.url },
+      sizes: { thumb: u.thumb_url, medium: u.medium_url, large: u.url },
       ...(isHit ? {} : { generation_queued: generationQueued }),
     },
   });

@@ -4,11 +4,12 @@ import { fakeServices } from "./fakes";
 import { sha256Hex } from "../src/auth";
 import type { AssetRow } from "../src/types";
 
-const cfg = { floorSimMax: 0.35, floorSimMin: 0.18, imagePrice: 0.04, now: () => 1000 };
+const BASE = "https://cdn.example.com";
+const cfg = { floorSimMax: 0.35, floorSimMin: 0.18, imagePrice: 0.04, now: () => 1000, assetBaseUrl: BASE };
 
 function asset(over: Partial<AssetRow> = {}): AssetRow {
-  return { id: "a1", prompt: "p", source: "pd12m", source_id: "7", thumb_url: "T", medium_url: "M",
-    url: "https://cdn/large.webp", model_used: "clip-vit-l-14", width: 10, height: 20,
+  return { id: "a1", prompt: "p", source: "pd12m", source_id: "7",
+    model_used: "clip-vit-l-14", width: 10, height: 20,
     mime: "image/webp", source_url: "https://ext/x.jpg", locally_cached: 1, ...over };
 }
 
@@ -58,10 +59,12 @@ it("hit: score >= floor, cached -> result hit + cost saved", async () => {
   const res = await handleGenerate({ prompt: "a fox", cache_tolerance: 0.15 }, s, cfg);
   const j: any = await res.json();
   expect(res.status).toBe(200);
-  expect(j.data[0].url).toBe("https://cdn/large.webp");
+  expect(j.data[0].url).toBe(`${BASE}/assets/a1/image.webp`);
   expect(j.shared_cache.result).toBe("hit");
   expect(j.shared_cache.cost_saved_usd).toBe(0.04);
-  expect(j.shared_cache.sizes).toEqual({ thumb: "T", medium: "M", large: "https://cdn/large.webp" });
+  expect(j.shared_cache.sizes).toEqual({
+    thumb: `${BASE}/assets/a1/thumb.webp`, medium: `${BASE}/assets/a1/medium.webp`, large: `${BASE}/assets/a1/image.webp`,
+  });
   expect(j.shared_cache.model_used).toBe("clip-vit-l-14");
   expect(j.shared_cache.source).toBe("pd12m");
   expect(j.shared_cache.similarity).toBe(0.40);
@@ -71,7 +74,7 @@ it("hit: score >= floor, cached -> result hit + cost saved", async () => {
 
 it("hit-not-rehosted: serves source_url, still result hit", async () => {
   const s = fakeServices();
-  (s as any)._assets.set("a1", asset({ locally_cached: 0, url: "https://ext/x.jpg", thumb_url: null, medium_url: null }));
+  (s as any)._assets.set("a1", asset({ locally_cached: 0 }));
   (s as any)._matches.push({ id: "a1", score: 0.40 });
   const res = await handleGenerate({ prompt: "a fox" }, s, cfg);
   const j: any = await res.json();
@@ -99,7 +102,7 @@ it("hit: recordQuery throws -> logging is best-effort, still 200 with asset url"
   const res = await handleGenerate({ prompt: "a fox", cache_tolerance: 0.15 }, s, cfg);
   const j: any = await res.json();
   expect(res.status).toBe(200);
-  expect(j.data[0].url).toBe("https://cdn/large.webp");
+  expect(j.data[0].url).toBe(`${BASE}/assets/a1/image.webp`);
   expect(j.shared_cache.result).toBe("hit");
 });
 
@@ -197,12 +200,12 @@ it("orphan tolerance: queries topK 3 and serves the first match with a live asse
   ];
   (s as any).vectorize = { query: async (_v: number[], topK: number) => { topKSeen = topK; return matches; } };
   (s as any)._assets.set("a1", asset());
-  (s as any)._assets.set("a2", asset({ id: "a2", url: "https://cdn/other.webp" }));
+  (s as any)._assets.set("a2", asset({ id: "a2" }));
   const res = await handleGenerate({ prompt: "a fox" }, s, cfg);
   expect(topKSeen).toBe(3);
   expect(res.status).toBe(200);
   const j: any = await res.json();
-  expect(j.data[0].url).toBe("https://cdn/large.webp"); // a1, not the orphan and not a2
+  expect(j.data[0].url).toBe(`${BASE}/assets/a1/image.webp`); // a1, not the orphan and not a2
   expect(j.shared_cache.result).toBe("hit");
   expect(j.shared_cache.similarity).toBe(0.40); // score of the served match, not the orphan's
 });

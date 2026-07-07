@@ -43,6 +43,7 @@ IMAGE_PRICE_USD = "0.04"
 PUBLIC_SITE_URL = "https://wagmi.photos"           # canonical site origin (override per environment / .dev.vars)
 PUBLIC_API_BASE_URL = "https://api.wagmi.photos/v1"  # documented API base rendered into docs/examples
 GITHUB_REPO = "wagmiphotos/wagmiphotos"            # repo for the header star-count badge
+# ASSET_BASE_URL = ""  # B2/CDN origin for locally_cached=1 assets (contract.json asset_paths); set at deploy, not here
 # Secrets (set with `wrangler secret put`): MASTER_API_KEY, RESEND_API_KEY
 
 [assets]

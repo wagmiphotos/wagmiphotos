@@ -97,9 +97,11 @@ export default {
         return await handleDeleteKey(id, request, env, services);
       }
 
+      const libraryCfg = { assetBaseUrl: env.ASSET_BASE_URL };
+
       if (url.pathname === "/v1/library" && request.method === "GET") {
         if (!(await resolveApiPrincipal(request, env, services))) return Response.json({ error: "login required" }, { status: 401 });
-        return await handleLibrarySearch(url, services);
+        return await handleLibrarySearch(url, services, libraryCfg);
       }
 
       const dl = url.pathname.match(/^\/v1\/library\/([^/]+)\/download$/);
@@ -111,7 +113,7 @@ export default {
         } catch {
           return new Response("Not found", { status: 404 });
         }
-        return await handleLibraryDownload(id, services, (u) => fetch(u));
+        return await handleLibraryDownload(id, services, libraryCfg, (u) => fetch(u));
       }
 
       if (url.pathname === "/v1/keys/generate" && request.method === "POST") {
@@ -139,6 +141,7 @@ export default {
           floorSimMin: numEnv(env.FLOOR_SIM_MIN, FLOOR_SIM_MIN),
           imagePrice: numEnv(env.IMAGE_PRICE_USD, 0.04),
           now: () => Math.floor(Date.now() / 1000),
+          assetBaseUrl: env.ASSET_BASE_URL,
         };
         return await handleGenerate(body, services, cfg);
       }

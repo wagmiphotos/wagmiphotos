@@ -2,7 +2,6 @@ import type { EmailSender } from "./email";
 
 export interface AssetRow {
   id: string; prompt: string; source: string; source_id: string | null;
-  thumb_url: string | null; medium_url: string | null; url: string;
   model_used: string | null; width: number | null; height: number | null;
   mime: string | null; source_url: string | null; locally_cached: number;
 }
@@ -62,4 +61,6 @@ export interface Env {
   GITHUB_REPO?: string;
   RESEND_API_KEY?: string; EMAIL_FROM?: string;
   PUBLIC_SITE_URL?: string; PUBLIC_API_BASE_URL?: string;
+  /** Base URL for locally_cached asset objects (B2/CDN origin); see asset-urls.ts. */
+  ASSET_BASE_URL?: string;
 }

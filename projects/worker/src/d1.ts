@@ -4,7 +4,7 @@ import type {
 } from "./types";
 
 const ASSET_COLS =
-  "id, prompt, source, source_id, thumb_url, medium_url, url, model_used, width, height, mime, source_url, locally_cached";
+  "id, prompt, source, source_id, model_used, width, height, mime, source_url, locally_cached";
 
 function escapeLike(s: string): string {
   return s.replace(/[\\%_]/g, (c) => "\\" + c);

@@ -3,16 +3,19 @@ import { handleLibrarySearch, handleLibraryDownload, assetFilename } from "../sr
 import { fakeServices } from "./fakes";
 import type { LibraryAssetRow } from "../src/types";
 
+const BASE = "https://cdn.example.com";
+const cfg = { assetBaseUrl: BASE };
+
 function libRow(over: Partial<LibraryAssetRow> = {}): LibraryAssetRow {
-  return { id: "a1", prompt: "a fox", source: "pd12m", source_id: null, thumb_url: "T",
-    medium_url: "M", url: "https://cdn/large.webp", model_used: "flux", width: 10, height: 20,
+  return { id: "a1", prompt: "a fox", source: "pd12m", source_id: null,
+    model_used: "flux", width: 10, height: 20,
     mime: "image/webp", source_url: null, locally_cached: 1, created_at: "2026-07-03 00:00:00", ...over };
 }
 
 it("search: defaults q='' limit 24 offset 0, fetches limit+1", async () => {
   const s = fakeServices();
   (s as any)._libraryRows.push(libRow());
-  const res = await handleLibrarySearch(new URL("https://x/v1/library"), s);
+  const res = await handleLibrarySearch(new URL("https://x/v1/library"), s, cfg);
   const j: any = await res.json();
   expect(res.status).toBe(200);
   expect(j.images).toHaveLength(1);
@@ -23,15 +26,15 @@ it("search: defaults q='' limit 24 offset 0, fetches limit+1", async () => {
 it("search: response projects to documented public shape, omits internal columns", async () => {
   const s = fakeServices();
   (s as any)._libraryRows.push(libRow());
-  const res = await handleLibrarySearch(new URL("https://x/v1/library"), s);
+  const res = await handleLibrarySearch(new URL("https://x/v1/library"), s, cfg);
   const j: any = await res.json();
   const img = j.images[0];
   expect(img).not.toHaveProperty("source_id");
   expect(img).not.toHaveProperty("source_url");
   expect(img).not.toHaveProperty("locally_cached");
   expect(img).toEqual({
-    id: "a1", prompt: "a fox", thumb_url: "T", medium_url: "M",
-    url: "https://cdn/large.webp", width: 10, height: 20, mime: "image/webp",
+    id: "a1", prompt: "a fox", thumb_url: `${BASE}/assets/a1/thumb.webp`, medium_url: `${BASE}/assets/a1/medium.webp`,
+    url: `${BASE}/assets/a1/image.webp`, width: 10, height: 20, mime: "image/webp",
     model_used: "flux", source: "pd12m", created_at: "2026-07-03 00:00:00",
   });
 });
@@ -39,7 +42,7 @@ it("search: response projects to documented public shape, omits internal columns
 it("search: has_more true when a full extra row exists, images trimmed to limit", async () => {
   const s = fakeServices();
   for (let i = 0; i < 25; i++) (s as any)._libraryRows.push(libRow({ id: "a" + i }));
-  const res = await handleLibrarySearch(new URL("https://x/v1/library"), s);
+  const res = await handleLibrarySearch(new URL("https://x/v1/library"), s, cfg);
   const j: any = await res.json();
   expect(j.images).toHaveLength(24);
   expect(j.has_more).toBe(true);
@@ -47,19 +50,19 @@ it("search: has_more true when a full extra row exists, images trimmed to limit"
 
 it("search: passes q and offset through, clamps numeric limit to 1..60", async () => {
   const s = fakeServices();
-  await handleLibrarySearch(new URL("https://x/v1/library?q=fox&limit=999&offset=48"), s);
+  await handleLibrarySearch(new URL("https://x/v1/library?q=fox&limit=999&offset=48"), s, cfg);
   expect((s as any)._searchCalls[0]).toEqual({ q: "fox", limit: 61, offset: 48 });
-  await handleLibrarySearch(new URL("https://x/v1/library?limit=0"), s);
+  await handleLibrarySearch(new URL("https://x/v1/library?limit=0"), s, cfg);
   expect((s as any)._searchCalls[1]).toEqual({ q: "", limit: 2, offset: 0 });
 });
 
 it("search: q over 200 chars -> 400, q at the cap still searches", async () => {
   const s = fakeServices();
-  const tooLong = await handleLibrarySearch(new URL("https://x/v1/library?q=" + "a".repeat(201)), s);
+  const tooLong = await handleLibrarySearch(new URL("https://x/v1/library?q=" + "a".repeat(201)), s, cfg);
   expect(tooLong.status).toBe(400);
   expect(typeof (await tooLong.json() as any).error).toBe("string");
   expect((s as any)._searchCalls).toHaveLength(0);
-  const atCap = await handleLibrarySearch(new URL("https://x/v1/library?q=" + "a".repeat(200)), s);
+  const atCap = await handleLibrarySearch(new URL("https://x/v1/library?q=" + "a".repeat(200)), s, cfg);
   expect(atCap.status).toBe(200);
   expect((s as any)._searchCalls[0].q).toHaveLength(200);
 });
@@ -67,7 +70,7 @@ it("search: q over 200 chars -> 400, q at the cap still searches", async () => {
 it("search: non-numeric or fractional limit/offset and negative offset -> 400", async () => {
   const s = fakeServices();
   for (const qs of ["limit=abc", "limit=1.5", "offset=-1", "offset=1.5", "offset=xyz"]) {
-    const res = await handleLibrarySearch(new URL(`https://x/v1/library?${qs}`), s);
+    const res = await handleLibrarySearch(new URL(`https://x/v1/library?${qs}`), s, cfg);
     expect(res.status).toBe(400);
     const j: any = await res.json();
     expect(typeof j.error).toBe("string");
@@ -85,7 +88,7 @@ function okUpstream(contentType: string | null = "image/webp"): (url: string) =>
 
 it("download: unknown id -> 404", async () => {
   const s = fakeServices();
-  const res = await handleLibraryDownload("nope", s, okUpstream());
+  const res = await handleLibraryDownload("nope", s, cfg, okUpstream());
   expect(res.status).toBe(404);
 });
 
@@ -93,30 +96,39 @@ it("download: streams upstream with attachment filename from prompt slug", async
   const s = fakeServices();
   (s as any)._assets.set("a1", libRow({ prompt: "A Fox! Jumping Over 2 Logs" }));
   let fetched = "";
-  const res = await handleLibraryDownload("a1", s, async (u) => { fetched = u; return okUpstream()(u); });
+  const res = await handleLibraryDownload("a1", s, cfg, async (u) => { fetched = u; return okUpstream()(u); });
   expect(res.status).toBe(200);
-  expect(fetched).toBe("https://cdn/large.webp");
+  expect(fetched).toBe(`${BASE}/assets/a1/image.webp`);
   expect(res.headers.get("content-type")).toBe("image/webp");
   expect(res.headers.get("content-disposition")).toBe('attachment; filename="a-fox-jumping-over-2-logs.webp"');
   expect(await res.text()).toBe("BYTES");
 });
 
+it("download: not locally cached fetches source_url", async () => {
+  const s = fakeServices();
+  (s as any)._assets.set("a1", libRow({ locally_cached: 0, source_url: "https://o.example/p.png" }));
+  let fetched = "";
+  const res = await handleLibraryDownload("a1", s, cfg, async (u) => { fetched = u; return okUpstream()(u); });
+  expect(res.status).toBe(200);
+  expect(fetched).toBe("https://o.example/p.png");
+});
+
 it("download: upstream non-OK or thrown fetch -> 502", async () => {
   const s = fakeServices();
   (s as any)._assets.set("a1", libRow());
-  const bad = await handleLibraryDownload("a1", s, async () => new Response("nope", { status: 403 }));
+  const bad = await handleLibraryDownload("a1", s, cfg, async () => new Response("nope", { status: 403 }));
   expect(bad.status).toBe(502);
-  const threw = await handleLibraryDownload("a1", s, async () => { throw new Error("net"); });
+  const threw = await handleLibraryDownload("a1", s, cfg, async () => { throw new Error("net"); });
   expect(threw.status).toBe(502);
 });
 
 it("download: content type falls back to asset mime, then octet-stream", async () => {
   const s = fakeServices();
   (s as any)._assets.set("a1", libRow({ mime: "image/png" }));
-  const res = await handleLibraryDownload("a1", s, okUpstream(null));
+  const res = await handleLibraryDownload("a1", s, cfg, okUpstream(null));
   expect(res.headers.get("content-type")).toBe("image/png");
   (s as any)._assets.set("a2", libRow({ id: "a2", mime: null }));
-  const res2 = await handleLibraryDownload("a2", s, okUpstream(null));
+  const res2 = await handleLibraryDownload("a2", s, cfg, okUpstream(null));
   expect(res2.headers.get("content-type")).toBe("application/octet-stream");
 });
 

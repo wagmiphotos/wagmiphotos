@@ -19,8 +19,8 @@ function fakeDb(firstResult: any = null, allResults: any[] = []) {
 }
 
 it("getAsset selects by id and maps row", async () => {
-  const row = { id: "a1", prompt: "p", source: "pd12m", source_id: "7", thumb_url: null,
-    medium_url: null, url: "https://ext/x.jpg", model_used: "clip-vit-l-14", width: 10, height: 20,
+  const row = { id: "a1", prompt: "p", source: "pd12m", source_id: "7",
+    model_used: "clip-vit-l-14", width: 10, height: 20,
     mime: "image/jpeg", source_url: "https://ext/x.jpg", locally_cached: 0 };
   const { db, calls } = fakeDb(row);
   const { assets } = makeD1Stores(db);
@@ -97,8 +97,8 @@ it("keys.deleteKey deletes scoped to the owner (key_hash AND user_id)", async ()
 });
 
 it("searchAssets browse mode: no WHERE, ordered newest-first, binds limit/offset", async () => {
-  const row = { id: "a1", prompt: "p", source: "pd12m", source_id: null, thumb_url: null,
-    medium_url: null, url: "u", model_used: null, width: null, height: null,
+  const row = { id: "a1", prompt: "p", source: "pd12m", source_id: null,
+    model_used: null, width: null, height: null,
     mime: null, source_url: null, locally_cached: 0, created_at: "2026-07-03 00:00:00" };
   const { db, calls } = fakeDb(null, [row]);
   const { assets } = makeD1Stores(db);
