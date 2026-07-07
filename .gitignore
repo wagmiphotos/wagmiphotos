@@ -15,3 +15,4 @@ projects/worker/node_modules/
 # Python build artifacts
 dist/
 *.egg-info/
+backup.sql
