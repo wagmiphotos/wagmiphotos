@@ -1,11 +1,35 @@
 # wagmi.photos — Handoff / Resume Here
 
-_Last updated: 2026-07-07. Everything below is merged to `main`, green
-(both offline test suites pass), and pushed to
-`github.com/wagmiphotos/wagmiphotos`. **Start here to resume:**
-[`docs/HANDOFF-2026-07-07.md`](docs/HANDOFF-2026-07-07.md) — magic-link auth + BGE
-edge embeddings shipped, and docs/deploy runbook reconciled to the wagmiphotos
-rename; live BGE provisioning (Task 6) is the next open item._
+_Last updated: 2026-07-07 (end of launch session). **The product is LIVE at
+[wagmi.photos](https://wagmi.photos)** — deployed, seeded, login working, first
+real user + demand queries in the database. The one missing organ is the GMI
+backfill box (step 4 of `DEPLOY.md`): until it runs, queued generations don't
+build and nothing rehosts to the CDN. Everything is merged to `main` and pushed
+to `github.com/wagmiphotos/wagmiphotos`._
+
+## What's live right now (verified 2026-07-07)
+
+- **`wagmi.photos` + `api.wagmi.photos`** → `wagmiphotos-worker` (workers.dev +
+  preview URLs disabled). Magic-link login works end-to-end via Resend
+  (sender `noreply@mail.suppers.ai`).
+- **D1 `wagmiphotos`** migrated 0001–0007; contents at session end: 1 user,
+  1,000 assets, 4 pending demand queries (real playground prompts, correctly
+  scored ~0.71–0.78 vs the museum-heavy seed pool and queued).
+- **Vectorize**: 3 shards `wagmiphotos-bge-0/1/2` holding 333/343/324 vectors —
+  fnv1a32 write-routing balance confirmed live.
+- **Assets CDN path**: `https://images.wagmi.photos/file/wagmi-photos-library`
+  (Cloudflare-proxied B2 `wagmi-photos-library`, public bucket, free egress via
+  the Backblaze/Cloudflare partnership, 1-year cache rule; keys are immutable).
+  Worker `ASSET_BASE_URL` == backfill `B2_PUBLIC_URL_BASE` — the seam check is
+  `curl -I` a rehosted `thumb_url` (see `DEPLOY.md` Verify).
+- **BGE drift check PASSED at cosine 1.0000** — after discovering live that
+  Workers AI **mean-pools** (BGE ships CLS): `BgeEmbedder.from_pretrained`
+  force-flips pooling and raises if it can't. Never swap the embedding stack
+  without re-running the drift check.
+- **Floors tuned against the live pool**: `FLOOR_SIM_MAX=0.87` /
+  `FLOOR_SIM_MIN=0.75` (verbatim 1.00, paraphrase 0.87–0.91, related ~0.79,
+  unrelated ≤0.71). Pinned in `contract.json` + both runtimes; re-probe as the
+  pool grows.
 
 ## What wagmi.photos is
 
@@ -22,122 +46,103 @@ Two deployables over three shared stores:
   Handles `POST /v1/images/generations`, `GET /v1/library`, `GET /v1/library/:id/download`,
   `POST /v1/auth/login`, `GET /v1/auth/verify`, `POST /v1/auth/logout`, `GET /v1/me`,
   `GET /v1/keys`, `DELETE /v1/keys/:id`, `POST /v1/keys/generate`, `GET /v1/meta/stars`,
-  and `GET /healthz`; serves the playground SPA for every other path via **Workers Static Assets**. It authenticates, embeds the prompt with **Cloudflare
-  Workers AI (`@cf/baai/bge-base-en-v1.5`, text-to-text, 768d)**, queries Vectorize (3-shard fan-out,
-  merged by score) for the nearest asset, reads/logs the query to D1, and returns the image URL. **It never
-  generates.** Branch outcomes: `hit` (≥ floor), `approximate` (< floor, nearest served anyway), `pending` (`202`, empty pool).
-- **Python backfill worker** (`projects/backfill/`, `python -m wagmiphotos.backfill`) — the "Hermes runner".
-  Polls D1 for pending queries (ranked by demand) and generates the most-requested missing images via
-  Genblaze/GMI Cloud, **re-checking Vectorize first** so nothing is built twice; also rehosts seeded PD12M
-  images to B2 in 3 webp sizes. Embeds asset prompts/captions with a **local** `BAAI/bge-base-en-v1.5`
-  (in-process, `model` extra) — no external embedder or tunnel. Runs locally or in a GMI Cloud Hermes
-  agentbox (Dockerfile included).
-- **Shared stores:** **D1** (query log + asset metadata + hashed api keys + users/sessions/login_tokens), **Vectorize** (768-dim BGE,
-  3 shards `wagmiphotos-bge-0/1/2`, write-routed by `fnv1a32(id) % 3` — prompt/caption text vectors), **Backblaze B2** (image bytes).
+  and `GET /healthz`; serves the playground SPA for every other path via **Workers Static Assets**.
+  It authenticates, embeds the prompt with **Cloudflare Workers AI**
+  (`@cf/baai/bge-base-en-v1.5`, 768d), queries Vectorize (3-shard fan-out, merged by max score),
+  reads/logs the query to D1, and returns derived asset URLs. **It never generates.**
+  Branch outcomes: `hit` (≥ floor), `approximate` (< floor, nearest served anyway, generation queued),
+  `pending` (`202`, empty pool). `GET /v1/library?q=` is semantic too (same BGE path, 0.75 relevance
+  floor, top-100 window) with the old SQL `LIKE` scan as automatic fallback on any semantic-path error
+  (that fallback is what offline local dev exercises).
+- **Python backfill worker** (`projects/backfill/`, `wagmiphotos-backfill`) — polls D1 for pending
+  queries (demand-ranked, claim/lease + 5-attempt budgets) and generates the most-requested missing
+  images via Genblaze/GMI Cloud, **re-checking Vectorize first** so nothing is built twice; rehosts
+  seeded images to B2 in 3 webp sizes at the contract-pinned keys. Embeds with a **local, mean-pooled**
+  `BAAI/bge-base-en-v1.5` (in-process, `[model]` extra). Durable lifetime spend cap in the D1 `meta` table.
+- **Shared stores:** **D1** (query log + slim asset metadata — URLs are DERIVED, not stored (migration
+  0007) + hashed api keys + users/sessions/login_tokens), **Vectorize** (3 shards, write-routed
+  `fnv1a32(id) % 3`), **Backblaze B2** (image bytes at `assets/<id>/{image,medium,thumb}.webp`).
 
-Data flow: Worker logs demand → backfill builds top misses → Vectorize/D1 updated → next identical/similar
-request is a HIT. Similarity floor is **BGE text-to-text-calibrated** (`FLOOR_SIM_MAX/MIN` default 0.90/0.72 —
-BGE text-to-text cosines run high; these are placeholders, tune against the real pool).
+Cross-language constants (floors, tolerance, BGE model ids, shard prefix/count + fixtures, asset path
+templates) live in repo-root **`contract.json`**, parity-asserted by BOTH test suites — change values
+there first; drift fails CI on either side.
 
 ## Repo layout (uv workspace monorepo)
 
 ```
 projects/
 ├── worker/        # Cloudflare Worker (TS) + public/index.html (the SPA)   — `npm test`, `npm run deploy`
-├── common/        # wagmiphotos-common     — models, config, floor, bge, D1/Vectorize REST clients
+├── common/        # wagmiphotos-common     — models, config, floor, shard, bge, asset_paths, D1/Vectorize REST
 ├── generation/    # wagmiphotos-generation — Genblaze/GMI + Backblaze B2 + image processing
 └── backfill/      # wagmiphotos-backfill   — demand-ranked runner (worker.py, seed_pd12m, __main__, Dockerfile)
 docs/superpowers/  # specs + plans (the full design/decision trail)
+contract.json      # cross-language constants (single source; parity-tested both sides)
 pyproject.toml     # uv virtual workspace root ; uv.lock
 ```
-Python dep graph: `common ← generation ← backfill`. Imports are `wagmiphotos.common.*` / `.generation.*` / `.backfill.*` (PEP 420 namespace).
+Python dep graph: `common ← generation ← backfill`. Imports are `wagmiphotos.common.*` etc.
 
 ## How to run / test / build
 
 ```bash
-# Python (offline, fakes for D1/Vectorize/BGE/B2) — all tests should pass
-uv sync && uv run pytest -q
-
-# Worker (offline, faked bindings — no Miniflare) — all tests should pass
-cd projects/worker && npm install && npm test
-
-# Build each Python package into a wheel
-uv build --package wagmiphotos-{common,generation,backfill}
-
-# Run the backfill once (needs real env for real work; stub/in-memory otherwise)
-uv run wagmiphotos-backfill --once
-
-# Preview the Worker + SPA locally
-cd projects/worker && npx wrangler dev
+uv sync && uv run pytest projects/ -q          # Python suite (offline fakes) — all green
+cd projects/worker && npm install && npm test  # Worker suite — all green; npx tsc --noEmit silent
+# Local dev (SPA + D1 offline; needs .dev.vars with DEV_MODE=true):
+#   see .claude/skills/running-locally/SKILL.md
+# Seed from the local PD12M download (NOT HuggingFace; metadata parquets only):
+set -a && source deploy/gmi/.env && set +a
+uv run python -m wagmiphotos.backfill.seed_pd12m --metadata-dir ~/data/PD12M/metadata --limit 1000
 ```
 
-## Domains & public URLs
+PD12M lives locally at `/home/joris/data/PD12M` (NOT in git): `metadata/` (125 parquet, 12.5M rows)
+is what seeding reads; the 36GB `embeddings/` dir is a different model's vectors — unusable, deletable.
 
-- Route BOTH custom domains to this worker: `wagmi.photos` (site + API) and
-  `api.wagmi.photos` (documented API base for external developers).
-- `[vars]` `PUBLIC_SITE_URL` / `PUBLIC_API_BASE_URL` hold the canonical URLs.
-  The SPA ships them as defaults; the worker substitutes overrides at serve
-  time (`src/rewrite.ts`), so a dev deployment (e.g. `dev.wagmi.photos` /
-  `api.dev.wagmi.photos`) renders its own URLs in docs and examples.
-- Local overrides go in `projects/worker/.dev.vars` (git-ignored). The SPA's
-  own requests are origin-relative, so local dev needs no configuration.
+## Credentials map (nothing secret in git)
 
-## GMI box (backfill)
-
-- One CPU GMI instance runs `deploy/gmi/docker-compose.yml`: just the backfill
-  worker container. It loads `BAAI/bge-base-en-v1.5` in-process
-  (`sentence-transformers`) to embed asset prompts/captions — there is no
-  separate embedding service and no tunnel to stand up.
-- The Worker embeds query prompts independently, at the edge, via the
-  Cloudflare Workers AI binding (`env.AI.run('@cf/baai/bge-base-en-v1.5', …)`,
-  `projects/worker/src/embed.ts`) — no HTTP call to the GMI box.
-- Full runbook: `deploy/gmi/README.md`.
-
-## Design trail
-
-- `docs/superpowers/specs/2026-07-01-cloudflare-edge-cache-design.md` — the Worker + backfill re-architecture.
-- `docs/superpowers/specs/2026-07-02-monorepo-restructure-design.md` — the uv-workspace monorepo.
-- `docs/superpowers/specs/2026-07-02-worker-served-frontend-design.md` — serving the SPA from the Worker.
-- Matching plans under `docs/superpowers/plans/`.
-- (A local, git-ignored execution ledger lives at `.superpowers/sdd/progress.md`.)
+- **Wrangler secrets** (set): `MASTER_API_KEY`, `RESEND_API_KEY` (sending-only key, domain
+  `mail.suppers.ai` verified).
+- **`deploy/gmi/.env`** (gitignored, FILLED on this machine): CF account/API token (D1+Vectorize edit),
+  D1 id, GMI key, B2 keys/bucket, floors. `scp` it to the GMI box when standing it up.
+- `DEV_MODE` must never be set in prod — all dev conveniences fail closed without it.
 
 ## Next steps (prioritized)
 
-### 1. Live verification — needs real Cloudflare / Backblaze / GMI credentials
-This is the biggest open item: everything is verified offline with fakes; nothing has run against live infra.
-- Provision + migrate D1: `cd projects/worker && npx wrangler d1 create wagmiphotos`, set `database_id` in
-  `wrangler.toml`, `npx wrangler d1 migrations apply wagmiphotos`.
-- Create the three Vectorize shards: `for i in 0 1 2; do npx wrangler vectorize create
-  "wagmiphotos-bge-$i" --dimensions=768 --metric=cosine; done`.
-- The Worker's query-prompt embedding uses the `[ai] binding = "AI"` Workers AI binding already declared in
-  `wrangler.toml` (`@cf/baai/bge-base-en-v1.5`) — no external endpoint to wire. The backfill embeds
-  prompts/captions with a local `BAAI/bge-base-en-v1.5` (see `deploy/gmi`).
-- Seed: `uv run python -m wagmiphotos.backfill.seed_pd12m --limit 100`.
-- **Tune `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN`** against the seeded pool (BGE text-to-text cosines run high, ~0.7–0.95).
-- **Deploy order dependency:** `cd projects/worker && npx wrangler d1 migrations apply
-  wagmiphotos` (remote) must run **before** `npm run deploy` — all migrations through `0007` must be live
-  first (see `DEPLOY.md` step 3 for the per-migration notes, including `0004`'s breaking anonymous-key
-  wipe). Deploying the Worker ahead of them breaks demand tracking and hard-errors the Python backfill.
-- Deploy the Worker: `cd projects/worker && npm run deploy`; **confirm `wrangler deploy --dry-run` lists the
-  `RATE_LIMITER` binding**; then check a request returns a nearest image and the SPA loads at `/`.
-- Verify the Vectorize v2 upsert/insert ndjson framing against one live call.
+### 1. Stand up the GMI backfill box (`DEPLOY.md` step 4 — the only missing piece)
+Provision a CPU GMI instance with Docker → clone the repo → `scp deploy/gmi/.env` across →
+`cd deploy/gmi && docker compose up -d --build` (first build pulls CPU torch + BGE weights).
+Then: the 4 pending queries should generate within a tick, rehosting starts, and the
+`curl -I <thumb_url>` seam check (DEPLOY Verify) proves the CDN path. Also confirms the
+non-root Docker image builds end-to-end (never built here).
 
-### 2. Deferred hardening (from the reviews — none blocking, triage before real traffic)
-Most items are now closed — see `docs/HANDOFF-2026-07-04.md` → "Addressed since". Remaining:
-- **Backfill:** rehost now has a 25 MB size cap, but still no host allowlist — add one _once user
-  input can set `source_url`_ (today it's trusted PD12M seed data only).
-- **Deploy:** the non-root Dockerfiles pass `docker build --check` but haven't been built end-to-end
-  here (torch/BGE weights) — do a `docker compose up --build` smoke check on the GMI box.
-- **Tooling:** dev-only `npm audit` findings in wrangler/vitest/esbuild transitive deps.
+### 2. Full-scale seed (1k → 12.5M) — needs batching work first
+Current seeding inserts D1 rows one REST call each — fine for thousands, days for millions.
+Before the big run: batch D1 inserts (D1 REST accepts multi-statement bodies), consider running
+the seed on the GMI box, and re-probe the floors after each big batch (coincidental similarity
+creeps up with scale). D1 headroom is fine (~4.4GB slim rows at 12.5M vs 10GB cap).
 
-### 3. Nice-to-haves
-- The SPA has no automated test harness (verified by inspection + live). A tiny Playwright smoke test could
-  cover the hit/approximate/pending render states.
-- `projects/worker/public/index.html`: the API returns `sizes.thumb/medium`, but the SPA doesn't use them —
-  it could serve responsive/thumbnail images instead of the full-size URL.
+### 3. Hardening before real traffic (unchanged from reviews; none blocking)
+- Rehost host allowlist once `source_url` can be user-influenced (today: trusted PD12M only).
+- Prompt→embedding cache in the Worker (cuts Workers AI calls on the hot path; also the
+  mitigation for unthrottled `/v1/library?q=` costs).
+- Edge caching on `/v1/library*`; scheduled token/session GC (opportunistic purge already runs).
+- A tiny Playwright smoke test for the SPA's hit/approximate/pending states.
+
+### 4. Hackathon deliverables (deadline Aug 3)
+Devpost submission + demo video — see `TODO.md`.
+
+## Design trail
+
+- `docs/superpowers/specs/2026-07-07-wagmiphotos-rename-and-scale-design.md` (+ plan) — the
+  rename, 3-shard Vectorize, derived URLs, semantic library search (this session).
+- `docs/superpowers/specs/2026-07-06-bge-edge-embeddings.*` — BGE migration; its Task 6
+  (live provisioning) was completed this session, with two live-only findings: Workers AI
+  mean-pools, and D1 caps bound params at 100/statement.
+- Earlier specs/plans under `docs/superpowers/`; execution ledger (git-ignored) at
+  `.superpowers/sdd/progress.md`.
 
 ## Ground truth
 
-- Branch: `main` (all work merged via PRs #1–#3). `git log --oneline -15` shows the history.
-- If resuming a multi-step build, use the superpowers brainstorm → writing-plans → subagent-driven-development
-  flow (that's how everything above was built).
+- Branch: `main`, pushed to origin. `git log --oneline -25` tells today's story: audit fix
+  sweep → rename/scale plan (13 reviewed tasks) → launch-gate fixes (mean pooling, D1 param
+  cap, floors 0.87/0.75) → live config.
+- If resuming a multi-step build, use the superpowers brainstorm → writing-plans →
+  subagent-driven-development flow (that's how everything above was built).
