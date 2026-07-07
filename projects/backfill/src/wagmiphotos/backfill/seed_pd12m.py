@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """Database seeding script for the PD12M (Public Domain 12 Million) dataset.
 
-Fetches rows from the Hugging Face dataset-viewer, embeds the captions with
-BGE, and inserts rows + vectors into D1 and Vectorize page by page.
+Reads rows from a local PD12M metadata download (--metadata-dir with the
+dataset's *.parquet files) or from the Hugging Face dataset-viewer, embeds the
+captions with BGE, and inserts rows + vectors into D1 and Vectorize page by
+page.
 
 Usage:
-    uv run python -m wagmiphotos.backfill.seed_pd12m --limit 100
+    uv run python -m wagmiphotos.backfill.seed_pd12m \
+        --metadata-dir ~/data/PD12M/metadata --limit 1000
 """
 import argparse
 import logging
 import sys
 import uuid
+from pathlib import Path
 
 from wagmiphotos.common.config import Settings
 from wagmiphotos.common.models import AssetRecord
@@ -44,7 +48,8 @@ def seed_rows(rows, d1, vectorize, *, source=SOURCE) -> int:
         asset_id = str(uuid.uuid4())
         rec = AssetRecord(
             id=asset_id, prompt=row["prompt"], model_used=None, source=source,
-            source_id=str(row.get("id", n)), content_hash=f"{source}-{row.get('id', n)}",
+            source_id=str(row.get("id", n)),
+            content_hash=row.get("hash") or f"{source}-{row.get('id', n)}",
             width=int(row.get("width", 0)), height=int(row.get("height", 0)),
             mime=row.get("mime", "image/jpeg"), created_at="", source_url=row["url"],
             locally_cached=False)
@@ -77,9 +82,10 @@ def _candidate(item: dict, fallback_id) -> dict | None:
     return {
         "id": str(row_data.get("id", item.get("row_idx", fallback_id))),
         "prompt": prompt, "url": image_url,
-        "width": int(row_data.get("width", 1024)),
-        "height": int(row_data.get("height", 1024)),
-        "mime": "image/jpeg",
+        "width": int(row_data.get("width") or 1024),
+        "height": int(row_data.get("height") or 1024),
+        "mime": row_data.get("mime_type") or "image/jpeg",
+        "hash": row_data.get("hash"),
     }
 
 
@@ -117,6 +123,55 @@ def seed_from_hf(repo_id: str, limit: int, d1, vectorize, embedder, *,
             client.close()
 
 
+def iter_parquet_candidates(metadata_dir):
+    """Yield candidate dicts from a local PD12M metadata download (the
+    dataset's *.parquet files, read in sorted filename order). Streams in
+    batches so the 12.5M-row full dataset never loads into memory at once."""
+    import pyarrow.parquet as pq  # lazy: only the local seed path needs it
+
+    files = sorted(Path(metadata_dir).glob("*.parquet"))
+    if not files:
+        raise RuntimeError(f"no .parquet files found in {metadata_dir}")
+    fallback_id = 0
+    for f in files:
+        for batch in pq.ParquetFile(f).iter_batches(batch_size=1000):
+            for row_data in batch.to_pylist():
+                c = _candidate({"row": row_data}, fallback_id)
+                fallback_id += 1
+                if c is not None:
+                    yield c
+
+
+def _seed_candidate_page(page, d1, vectorize, embedder, *, source) -> int:
+    """Dedupe one page against D1, embed the fresh captions, and write the
+    paired D1+Vectorize chunk. Returns the number of rows actually seeded."""
+    existing = d1.existing_source_ids(source, [c["id"] for c in page])
+    fresh = [c for c in page if c["id"] not in existing]
+    for c in fresh:
+        c["embedding"] = embedder.text_embed(c["prompt"])  # BGE caption embedding
+    return seed_rows(fresh, d1, vectorize, source=source) if fresh else 0
+
+
+def seed_from_parquet(metadata_dir, limit: int, d1, vectorize, embedder, *,
+                      source: str = SOURCE, page_size: int = HF_MAX_PAGE_LENGTH) -> int:
+    """Seed up to `limit` rows from a local parquet metadata dir. Pages are
+    deduped against D1, so re-runs skip already-seeded (source, source_id)s
+    and keep reading until `limit` NEW rows land (or the data runs out)."""
+    seeded = 0
+    page: list[dict] = []
+    for c in iter_parquet_candidates(metadata_dir):
+        page.append(c)
+        if len(page) >= min(page_size, limit - seeded):
+            seeded += _seed_candidate_page(page, d1, vectorize, embedder, source=source)
+            page = []
+            if seeded >= limit:
+                break
+            logger.info("seeded %d/%d", seeded, limit)
+    if page and seeded < limit:
+        seeded += _seed_candidate_page(page, d1, vectorize, embedder, source=source)
+    return seeded
+
+
 def build_clients(settings: Settings) -> tuple:
     """Build (D1Client, VectorizeClient, BgeEmbedder) from Settings.
 
@@ -152,6 +207,8 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     parser = argparse.ArgumentParser(description="Seed PD12M rows into D1 and Vectorize.")
+    parser.add_argument("--metadata-dir", type=Path, default=None,
+                        help="Local PD12M metadata dir (*.parquet); preferred over HF")
     parser.add_argument("--repo-id", default=DEFAULT_HF_REPO_ID, help="HF Dataset Repository ID")
     parser.add_argument("--limit", type=int, default=5, help="Number of items to seed")
     args = parser.parse_args()
@@ -159,8 +216,11 @@ def main() -> None:
     settings = Settings()
     d1, vectorize, embedder = build_clients(settings)
     try:
-        seeded = seed_from_hf(args.repo_id, args.limit, d1, vectorize, embedder,
-                              hf_token=settings.hf_token)
+        if args.metadata_dir is not None:
+            seeded = seed_from_parquet(args.metadata_dir, args.limit, d1, vectorize, embedder)
+        else:
+            seeded = seed_from_hf(args.repo_id, args.limit, d1, vectorize, embedder,
+                                  hf_token=settings.hf_token)
     except Exception:
         logger.exception("seeding failed")
         sys.exit(1)

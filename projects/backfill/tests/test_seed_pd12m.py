@@ -117,6 +117,78 @@ def test_default_repo_is_a_named_constant():
     assert seed_pd12m.DEFAULT_HF_REPO_ID == "jorissup/PD12M-bucket"
 
 
+def _prow(i, **overrides):
+    row = {"id": f"p{i}", "url": f"https://pd12m.s3/img{i}.jpeg", "caption": f"caption {i}",
+           "width": 100 + i, "height": 200 + i, "mime_type": "image/png", "hash": f"h{i}",
+           "license": "cc0", "source": "Some Museum"}
+    row.update(overrides)
+    return row
+
+
+def _write_parquet_dir(tmp_path, files):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    d = tmp_path / "metadata"
+    d.mkdir()
+    for i, rows in enumerate(files):
+        pq.write_table(pa.Table.from_pylist(rows), d / f"pd12m.{i:03d}.parquet")
+    return d
+
+
+def test_seed_from_parquet_seeds_up_to_limit_across_files(tmp_path):
+    d1, vec = FakeD1(), FakeVectorize()
+    meta = _write_parquet_dir(tmp_path, [[_prow(i) for i in range(3)],
+                                         [_prow(i) for i in range(3, 6)]])
+    n = seed_pd12m.seed_from_parquet(meta, 5, d1, vec, FakeEmbedder())
+    assert n == 5
+    assert {r.source_id for r in d1.inserted} == {"p0", "p1", "p2", "p3", "p4"}
+
+
+def test_seed_from_parquet_dedupes_existing_source_ids(tmp_path):
+    d1, vec = FakeD1(), FakeVectorize()
+    d1.insert_asset(AssetRecord(
+        id="old", prompt="p", model_used=None, source="pd12m", source_id="p1",
+        content_hash="h", width=1, height=1, mime="image/jpeg", created_at=""))
+    meta = _write_parquet_dir(tmp_path, [[_prow(i) for i in range(3)]])
+    n = seed_pd12m.seed_from_parquet(meta, 10, d1, vec, FakeEmbedder())
+    assert n == 2
+    assert {r.source_id for r in d1.inserted if r.id != "old"} == {"p0", "p2"}
+
+
+def test_seed_from_parquet_maps_mime_and_real_content_hash(tmp_path):
+    d1, vec = FakeD1(), FakeVectorize()
+    meta = _write_parquet_dir(tmp_path, [[_prow(0)]])
+    seed_pd12m.seed_from_parquet(meta, 1, d1, vec, FakeEmbedder())
+    rec = d1.inserted[0]
+    assert rec.mime == "image/png"          # from mime_type, not hardcoded jpeg
+    assert rec.content_hash == "h0"         # the dataset's real hash, not synthetic
+    assert rec.source_url == "https://pd12m.s3/img0.jpeg"
+
+
+def test_seed_from_parquet_skips_rows_missing_caption_or_url(tmp_path):
+    d1, vec = FakeD1(), FakeVectorize()
+    meta = _write_parquet_dir(tmp_path, [[_prow(0, caption=None), _prow(1, url=None), _prow(2)]])
+    n = seed_pd12m.seed_from_parquet(meta, 10, d1, vec, FakeEmbedder())
+    assert n == 1
+    assert d1.inserted[0].source_id == "p2"
+
+
+def test_seed_from_parquet_raises_on_empty_dir(tmp_path):
+    (tmp_path / "empty").mkdir()
+    with pytest.raises(RuntimeError, match="parquet"):
+        seed_pd12m.seed_from_parquet(tmp_path / "empty", 1, FakeD1(), FakeVectorize(), FakeEmbedder())
+
+
+def test_main_metadata_dir_routes_to_parquet(monkeypatch, tmp_path):
+    seen = {}
+    monkeypatch.setattr(seed_pd12m, "build_clients", lambda s: (None, None, None))
+    monkeypatch.setattr(seed_pd12m, "seed_from_parquet",
+                        lambda path, limit, *a, **kw: seen.update(path=str(path), limit=limit) or 7)
+    monkeypatch.setattr(sys, "argv", ["seed_pd12m", "--metadata-dir", str(tmp_path), "--limit", "9"])
+    seed_pd12m.main()
+    assert seen == {"path": str(tmp_path), "limit": 9}
+
+
 def test_build_clients_uses_correct_settings_attrs_and_kwargs(monkeypatch):
     from wagmiphotos.common.bge import BgeEmbedder
 
