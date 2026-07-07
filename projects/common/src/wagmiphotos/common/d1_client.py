@@ -49,23 +49,21 @@ RECORD_QUERY_FAILURE_SQL = (
     "last_error=? WHERE normalized_prompt=?")
 
 INSERT_ASSET_SQL = (
-    "INSERT INTO assets (id, prompt, source, source_id, thumb_url, medium_url, url, "
-    "model_used, content_hash, width, height, mime, source_url, locally_cached, "
-    "manifest_url) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+    "INSERT INTO assets (id, prompt, source, source_id, content_hash, width, height, mime, "
+    "source_url, locally_cached) VALUES (?,?,?,?,?,?,?,?,?,?)")
 
 ASSET_EXISTS_SQL = "SELECT 1 FROM assets WHERE id=? LIMIT 1"
 
 ASSETS_NEEDING_REHOST_SQL = (
-    "SELECT id, prompt, source, source_id, thumb_url, medium_url, url, model_used, "
-    "content_hash, width, height, mime, source_url, locally_cached FROM assets "
+    "SELECT id, prompt, source, source_id, model_used, content_hash, width, height, mime, "
+    "source_url, locally_cached FROM assets "
     f"WHERE locally_cached=0 AND rehost_attempts < {MAX_REHOST_ATTEMPTS} LIMIT ?")
 
 INCREMENT_REHOST_ATTEMPTS_SQL = (
     "UPDATE assets SET rehost_attempts=rehost_attempts+1 WHERE id=?")
 
-UPDATE_ASSET_URLS_SQL = (
-    "UPDATE assets SET url=?, medium_url=?, thumb_url=?, width=?, height=?, mime=?, "
-    "locally_cached=? WHERE id=?")
+MARK_ASSET_REHOSTED_SQL = (
+    "UPDATE assets SET width=?, height=?, mime=?, locally_cached=1 WHERE id=?")
 
 META_GET_SQL = "SELECT value FROM meta WHERE key=?"
 
@@ -124,9 +122,8 @@ class D1Client:
     def insert_asset(self, rec: AssetRecord) -> None:
         self._query(
             INSERT_ASSET_SQL,
-            [rec.id, rec.prompt, rec.source, rec.source_id, rec.thumb_url, rec.medium_url,
-             rec.url, rec.model_used, rec.content_hash, rec.width, rec.height, rec.mime,
-             rec.source_url, 1 if rec.locally_cached else 0, rec.manifest_url])
+            [rec.id, rec.prompt, rec.source, rec.source_id, rec.content_hash, rec.width,
+             rec.height, rec.mime, rec.source_url, 1 if rec.locally_cached else 0])
 
     def asset_exists(self, asset_id: str) -> bool:
         return bool(self._query(ASSET_EXISTS_SQL, [asset_id]))
@@ -134,19 +131,16 @@ class D1Client:
     def assets_needing_rehost(self, limit: int) -> list[AssetRecord]:
         rows = self._query(ASSETS_NEEDING_REHOST_SQL, [limit])
         return [AssetRecord(
-            id=r["id"], prompt=r["prompt"], url=r["url"], thumb_url=r["thumb_url"],
-            medium_url=r["medium_url"], model_used=r["model_used"], source=r["source"],
+            id=r["id"], prompt=r["prompt"], model_used=r["model_used"], source=r["source"],
             source_id=r["source_id"], content_hash=r["content_hash"], width=r["width"],
-            height=r["height"], mime=r["mime"], manifest_url=None, created_at="",
+            height=r["height"], mime=r["mime"], created_at="",
             source_url=r["source_url"], locally_cached=bool(r["locally_cached"])) for r in rows]
 
     def increment_rehost_attempts(self, asset_id: str) -> None:
         self._query(INCREMENT_REHOST_ATTEMPTS_SQL, [asset_id])
 
-    def update_asset_urls(self, asset_id, *, url, medium_url, thumb_url, width, height, mime, locally_cached):
-        self._query(UPDATE_ASSET_URLS_SQL,
-                    [url, medium_url, thumb_url, width, height, mime,
-                     1 if locally_cached else 0, asset_id])
+    def mark_asset_rehosted(self, asset_id: str, *, width: int, height: int, mime: str) -> None:
+        self._query(MARK_ASSET_REHOSTED_SQL, [width, height, mime, asset_id])
 
     def get_meta(self, key: str) -> str | None:
         rows = self._query(META_GET_SQL, [key])

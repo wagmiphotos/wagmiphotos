@@ -2,6 +2,7 @@ import json
 import logging
 import uuid
 
+from wagmiphotos.common.asset_paths import asset_key
 from wagmiphotos.common.d1_client import QueryRow
 from wagmiphotos.common.floor import DEFAULT_CACHE_TOLERANCE, similarity_floor
 from wagmiphotos.common.models import AssetRecord
@@ -107,21 +108,23 @@ class BackfillWorker:
         sizes = derive_sizes(original)
         w, h = dimensions(sizes["large"])
         asset_id = str(uuid.uuid4())
-        url = self._storage.put(f"assets/{asset_id}/image.webp", sizes["large"], "image/webp")
-        med = self._storage.put(f"assets/{asset_id}/medium.webp", sizes["medium"], "image/webp")
-        thumb = self._storage.put(f"assets/{asset_id}/thumb.webp", sizes["thumb"], "image/webp")
+        url = self._storage.put(asset_key("large", asset_id), sizes["large"], "image/webp")
+        med = self._storage.put(asset_key("medium", asset_id), sizes["medium"], "image/webp")
+        thumb = self._storage.put(asset_key("thumb", asset_id), sizes["thumb"], "image/webp")
         manifest = {
             "id": asset_id, "prompt": q.original_prompt, "model_used": gen.model_used,
             "content_hash": gen.content_hash, "source": "generated", "width": w, "height": h,
             "sizes": {"thumb": thumb, "medium": med, "large": url},
         }
-        manifest_url = self._storage.put(
-            f"assets/{asset_id}/manifest.json",
+        # manifest content still embeds the URLs *returned by* storage.put — the
+        # ground truth of where bytes landed — even though AssetRecord no
+        # longer stores them (derived from id/locally_cached/source_url instead).
+        self._storage.put(
+            asset_key("manifest", asset_id),
             json.dumps(manifest, sort_keys=True).encode("utf-8"), "application/json")
-        rec = AssetRecord(id=asset_id, prompt=q.original_prompt, url=url, thumb_url=thumb,
-                          medium_url=med, model_used=gen.model_used, source="generated",
-                          source_id=None, content_hash=gen.content_hash, width=w, height=h,
-                          mime="image/webp", manifest_url=manifest_url, created_at="", locally_cached=True)
+        rec = AssetRecord(id=asset_id, prompt=q.original_prompt, model_used=gen.model_used,
+                          source="generated", source_id=None, content_hash=gen.content_hash,
+                          width=w, height=h, mime="image/webp", created_at="", locally_cached=True)
         # D1 first: if the vector upsert fails we're left with a
         # servable-but-unindexed asset instead of a dangling vector.
         self._d1.insert_asset(rec)
@@ -151,15 +154,13 @@ class BackfillWorker:
         async with httpx.AsyncClient() as client:  # one client for the whole pass
             for rec in records:
                 try:
-                    src = rec.source_url or rec.url
-                    orig = await self._download_capped(client, src)
+                    orig = await self._download_capped(client, rec.source_url)
                     sizes = derive_sizes(orig)
                     w, h = dimensions(sizes["large"])
-                    url = self._storage.put(f"assets/{rec.id}/image.webp", sizes["large"], "image/webp")
-                    med = self._storage.put(f"assets/{rec.id}/medium.webp", sizes["medium"], "image/webp")
-                    thumb = self._storage.put(f"assets/{rec.id}/thumb.webp", sizes["thumb"], "image/webp")
-                    self._d1.update_asset_urls(rec.id, url=url, medium_url=med, thumb_url=thumb,
-                                               width=w, height=h, mime="image/webp", locally_cached=True)
+                    self._storage.put(asset_key("large", rec.id), sizes["large"], "image/webp")
+                    self._storage.put(asset_key("medium", rec.id), sizes["medium"], "image/webp")
+                    self._storage.put(asset_key("thumb", rec.id), sizes["thumb"], "image/webp")
+                    self._d1.mark_asset_rehosted(rec.id, width=w, height=h, mime="image/webp")
                     done += 1
                 except Exception:
                     logger.exception("rehost failed for asset %s", rec.id)

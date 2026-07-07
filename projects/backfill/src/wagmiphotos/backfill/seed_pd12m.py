@@ -43,11 +43,11 @@ def seed_rows(rows, d1, vectorize, *, source=SOURCE) -> int:
     for row in rows:
         asset_id = str(uuid.uuid4())
         rec = AssetRecord(
-            id=asset_id, prompt=row["prompt"], url=row["url"], thumb_url=None, medium_url=None,
-            model_used=None, source=source, source_id=str(row.get("id", n)),
-            content_hash=f"{source}-{row.get('id', n)}", width=int(row.get("width", 0)),
-            height=int(row.get("height", 0)), mime=row.get("mime", "image/jpeg"),
-            manifest_url=None, created_at="", source_url=row["url"], locally_cached=False)
+            id=asset_id, prompt=row["prompt"], model_used=None, source=source,
+            source_id=str(row.get("id", n)), content_hash=f"{source}-{row.get('id', n)}",
+            width=int(row.get("width", 0)), height=int(row.get("height", 0)),
+            mime=row.get("mime", "image/jpeg"), created_at="", source_url=row["url"],
+            locally_cached=False)
         d1.insert_asset(rec)
         batch.append({"id": asset_id, "values": list(row["embedding"]), "metadata": {"source": source}})
         n += 1

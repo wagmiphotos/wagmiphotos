@@ -45,7 +45,8 @@ def test_seed_rows_inserts_d1_and_vectorize():
     assert n == 1
     rec = d1.inserted[0]
     assert isinstance(rec, AssetRecord) and rec.source == "pd12m" and rec.source_id == "7"
-    assert rec.locally_cached is False and rec.url == "https://ext/fox.jpg" and rec.source_url == "https://ext/fox.jpg"
+    assert rec.locally_cached is False and rec.source_url == "https://ext/fox.jpg"
+    assert not hasattr(rec, "url")  # derived, not stored
     assert list(vec.vectors)[0] == rec.id and vec.vectors[rec.id]["metadata"] == {"source": "pd12m"}
 
 
@@ -77,9 +78,8 @@ def test_seed_from_hf_dedupes_existing_source_ids():
     hf = FakeHf(total_rows=3)
     # r1 was seeded on a previous run
     d1.insert_asset(AssetRecord(
-        id="old", prompt="p", url="u", thumb_url=None, medium_url=None, model_used=None,
-        source="pd12m", source_id="r1", content_hash="h", width=1, height=1,
-        mime="image/jpeg", manifest_url=None, created_at=""))
+        id="old", prompt="p", model_used=None, source="pd12m", source_id="r1",
+        content_hash="h", width=1, height=1, mime="image/jpeg", created_at=""))
     n = seed_pd12m.seed_from_hf("repo/x", 3, d1, vec, FakeEmbedder(), client=hf)
     assert n == 2                                             # r1 skipped
     assert {rec.source_id for rec in d1.inserted if rec.id != "old"} == {"r0", "r2"}

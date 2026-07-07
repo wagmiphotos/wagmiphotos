@@ -53,3 +53,14 @@ def test_shard_routing_matches_contract_fixtures():
 
 def test_fnv1a32_reference_value():
     assert fnv1a32("demo-1") == 207613968
+
+
+from wagmiphotos.common.asset_paths import ASSET_PATHS, asset_key
+
+
+def test_asset_paths_match_contract():
+    assert ASSET_PATHS == CONTRACT["asset_paths"]
+
+
+def test_asset_key_substitutes_id():
+    assert asset_key("thumb", "abc") == "assets/abc/thumb.webp"

@@ -1,6 +1,7 @@
 import io, logging, pytest
 from PIL import Image
 from wagmiphotos.backfill.worker import SPEND_META_KEY, BackfillWorker
+from wagmiphotos.common.asset_paths import asset_key
 from wagmiphotos.common.d1_client import QueryRow
 from wagmiphotos.common.models import AssetRecord
 from wagmiphotos.generation.storage import InMemoryStorage
@@ -181,12 +182,19 @@ async def test_generate_pass_writes_provenance_manifest():
                        max_spend_usd=100.0, model=TEST_MODEL)
     assert await w.generate_pass() == 1
     rec = d1.inserted[0]
-    assert rec.manifest_url is not None and rec.manifest_url.endswith("manifest.json")
-    manifest = json.loads(storage.get(f"assets/{rec.id}/manifest.json"))
+    # derived-URL design: AssetRecord carries no URL fields
+    assert not hasattr(rec, "url") and not hasattr(rec, "manifest_url")
+    assert not hasattr(rec, "thumb_url") and not hasattr(rec, "medium_url")
+    # storage.put was called with the exact contract-pinned keys (asset_key)
+    assert storage.get(asset_key("large", rec.id))
+    assert storage.get(asset_key("medium", rec.id))
+    assert storage.get(asset_key("thumb", rec.id))
+    manifest = json.loads(storage.get(asset_key("manifest", rec.id)))
     assert manifest["id"] == rec.id
     assert manifest["prompt"] == "popular"
     assert manifest["source"] == "generated"
-    assert manifest["sizes"]["large"] == rec.url
+    # the manifest still embeds the real URL returned by storage.put (ground truth)
+    assert manifest["sizes"]["large"] == InMemoryStorage.BASE + asset_key("large", rec.id)
 
 @pytest.mark.asyncio
 async def test_lifetime_spend_cap_persists_across_ticks():
@@ -215,10 +223,10 @@ async def test_lifetime_spend_survives_worker_restart():
     assert len(d1.inserted) == 1
 
 def _rehost_rec(id="pd1"):
-    return AssetRecord(id=id, prompt="p", url="https://ext/x.jpg", thumb_url=None, medium_url=None,
-                       model_used="clip-vit-l-14", source="pd12m", source_id="7", content_hash="pd12m-7",
-                       width=40, height=20, mime="image/jpeg", manifest_url=None, created_at="",
-                       source_url="https://ext/x.jpg", locally_cached=False)
+    return AssetRecord(id=id, prompt="p", model_used="clip-vit-l-14", source="pd12m",
+                       source_id="7", content_hash="pd12m-7", width=40, height=20,
+                       mime="image/jpeg", created_at="", source_url="https://ext/x.jpg",
+                       locally_cached=False)
 
 @pytest.mark.asyncio
 async def test_rehost_pass_downloads_and_updates(monkeypatch):
@@ -228,8 +236,10 @@ async def test_rehost_pass_downloads_and_updates(monkeypatch):
     w = _worker(d1, vec, batch_size=5)
     done = await w.rehost_pass()
     assert done == 1 and d1.rehost == []
-    aid, kw = d1.url_updates[0]
-    assert aid == "pd1" and kw["locally_cached"] is True and kw["url"].endswith("image.webp")
+    aid, kw = d1.rehost_marks[0]
+    assert aid == "pd1" and kw["mime"] == "image/webp"
+    # bytes actually landed at the contract-pinned key
+    assert w._storage.get(asset_key("large", "pd1"))
 
 @pytest.mark.asyncio
 async def test_rehost_pass_reuses_one_http_client(monkeypatch):
@@ -249,7 +259,7 @@ async def test_rehost_pass_skips_source_over_size_cap(monkeypatch):
     w = _worker(d1, vec, batch_size=5, max_rehost_bytes=10)
     done = await w.rehost_pass()
     assert done == 0
-    assert d1.url_updates == []
+    assert d1.rehost_marks == []
     assert d1.rehost == [rec]        # left in place for a later attempt
     assert d1.rehost_attempts["pd1"] == 1
 
@@ -260,7 +270,7 @@ async def test_rehost_pass_failure_increments_attempts_and_logs(monkeypatch, cap
     _patch_httpx(monkeypatch, status_code=404, chunks=[])
     with caplog.at_level(logging.ERROR):
         done = await _worker(d1, vec).rehost_pass()
-    assert done == 0 and d1.url_updates == []
+    assert done == 0 and d1.rehost_marks == []
     assert d1.rehost_attempts["pd1"] == 1
     assert any("pd1" in r.getMessage() and r.exc_info for r in caplog.records)
 

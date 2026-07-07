@@ -61,14 +61,16 @@ def test_record_query_failure_resets_and_increments(monkeypatch):
 
 def test_insert_asset_binds_all_columns(monkeypatch):
     c, calls = _client(monkeypatch, [[]])
-    rec = AssetRecord(id="i1", prompt="p", url="u", thumb_url=None, medium_url=None,
-                      model_used="m", source="generated", source_id=None, content_hash="h",
-                      width=1, height=2, mime="image/webp", manifest_url="mf", created_at="t",
+    rec = AssetRecord(id="i1", prompt="p", model_used="m", source="generated", source_id=None,
+                      content_hash="h", width=1, height=2, mime="image/webp", created_at="t",
                       source_url=None, locally_cached=True)
     c.insert_asset(rec)
     sql, params = calls[0]
-    assert "INSERT INTO assets" in sql and "manifest_url" in sql
-    assert params[0] == "i1" and 1 in params and "generated" in params and "mf" in params
+    assert "INSERT INTO assets" in sql and "source_url" in sql
+    assert params[0] == "i1" and 1 in params and "generated" in params
+    # 0007: no stored-URL columns are bound (source_url is the only survivor)
+    columns = {c.strip() for c in sql.split("(", 1)[1].split(")", 1)[0].split(",")}
+    assert not (columns & {"url", "thumb_url", "medium_url", "manifest_url"})
 
 def test_asset_exists(monkeypatch):
     c, calls = _client(monkeypatch, [[{"1": 1}], []])
@@ -79,7 +81,6 @@ def test_asset_exists(monkeypatch):
 
 def test_assets_needing_rehost_maps(monkeypatch):
     rows = [[{"id": "i1", "prompt": "p", "source": "pd12m", "source_id": "7",
-              "thumb_url": None, "medium_url": None, "url": "https://ext/x.jpg",
               "model_used": "clip-vit-l-14", "content_hash": "pd12m-7", "width": 10, "height": 20,
               "mime": "image/jpeg", "source_url": "https://ext/x.jpg", "locally_cached": 0}]]
     c, calls = _client(monkeypatch, rows)
@@ -94,13 +95,12 @@ def test_increment_rehost_attempts(monkeypatch):
     sql, params = calls[0]
     assert "rehost_attempts=rehost_attempts+1" in sql and params == ["i1"]
 
-def test_update_asset_urls_binds(monkeypatch):
+def test_mark_asset_rehosted_binds(monkeypatch):
     c, calls = _client(monkeypatch, [[]])
-    c.update_asset_urls("i1", url="b/large", medium_url="b/med", thumb_url="b/thumb",
-                        width=3, height=4, mime="image/webp", locally_cached=True)
+    c.mark_asset_rehosted("i1", width=3, height=4, mime="image/webp")
     sql, params = calls[0]
-    assert "UPDATE assets" in sql and "locally_cached" in sql
-    assert params[-1] == "i1" and 1 in params  # locally_cached True -> 1
+    assert "UPDATE assets" in sql and "locally_cached=1" in sql
+    assert params == [3, 4, "image/webp", "i1"]
 
 def test_get_meta_returns_value_or_none(monkeypatch):
     c, calls = _client(monkeypatch, [[{"value": "0.12"}], []])

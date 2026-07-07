@@ -24,15 +24,17 @@ def conn():
 
 def test_all_migrations_applied_in_order():
     assert [p.name[:4] for p in MIGRATIONS] == [f"{i:04d}" for i in range(1, len(MIGRATIONS) + 1)]
-    assert len(MIGRATIONS) >= 6  # 0006 adds the backfill reliability columns
+    assert len(MIGRATIONS) >= 7  # 0007 drops the stored-URL columns (derived URLs)
 
 
 def test_migrations_create_tables_and_columns(conn):
     cols = {t: {r[1] for r in conn.execute(f"PRAGMA table_info({t})")}
             for t in ("assets", "queries", "api_keys", "meta")}
-    assert {"id", "prompt", "source", "source_id", "thumb_url", "medium_url", "url",
-            "model_used", "content_hash", "width", "height", "mime", "source_url",
-            "locally_cached", "created_at", "rehost_attempts", "manifest_url"} <= cols["assets"]
+    assert {"id", "prompt", "source", "source_id", "model_used", "content_hash", "width",
+            "height", "mime", "source_url", "locally_cached", "created_at",
+            "rehost_attempts"} <= cols["assets"]
+    # 0007: URLs are derived from (id, locally_cached, source_url) — no longer stored.
+    assert not ({"thumb_url", "medium_url", "url", "manifest_url"} & cols["assets"])
     assert {"normalized_prompt", "original_prompt", "count", "status", "last_asset_id",
             "last_similarity", "first_seen", "last_seen", "generate", "attempts",
             "last_error", "claimed_at"} <= cols["queries"]
@@ -53,8 +55,7 @@ def _seed_query(conn, prompt="a fox", **overrides):
          row["generate"], row["attempts"], row["claimed_at"]])
 
 
-ASSET_PARAMS = ["a1", "a fox", "generated", None, "t.webp", "m.webp", "l.webp",
-                "gpt-image-1", "hash", 1024, 1024, "image/webp", None, 1, "man.json"]
+ASSET_PARAMS = ["a1", "a fox", "generated", None, "hash", 1024, 1024, "image/webp", None, 1]
 
 
 def test_pending_queries_sql_selects_and_filters(conn):
@@ -121,13 +122,24 @@ def test_insert_asset_and_asset_exists_sql(conn):
     conn.execute(d1_client.INSERT_ASSET_SQL, ASSET_PARAMS)
     assert conn.execute(d1_client.ASSET_EXISTS_SQL, ["a1"]).fetchall()
     assert not conn.execute(d1_client.ASSET_EXISTS_SQL, ["missing"]).fetchall()
-    manifest = conn.execute("SELECT manifest_url FROM assets WHERE id='a1'").fetchone()[0]
-    assert manifest == "man.json"
+    row = conn.execute("SELECT source, locally_cached FROM assets WHERE id='a1'").fetchone()
+    assert row == ("generated", 1)
+
+
+def test_old_insert_asset_sql_with_url_fails_after_0007(conn):
+    """The pre-0007 INSERT (writing thumb_url/medium_url/url/manifest_url) must
+    fail against the post-migration schema — those columns are gone."""
+    old_sql = ("INSERT INTO assets (id, prompt, source, source_id, thumb_url, medium_url, url, "
+               "model_used, content_hash, width, height, mime, source_url, locally_cached, "
+               "manifest_url) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+    with pytest.raises(sqlite3.OperationalError):
+        conn.execute(old_sql, ["a1", "a fox", "generated", None, None, None, "l.webp",
+                               "gpt-image-1", "hash", 1024, 1024, "image/webp", None, 1, "man.json"])
 
 
 def test_rehost_sql_filters_attempts_and_increments(conn):
     params = list(ASSET_PARAMS)
-    params[13] = 0                                                # locally_cached = 0
+    params[9] = 0                                                 # locally_cached = 0
     conn.execute(d1_client.INSERT_ASSET_SQL, params)
     rows = conn.execute(d1_client.ASSETS_NEEDING_REHOST_SQL, [5]).fetchall()
     assert len(rows) == 1
@@ -136,14 +148,14 @@ def test_rehost_sql_filters_attempts_and_increments(conn):
     assert conn.execute(d1_client.ASSETS_NEEDING_REHOST_SQL, [5]).fetchall() == []
 
 
-def test_update_asset_urls_sql(conn):
+def test_mark_asset_rehosted_sql(conn):
     params = list(ASSET_PARAMS)
-    params[13] = 0
+    params[9] = 0
     conn.execute(d1_client.INSERT_ASSET_SQL, params)
-    conn.execute(d1_client.UPDATE_ASSET_URLS_SQL,
-                 ["l2.webp", "m2.webp", "t2.webp", 512, 512, "image/webp", 1, "a1"])
-    row = conn.execute("SELECT url, locally_cached FROM assets WHERE id='a1'").fetchone()
-    assert row == ("l2.webp", 1)
+    conn.execute(d1_client.MARK_ASSET_REHOSTED_SQL, [512, 512, "image/webp", "a1"])
+    row = conn.execute("SELECT width, height, mime, locally_cached FROM assets "
+                       "WHERE id='a1'").fetchone()
+    assert row == (512, 512, "image/webp", 1)
 
 
 def test_meta_add_sql_accumulates_float(conn):

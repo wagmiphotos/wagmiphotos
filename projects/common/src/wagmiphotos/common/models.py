@@ -4,9 +4,6 @@ from dataclasses import dataclass
 class AssetRecord:
     id: str
     prompt: str
-    url: str                 # large webp
-    thumb_url: str | None
-    medium_url: str | None
     model_used: str | None
     source: str              # "pd12m" | "generated" | "stub"
     source_id: str | None
@@ -14,7 +11,6 @@ class AssetRecord:
     width: int
     height: int
     mime: str
-    manifest_url: str | None
     created_at: str
     source_url: str | None = None
     locally_cached: bool = True

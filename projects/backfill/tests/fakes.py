@@ -12,7 +12,7 @@ class FakeD1:
         self.built: list[tuple[str, str]] = []
         self.similarities: dict[str, float | None] = {}
         self.inserted: list = []
-        self.url_updates: list[tuple] = []
+        self.rehost_marks: list[tuple] = []
         self.failures: list[tuple[str, str]] = []
         self.attempts: dict[str, int] = {}
         self.claims: dict[str, str] = {}
@@ -61,8 +61,8 @@ class FakeD1:
     def increment_rehost_attempts(self, asset_id):
         self.rehost_attempts[asset_id] = self.rehost_attempts.get(asset_id, 0) + 1
 
-    def update_asset_urls(self, asset_id, **kw):
-        self.url_updates.append((asset_id, kw))
+    def mark_asset_rehosted(self, asset_id, *, width, height, mime):
+        self.rehost_marks.append((asset_id, {"width": width, "height": height, "mime": mime}))
         self.rehost = [a for a in self.rehost if a.id != asset_id]
 
     # -- meta ---------------------------------------------------------------
