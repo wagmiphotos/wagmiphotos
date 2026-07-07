@@ -14,7 +14,8 @@ embedding service or tunnel to run.
    CF_ACCOUNT_ID=
    CF_API_TOKEN=
    D1_DATABASE_ID=
-   VECTORIZE_INDEX_NAME=wagmiphotos-bge
+   VECTORIZE_INDEX_PREFIX=wagmiphotos-bge-
+   VECTORIZE_SHARDS=3
    GMICLOUD_API_KEY=
    B2_KEY_ID=
    B2_APP_KEY=
