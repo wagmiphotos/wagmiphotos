@@ -7,14 +7,16 @@ export interface LibrarySearchCfg extends LibraryCfg { floorSimMin: number; }
 export const SEARCH_TOP_K = 100; // Vectorize topK cap without values/metadata
 
 // The documented public shape for a library image (spec §GET /v1/library).
-// Internal columns (source_id, source_url, locally_cached) are intentionally dropped;
-// the URL fields are derived (Task 10 / migration 0007).
+// source_id and locally_cached stay internal; source_url is deliberately
+// public as original_url (spec 2026-07-07-large-cap-original-url-design.md).
+// The URL fields are derived (Task 10 / migration 0007).
 function publicAsset(r: LibraryAssetRow, baseUrl: string | undefined) {
   const u = assetUrls(r, baseUrl);
   return {
     id: r.id, prompt: r.prompt, thumb_url: u.thumb_url, medium_url: u.medium_url,
     url: u.url, width: r.width, height: r.height, mime: r.mime,
     model_used: r.model_used, source: r.source, created_at: r.created_at,
+    original_url: u.original_url,
   };
 }
 

@@ -83,6 +83,7 @@ export async function handleGenerate(body: GenBody, s: Services, cfg: GenCfg): P
       model_used: asset.model_used,
       source: asset.source,
       sizes: { thumb: u.thumb_url, medium: u.medium_url, large: u.url },
+      original_url: u.original_url,
       ...(isHit ? {} : { generation_queued: generationQueued }),
     },
   });

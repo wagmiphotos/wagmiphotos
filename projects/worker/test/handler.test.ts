@@ -65,6 +65,7 @@ it("hit: score >= floor, cached -> result hit + cost saved", async () => {
   expect(j.shared_cache.sizes).toEqual({
     thumb: `${BASE}/assets/a1/thumb.webp`, medium: `${BASE}/assets/a1/medium.webp`, large: `${BASE}/assets/a1/image.webp`,
   });
+  expect(j.shared_cache.original_url).toBe("https://ext/x.jpg");
   expect(j.shared_cache.model_used).toBe("clip-vit-l-14");
   expect(j.shared_cache.source).toBe("pd12m");
   expect(j.shared_cache.similarity).toBe(0.40);
@@ -81,6 +82,7 @@ it("hit-not-rehosted: serves source_url, still result hit", async () => {
   expect(j.data[0].url).toBe("https://ext/x.jpg");
   expect(j.shared_cache.result).toBe("hit");
   expect(j.shared_cache.sizes.thumb).toBeNull();
+  expect(j.shared_cache.original_url).toBe("https://ext/x.jpg"); // pre-rehost: same as data[0].url
 });
 
 it("approximate: score < floor -> result approximate + pending query, nothing saved", async () => {

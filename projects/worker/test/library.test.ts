@@ -35,8 +35,17 @@ it("search: response projects to documented public shape, omits internal columns
   expect(img).toEqual({
     id: "a1", prompt: "a fox", thumb_url: `${BASE}/assets/a1/thumb.webp`, medium_url: `${BASE}/assets/a1/medium.webp`,
     url: `${BASE}/assets/a1/image.webp`, width: 10, height: 20, mime: "image/webp",
-    model_used: "flux", source: "pd12m", created_at: "2026-07-03 00:00:00",
+    model_used: "flux", source: "pd12m", created_at: "2026-07-03 00:00:00", original_url: null,
   });
+});
+
+it("search: sourced rows expose original_url", async () => {
+  const s = fakeServices();
+  (s as any)._libraryRows.push(libRow({ source_url: "https://pd12m.example/x.jpg" }));
+  const res = await handleLibrarySearch(new URL("https://x/v1/library"), s, cfg);
+  const j: any = await res.json();
+  expect(j.images[0].original_url).toBe("https://pd12m.example/x.jpg");
+  expect(j.images[0]).not.toHaveProperty("source_url");
 });
 
 it("search: has_more true when a full extra row exists, images trimmed to limit", async () => {
