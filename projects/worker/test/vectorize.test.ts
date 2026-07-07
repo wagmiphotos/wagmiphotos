@@ -1,33 +1,26 @@
-import { it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { makeVectorize } from "../src/vectorize";
 
-it("query maps binding response to {id, score}[] and drops extra fields", async () => {
-  const binding: any = {
-    query: vi.fn(async () => ({
-      matches: [
-        { id: "a", score: 0.9, meta: "ignored" },
-        { id: "b", score: 0.1 },
-      ],
-    })),
-  };
+const shard = (matches: { id: string; score: number }[]) =>
+  ({ query: async (_v: number[], _o: any) => ({ matches }) }) as any;
 
-  const store = makeVectorize(binding);
-  const result = await store.query([0.1], 2);
-
-  expect(result).toEqual([
-    { id: "a", score: 0.9 },
-    { id: "b", score: 0.1 },
-  ]);
-  expect(binding.query).toHaveBeenCalledWith([0.1], { topK: 2 });
-});
-
-it("query returns empty array when binding response has no matches", async () => {
-  const binding: any = {
-    query: async () => ({}),
-  };
-
-  const store = makeVectorize(binding);
-  const result = await store.query([0.1], 1);
-
-  expect(result).toEqual([]);
+describe("makeVectorize (sharded)", () => {
+  it("fans out to every shard and merges by score desc", async () => {
+    const store = makeVectorize([
+      shard([{ id: "a", score: 0.91 }, { id: "b", score: 0.5 }]),
+      shard([{ id: "c", score: 0.95 }]),
+      shard([{ id: "d", score: 0.8 }]),
+    ]);
+    const out = await store.query([0.1], 3);
+    expect(out.map((m) => m.id)).toEqual(["c", "a", "d"]);
+  });
+  it("dedupes ids keeping the higher score", async () => {
+    const store = makeVectorize([shard([{ id: "a", score: 0.7 }]), shard([{ id: "a", score: 0.9 }])]);
+    const out = await store.query([0.1], 5);
+    expect(out).toEqual([{ id: "a", score: 0.9 }]);
+  });
+  it("tolerates a shard returning no matches field", async () => {
+    const store = makeVectorize([({ query: async () => ({}) }) as any, shard([{ id: "x", score: 0.6 }])]);
+    expect(await store.query([0.1], 2)).toEqual([{ id: "x", score: 0.6 }]);
+  });
 });

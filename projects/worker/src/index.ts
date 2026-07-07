@@ -22,7 +22,7 @@ function buildServices(env: Env): Services {
   };
   return {
     embedder: { textEmbed: (p) => bgeTextEmbed(p, env) },
-    vectorize: makeVectorize(env.VECTORIZE),
+    vectorize: makeVectorize([env.VECTORIZE_0, env.VECTORIZE_1, env.VECTORIZE_2]),
     assets, queries, keys, rateLimiter,
     users, sessions, loginTokens, email: makeEmailSender(env),
   };

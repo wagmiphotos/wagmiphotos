@@ -12,10 +12,18 @@ database_id = "f154509c-622f-451f-a004-70e91a0ed68a"
 [ai]
 binding = "AI"
 
-# Vectorize — BGE index
+# Vectorize — 3-shard BGE index (fan-out query, fnv1a32(id)-routed writes)
 [[vectorize]]
-binding = "VECTORIZE"
-index_name = "wagmiphotos-bge"
+binding = "VECTORIZE_0"
+index_name = "wagmiphotos-bge-0"
+
+[[vectorize]]
+binding = "VECTORIZE_1"
+index_name = "wagmiphotos-bge-1"
+
+[[vectorize]]
+binding = "VECTORIZE_2"
+index_name = "wagmiphotos-bge-2"
 
 # Per-IP rate limit for key generation
 [[unsafe.bindings]]

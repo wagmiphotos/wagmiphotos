@@ -53,7 +53,7 @@ export interface Services {
   email: EmailSender;
 }
 export interface Env {
-  DB: D1Database; VECTORIZE: VectorizeIndex; AI: Ai; RATE_LIMITER?: RateLimitBinding;
+  DB: D1Database; VECTORIZE_0: VectorizeIndex; VECTORIZE_1: VectorizeIndex; VECTORIZE_2: VectorizeIndex; AI: Ai; RATE_LIMITER?: RateLimitBinding;
   ASSETS: { fetch(request: Request): Promise<Response> };
   MASTER_API_KEY?: string;
   /** "true"/"1" opens dev-only lanes (dev API principal, console magic links). NEVER set in production. */

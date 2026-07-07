@@ -3,14 +3,17 @@ import worker from "../src/index";
 
 afterEach(() => vi.unstubAllGlobals());
 
-// Minimal fake env: DB stub used only by keygen/auth; VECTORIZE returns no matches.
+// Minimal fake env: DB stub used only by keygen/auth; VECTORIZE_* shards return no matches.
 function fakeEnv(over: any = {}) {
   const db: any = {
     prepare: () => ({ bind: () => ({ first: async () => null, run: async () => ({ success: true }), all: async () => ({ results: [] }) }) }),
   };
+  const vectorizeStub = { query: async () => ({ matches: [] }) };
   return {
     DB: db,
-    VECTORIZE: { query: async () => ({ matches: [] }) },
+    VECTORIZE_0: vectorizeStub,
+    VECTORIZE_1: vectorizeStub,
+    VECTORIZE_2: vectorizeStub,
     AI: { run: async () => ({ shape: [1, 2], data: [[0.1, 0.2]] }) },
     ASSETS: { fetch: async () => new Response("<!doctype html><title>SPA</title>", { status: 200, headers: { "content-type": "text/html" } }) },
     DEV_MODE: "true", // tests exercise the dev-open lane unless overridden
@@ -110,7 +113,7 @@ it("generate: upstream throw (vectorize.query throws) -> 500 without internal de
   const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
   const res = await worker.fetch(
     new Request("https://x/v1/images/generations", { method: "POST", body: JSON.stringify({ prompt: "hi" }) }),
-    fakeEnv({ VECTORIZE: { query: async () => { throw new Error("boom"); } } })
+    fakeEnv({ VECTORIZE_0: { query: async () => { throw new Error("boom"); } } })
   );
   expect(res.status).toBe(500);
   const j: any = await res.json();
