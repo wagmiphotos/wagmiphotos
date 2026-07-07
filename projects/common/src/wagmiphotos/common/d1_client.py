@@ -150,9 +150,16 @@ class D1Client:
         """Atomically add `amount` to a numeric meta value (creates it if absent)."""
         self._query(META_ADD_SQL, [key, str(amount)])
 
+    # D1 hard-caps bound parameters at 100 per statement; each chunk binds
+    # source + up to 99 ids.
+    _SOURCE_ID_CHUNK = 99
+
     def existing_source_ids(self, source: str, source_ids: list[str]) -> set[str]:
-        """Which of `source_ids` already exist for `source` (seed dedupe)."""
-        if not source_ids:
-            return set()
-        rows = self._query(existing_source_ids_sql(len(source_ids)), [source, *source_ids])
-        return {r["source_id"] for r in rows}
+        """Which of `source_ids` already exist for `source` (seed dedupe).
+        Chunked to stay under D1's 100-bound-parameter cap."""
+        found: set[str] = set()
+        for i in range(0, len(source_ids), self._SOURCE_ID_CHUNK):
+            chunk = source_ids[i:i + self._SOURCE_ID_CHUNK]
+            rows = self._query(existing_source_ids_sql(len(chunk)), [source, *chunk])
+            found.update(r["source_id"] for r in rows)
+        return found

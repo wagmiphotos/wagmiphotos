@@ -129,3 +129,15 @@ def test_existing_source_ids_empty_short_circuits(monkeypatch):
     c, calls = _client(monkeypatch, [[]])
     assert c.existing_source_ids("pd12m", []) == set()
     assert calls == []  # no round-trip for an empty batch
+
+def test_existing_source_ids_chunks_under_d1_param_cap(monkeypatch):
+    # D1 hard-caps bound parameters at 100 per statement; source + ids must
+    # never exceed it (a 100-id seed page = 101 params = SQLITE_ERROR live).
+    ids = [str(i) for i in range(150)]
+    c, calls = _client(monkeypatch, [[{"source_id": "0"}], [{"source_id": "149"}]])
+    out = c.existing_source_ids("pd12m", ids)
+    assert out == {"0", "149"}                      # results merged across chunks
+    assert len(calls) == 2
+    for sql, params in calls:
+        assert len(params) <= 100                   # source + <=99 ids
+    assert [p for _, params in calls for p in params if p != "pd12m"] == ids  # all ids queried once
