@@ -43,10 +43,12 @@ CREATE INDEX idx_assets_rehostable ON assets(rowid)
 CREATE VIEW live_assets AS SELECT * FROM assets WHERE dead_at IS NULL;
 ```
 
-SQLite expands the view's `*` at creation time; the view is created after
-the ALTERs so it includes the new columns. Any future migration that adds
-asset columns must recreate the view (note this in the migration's header
-comment).
+The view is created after the ALTERs so it includes the new columns. Any
+future migration that adds asset columns should DROP and recreate the view —
+defensive: `*` re-expansion timing on schema changes is an engine detail we
+don't want to depend on (noted in the migration's header comment). The
+shipped index is on `assets(id)`, not `rowid` as originally drafted —
+SQLite's CREATE INDEX cannot reference rowid.
 
 ### 2. Demand-ranked selection (`projects/common/.../d1_client.py`)
 
