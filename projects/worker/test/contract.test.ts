@@ -1,4 +1,6 @@
 import { it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 // The cross-language constants contract at the repo root. The Python backfill
 // pins its side in projects/common/tests/test_contract.py; a drift on either
 // side must fail tests.
@@ -30,4 +32,35 @@ it("shard routing matches the contract fixtures", () => {
 
 it("fnv1a32 reference value", () => {
   expect(fnv1a32("demo-1")).toBe(207613968);
+});
+
+it("wrangler.toml [[vectorize]] bindings match contract.json (shard count + index names)", () => {
+  const toml = readFileSync(join(__dirname, "../wrangler.toml"), "utf8");
+  const blocks = toml.split("[[vectorize]]").slice(1);
+  expect(
+    blocks.length,
+    `wrangler.toml has ${blocks.length} [[vectorize]] block(s), contract.json vectorize_shards is ${contract.vectorize_shards}`,
+  ).toBe(contract.vectorize_shards);
+
+  const parsed = blocks.map((block, i) => {
+    const bindingMatch = block.match(/binding\s*=\s*"VECTORIZE_(\d+)"/);
+    const indexMatch = block.match(/index_name\s*=\s*"([^"]+)"/);
+    expect(bindingMatch, `[[vectorize]] block ${i} in wrangler.toml is missing a binding = "VECTORIZE_<n>" line`).not.toBeNull();
+    expect(indexMatch, `[[vectorize]] block ${i} in wrangler.toml is missing an index_name = "..." line`).not.toBeNull();
+    return { shard: Number(bindingMatch![1]), indexName: indexMatch![1] };
+  });
+
+  for (let i = 0; i < contract.vectorize_shards; i++) {
+    const expectedBinding = `VECTORIZE_${i}`;
+    const expectedIndexName = `${contract.vectorize_index_prefix}${i}`;
+    const entry = parsed.find((p) => p.shard === i);
+    expect(
+      entry,
+      `wrangler.toml has no [[vectorize]] block with binding = "${expectedBinding}"`,
+    ).toBeDefined();
+    expect(
+      entry!.indexName,
+      `wrangler.toml binding "${expectedBinding}" has index_name = "${entry!.indexName}", expected "${expectedIndexName}"`,
+    ).toBe(expectedIndexName);
+  }
 });

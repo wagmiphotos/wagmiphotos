@@ -141,6 +141,11 @@ def test_query_fans_out_to_every_shard_and_merges_desc(monkeypatch):
     v, fake = _vectorize(monkeypatch, responses, shards=3)
     out = v.query([0.0] * 768, top_k=2)
     assert len(fake.calls) == 3  # every shard queried, full top_k each
+    # Each shard must be asked for the FULL top_k, not top_k // shards — the
+    # merge only re-slices to top_k across the union of per-shard results, so
+    # under-asking any shard could silently drop a better match.
+    for url, kw in fake.calls:
+        assert kw["json"]["topK"] == 2, f"{url} got topK={kw['json']['topK']!r}, expected the full top_k=2"
     assert [m["id"] for m in out] == ["c", "a"]  # merged, sorted desc, sliced to top_k
 
 def test_query_merge_keeps_max_score_when_earlier_shard_scores_higher(monkeypatch):

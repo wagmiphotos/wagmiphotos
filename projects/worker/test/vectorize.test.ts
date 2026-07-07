@@ -14,8 +14,11 @@ describe("makeVectorize (sharded)", () => {
     const out = await store.query([0.1], 3);
     expect(out.map((m) => m.id)).toEqual(["c", "a", "d"]);
   });
-  it("dedupes ids keeping the higher score", async () => {
-    const store = makeVectorize([shard([{ id: "a", score: 0.7 }]), shard([{ id: "a", score: 0.9 }])]);
+  it("dedupes ids keeping the higher score, even when the higher score comes from the earlier shard", async () => {
+    // The higher score (0.9) arrives from shard 0 (earlier); the lower score
+    // (0.7) arrives from shard 1 (later). A last-write-wins merge would
+    // wrongly clobber 0.9 with 0.7; max-score merge must keep 0.9.
+    const store = makeVectorize([shard([{ id: "a", score: 0.9 }]), shard([{ id: "a", score: 0.7 }])]);
     const out = await store.query([0.1], 5);
     expect(out).toEqual([{ id: "a", score: 0.9 }]);
   });

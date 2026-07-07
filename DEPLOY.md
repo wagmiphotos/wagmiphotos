@@ -168,6 +168,12 @@ curl https://wagmi.photos/healthz                # worker up
 docker compose logs backfill --tail 20           # (on the box) polling loop ticking
 ```
 
+Once rehosting has run for at least one asset, open a rehosted asset's
+`thumb_url` from `GET /v1/library` directly in a browser (or `curl -I`) and
+confirm it returns 200 — a 404 here means `ASSET_BASE_URL` (Worker) and
+`B2_PUBLIC_URL_BASE` (backfill) don't agree, and it's a ten-second check
+instead of a support ticket.
+
 ## Day 2
 
 - Logs: `docker compose logs -f backfill`
