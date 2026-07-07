@@ -125,6 +125,28 @@ it("falls back to LIKE search when the embedder throws", async () => {
   expect(body.images.map((i: any) => i.id)).toEqual(["like-hit"]);
 });
 
+it("falls back to LIKE search when vectorize.query throws", async () => {
+  const s = fakeServices({ vectorize: { query: async () => { throw new Error("index unavailable"); } } });
+  (s as any)._libraryRows.push(libRow({ id: "like-hit" }));
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?q=cat"), s, { floorSimMin: 0.72 });
+  expect(res.status).toBe(200);
+  const body: any = await res.json();
+  expect((s as any)._searchCalls[0]).toEqual({ q: "cat", limit: 25, offset: 0 });
+  expect(body.images.map((i: any) => i.id)).toEqual(["like-hit"]);
+});
+
+it("falls back to LIKE search when getAssetsByIds throws (embedder+vectorize succeed)", async () => {
+  const s = fakeServices();
+  (s as any)._matches.push({ id: "b", score: 0.95 }); // above floor, so hydration is reached
+  s.assets.getAssetsByIds = async () => { throw new Error("D1 blip"); };
+  (s as any)._libraryRows.push(libRow({ id: "like-hit" }));
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?q=cat"), s, { floorSimMin: 0.72 });
+  expect(res.status).toBe(200);
+  const body: any = await res.json();
+  expect((s as any)._searchCalls[0]).toEqual({ q: "cat", limit: 25, offset: 0 });
+  expect(body.images.map((i: any) => i.id)).toEqual(["like-hit"]);
+});
+
 it("empty q keeps the recency browse (vectorize and embedder never called)", async () => {
   let vectorizeCalled = false;
   let embedderCalled = false;
