@@ -36,7 +36,7 @@ simple = { limit = 10, period = 60 }
 # DEV_MODE must NEVER be set in production: it opens the unauthenticated dev API
 # lane and console-logs magic links. Set it only in .dev.vars for local dev
 # (see .dev.vars.example).
-EMAIL_FROM = "login@wagmi.photos"   # verified Resend sending address
+EMAIL_FROM = "noreply@mail.suppers.ai"   # verified Resend sending address (domain: mail.suppers.ai)
 FLOOR_SIM_MAX = "0.90"
 FLOOR_SIM_MIN = "0.72"
 IMAGE_PRICE_USD = "0.04"

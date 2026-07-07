@@ -258,7 +258,7 @@ wrangler secret put RESEND_API_KEY
 # (paste your Resend API key)
 ```
 
-The `EMAIL_FROM` sender address is configured in `projects/worker/wrangler.toml` as `login@wagmi.photos` (a verified Resend sending domain).
+The `EMAIL_FROM` sender address is configured in `projects/worker/wrangler.toml` as `noreply@mail.suppers.ai` (a verified Resend sending domain — `mail.suppers.ai`).
 
 ---
 

@@ -238,7 +238,7 @@ prefetched verify link alone can't log anyone in. Deploy steps:
    step 3 above (note `0004`'s breaking anonymous-key wipe and `0005` voiding
    outstanding magic links).
 2. **Set the Resend secret + sender:** `npx wrangler secret put RESEND_API_KEY`;
-   confirm `EMAIL_FROM` in `wrangler.toml` (`login@wagmi.photos`) and **verify that
+   confirm `EMAIL_FROM` in `wrangler.toml` (`noreply@mail.suppers.ai`) and **verify that
    sending domain in Resend**. With `RESEND_API_KEY` unset (and no `DEV_MODE`, which
    prod must never set — see step 5) login fails closed: no email is sent and no
    link is logged or returned. Never deploy prod without the Resend secret.
