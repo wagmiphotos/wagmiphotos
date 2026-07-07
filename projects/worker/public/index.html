@@ -437,6 +437,8 @@
       background: var(--ink); color: #fff; border-radius: 8px;
     }
     .library-download:hover { background: var(--red); }
+    .library-original { font-size: 0.8125rem; color: var(--muted); text-decoration: underline; }
+    .library-original:hover { color: var(--ink); }
     .library-status { text-align: center; color: var(--muted); padding: 40px 0; font-size: 0.9375rem; }
     .library-status a { color: var(--red); }
     .link-btn {
@@ -3255,6 +3257,10 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
     <span class="tk-key">"original_url"</span>: <span class="tk-str">"https://pd12m.s3.us-west-2.amazonaws.com/…"</span>
   }
 }</pre>
+            <p>
+              <code>original_url</code> is the external source image when one exists, and
+              <code>null</code> for generated images.
+            </p>
 
             <h3>Response — nothing close enough yet (202)</h3>
             <pre class="docs-pre">{
@@ -4119,7 +4125,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       const tags = [img.model_used, img.source].filter(Boolean)
         .map(t => '<span class="library-tag">' + escapeHtml(t) + '</span>').join('');
       const original = img.original_url
-        ? '<a class="library-download" href="' + escapeHtml(img.original_url) + '" target="_blank" rel="noopener">Original ↗</a>'
+        ? '<a class="library-original" href="' + escapeHtml(img.original_url) + '" target="_blank" rel="noopener">Original ↗</a>'
         : '';
       return '<div class="library-card">' +
         '<img class="library-thumb" loading="lazy" src="' + escapeHtml(thumb) + '" alt="' + escapeHtml(img.prompt) + '">' +
