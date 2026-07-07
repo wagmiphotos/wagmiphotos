@@ -1,6 +1,9 @@
 name = "wagmiphotos-worker"
 main = "src/index.ts"
 compatibility_date = "2026-06-01"
+# Served exclusively via the custom domains wagmi.photos + api.wagmi.photos.
+workers_dev = false
+preview_urls = false
 
 # D1 — same database the backfill/seed write (set database_id after `wrangler d1 create`)
 [[d1_databases]]
