@@ -160,3 +160,25 @@ def test_query_merge_keeps_max_score_when_earlier_shard_scores_higher(monkeypatc
     v, fake = _vectorize(monkeypatch, responses, shards=2)
     out = v.query([0.0] * 768, top_k=1)
     assert out == [{"id": "a", "score": 0.95}]
+
+def test_delete_posts_ids_to_the_routed_shard(monkeypatch):
+    v, fake = _vectorize(monkeypatch, [_ok()])
+    v.delete(["a1"])
+    url, kw = fake.calls[0]
+    assert url.endswith("/wagmiphotos-bge-0/delete_by_ids")
+    assert kw["json"] == {"ids": ["a1"]}
+
+def test_delete_groups_ids_by_shard(monkeypatch):
+    from wagmiphotos.common.shard import shard_for
+    v, fake = _vectorize(monkeypatch, [_ok(), _ok(), _ok()], shards=3)
+    ids = ["demo-1", "demo-3", "pd12m-8492731"]   # contract fixtures: shards 0, 1, 2
+    v.delete(ids)
+    assert len(fake.calls) == 3
+    for url, kw in fake.calls:
+        shard = int(url.split("wagmiphotos-bge-")[1].split("/")[0])
+        assert all(shard_for(i, 3) == shard for i in kw["json"]["ids"])
+
+def test_delete_empty_is_a_noop(monkeypatch):
+    v, fake = _vectorize(monkeypatch, [])
+    v.delete([])
+    assert fake.calls == []

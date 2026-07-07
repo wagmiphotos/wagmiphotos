@@ -79,3 +79,14 @@ class VectorizeClient:
             by_shard.setdefault(shard_for(v["id"], self._shards), []).append(v)
         for shard in sorted(by_shard):
             self._post_ndjson(shard, "insert", by_shard[shard])
+
+    def delete(self, ids: list[str]) -> None:
+        """Delete vectors by id, routed to each id's shard (best-effort cleanup
+        for tombstoned assets — the Worker tolerates orphan vectors)."""
+        by_shard: dict[int, list[str]] = {}
+        for id in ids:
+            by_shard.setdefault(shard_for(id, self._shards), []).append(id)
+        for shard in sorted(by_shard):
+            post_with_retry(self._client, f"{self._index_base(shard)}/delete_by_ids",
+                            what="Vectorize delete_by_ids", headers=self._headers(),
+                            json={"ids": by_shard[shard]})
