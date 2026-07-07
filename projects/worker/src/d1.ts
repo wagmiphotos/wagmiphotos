@@ -3,6 +3,8 @@ import type {
   User, UserStore, SessionStore, LoginTokenStore,
 } from "./types";
 
+// Reads select FROM live_assets (migration 0008): the view owns the
+// dead_at IS NULL invariant, so dead assets are invisible to every read.
 const ASSET_COLS =
   "id, prompt, source, source_id, model_used, width, height, mime, source_url, locally_cached";
 
@@ -16,7 +18,7 @@ export function makeD1Stores(db: D1Database): {
 } {
   const assets: AssetStore = {
     async getAsset(id) {
-      const row = await db.prepare(`SELECT ${ASSET_COLS} FROM assets WHERE id = ?`).bind(id).first<AssetRow>();
+      const row = await db.prepare(`SELECT ${ASSET_COLS} FROM live_assets WHERE id = ?`).bind(id).first<AssetRow>();
       return row ?? null;
     },
     async searchAssets({ q, limit, offset }) {
@@ -24,9 +26,9 @@ export function makeD1Stores(db: D1Database): {
       const tail = "ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?";
       const stmt = tokens.length
         ? db.prepare(
-            `SELECT ${ASSET_COLS}, created_at FROM assets WHERE ${tokens.map(() => "prompt LIKE ? ESCAPE '\\'").join(" AND ")} ${tail}`
+            `SELECT ${ASSET_COLS}, created_at FROM live_assets WHERE ${tokens.map(() => "prompt LIKE ? ESCAPE '\\'").join(" AND ")} ${tail}`
           ).bind(...tokens.map((t) => `%${escapeLike(t)}%`), limit, offset)
-        : db.prepare(`SELECT ${ASSET_COLS}, created_at FROM assets ${tail}`).bind(limit, offset);
+        : db.prepare(`SELECT ${ASSET_COLS}, created_at FROM live_assets ${tail}`).bind(limit, offset);
       const { results } = await stmt.all<LibraryAssetRow>();
       return results ?? [];
     },
@@ -34,7 +36,7 @@ export function makeD1Stores(db: D1Database): {
       if (ids.length === 0) return [];
       const marks = ids.map(() => "?").join(",");
       const { results } = await db.prepare(
-        `SELECT ${ASSET_COLS}, created_at FROM assets WHERE id IN (${marks})`
+        `SELECT ${ASSET_COLS}, created_at FROM live_assets WHERE id IN (${marks})`
       ).bind(...ids).all<LibraryAssetRow>();
       return results ?? [];
     },

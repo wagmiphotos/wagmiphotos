@@ -26,7 +26,7 @@ it("getAsset selects by id and maps row", async () => {
   const { assets } = makeD1Stores(db);
   const got = await assets.getAsset("a1");
   expect(got?.id).toBe("a1");
-  expect(calls[0].sql).toContain("FROM assets");
+  expect(calls[0].sql).toContain("FROM live_assets");
   expect(calls[0].args).toEqual(["a1"]);
 });
 
@@ -108,6 +108,7 @@ it("searchAssets browse mode: no WHERE, ordered newest-first, binds limit/offset
   expect(calls[0].sql).toContain("ORDER BY created_at DESC, id DESC");
   expect(calls[0].sql).toContain("created_at");
   expect(calls[0].args).toEqual([25, 0]);
+  expect(calls[0].sql).toContain("FROM live_assets");
 });
 
 it("searchAssets query mode: LIKE over prompt with bound pattern", async () => {
@@ -116,6 +117,7 @@ it("searchAssets query mode: LIKE over prompt with bound pattern", async () => {
   await assets.searchAssets({ q: "fox", limit: 10, offset: 20 });
   expect(calls[0].sql).toContain("WHERE prompt LIKE ? ESCAPE '\\'");
   expect(calls[0].args).toEqual(["%fox%", 10, 20]);
+  expect(calls[0].sql).toContain("FROM live_assets");
 });
 
 it("searchAssets escapes LIKE wildcards in user input", async () => {
@@ -159,6 +161,7 @@ it("getAssetsByIds selects rows by id IN (...), binding every id", async () => {
   expect(got).toEqual(rows);
   expect(calls[0].sql).toContain("WHERE id IN (?,?)");
   expect(calls[0].args).toEqual(["demo-2", "demo-1"]);
+  expect(calls[0].sql).toContain("FROM live_assets");
 });
 
 it("searchAssets whitespace-only query: browse mode (no WHERE)", async () => {
