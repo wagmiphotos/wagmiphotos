@@ -79,9 +79,14 @@ demand tracking and **hard-errors the Python backfill**:
   `contract.json`); everything else serves `source_url`. Set `ASSET_BASE_URL`
   before/at deploy (see step 5) — without it, cached assets degrade to
   `source_url` too.
+- `0008` — adds `assets.dead_at` and `assets.dead_reason` (demand-ranked
+  rehosting + tombstones), the partial index `idx_assets_rehostable`, and the
+  `live_assets` view. **Must be applied before the next Worker deploy and
+  before the backfill runs this code** — readers reference the view; old code
+  against a migrated DB is safe, the reverse is not.
 
 ```bash
-npx wrangler d1 migrations apply wagmiphotos --remote   # runs 0001 → 0007
+npx wrangler d1 migrations apply wagmiphotos --remote   # runs 0001 → 0008
 ```
 
 ## 4. Stand up the GMI box (backfill)

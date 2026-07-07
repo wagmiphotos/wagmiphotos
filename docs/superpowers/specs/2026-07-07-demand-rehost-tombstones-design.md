@@ -122,8 +122,10 @@ re-records — the existing self-healing path.
 - Worker: read-side filters only; no new failure modes.
 - Backfill: `SourceGone` and exhaustion both funnel through
   `mark_asset_dead`, which runs before vector deletion. If the D1 write
-  fails, the existing per-asset exception isolation logs and moves on; the
-  asset is retried next tick.
+  inside a tombstone/increment fails, it escapes `rehost_pass` and aborts
+  the remainder of that batch; the per-tick guard in `run()` catches it, and
+  the affected assets are retried next tick. (Pre-existing shape — the old
+  bare `increment_rehost_attempts` behaved the same.)
 
 ### 7. Testing
 
