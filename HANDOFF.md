@@ -1,20 +1,39 @@
 # wagmi.photos — Handoff / Resume Here
 
-_Last updated: 2026-07-07 (end of launch session). **The product is LIVE at
-[wagmi.photos](https://wagmi.photos)** — deployed, seeded, login working, first
-real user + demand queries in the database. The one missing organ is the GMI
-backfill box (step 4 of `DEPLOY.md`): until it runs, queued generations don't
-build and nothing rehosts to the CDN. Everything is merged to `main` and pushed
-to `github.com/wagmiphotos/wagmiphotos`._
+_Last updated: 2026-07-07 (evening session, after launch). **The product is
+LIVE at [wagmi.photos](https://wagmi.photos)**. This session shipped two
+reviewed features, both deployed: (1) the rehosted `large` variant is capped at
+2048px and the pd12m source is exposed as `original_url` in the API + a
+"View original" link in the playground; (2) rehosting is demand-ranked and dead
+sources get tombstoned (migration **0008**: `dead_at`/`dead_reason` + the
+`live_assets` view every Worker read now goes through). Migration 0008 is
+APPLIED to prod D1 and the Worker is deployed (version `937f9713`). The one
+missing organ is still the GMI backfill box (step 4 of `DEPLOY.md`): until it
+runs, queued generations don't build, nothing rehosts, and none of today's
+backfill-side code has ever executed against live infra. Everything is merged
+to `main` and pushed._
 
 ## What's live right now (verified 2026-07-07)
 
 - **`wagmi.photos` + `api.wagmi.photos`** → `wagmiphotos-worker` (workers.dev +
   preview URLs disabled). Magic-link login works end-to-end via Resend
   (sender `noreply@mail.suppers.ai`).
-- **D1 `wagmiphotos`** migrated 0001–0007; contents at session end: 1 user,
-  1,000 assets, 4 pending demand queries (real playground prompts, correctly
-  scored ~0.71–0.78 vs the museum-heavy seed pool and queued).
+- **D1 `wagmiphotos`** migrated 0001–**0008**; contents at session end: 1 user,
+  1,000 assets (all alive through the new `live_assets` view), 4 pending demand
+  queries (real playground prompts, correctly scored ~0.71–0.78 vs the
+  museum-heavy seed pool and queued).
+- **Rehost pipeline semantics (new this session, deployed but never yet run):**
+  `assets_needing_rehost` is demand-first (ranked by `SUM(queries.count)` per
+  `last_asset_id`, FIFO trickle fills leftover slots); `large` is capped at
+  2048px longest side (`MAX_LARGE_DIM`, never upscales); HTTP 404/410 from a
+  source tombstones immediately (`dead_at`/`dead_reason`, no retry spend),
+  retry exhaustion (5) tombstones too; death is D1-first then best-effort
+  vector delete (Worker skips orphan vectors). Tombstones are reversible
+  (`UPDATE assets SET dead_at=NULL`). Reads must go through `live_assets` —
+  the view owns the invariant; writes target `assets`.
+- **API additions:** `original_url` (source image, `null` for generated) sits
+  next to `sizes` in the generate response and on library items; the playground
+  shows "View original ↗" links.
 - **Vectorize**: 3 shards `wagmiphotos-bge-0/1/2` holding 333/343/324 vectors —
   fnv1a32 write-routing balance confirmed live.
 - **Assets CDN path**: `https://images.wagmi.photos/file/wagmi-photos-library`
@@ -109,15 +128,21 @@ is what seeding reads; the 36GB `embeddings/` dir is a different model's vectors
 ### 1. Stand up the GMI backfill box (`DEPLOY.md` step 4 — the only missing piece)
 Provision a CPU GMI instance with Docker → clone the repo → `scp deploy/gmi/.env` across →
 `cd deploy/gmi && docker compose up -d --build` (first build pulls CPU torch + BGE weights).
-Then: the 4 pending queries should generate within a tick, rehosting starts, and the
-`curl -I <thumb_url>` seam check (DEPLOY Verify) proves the CDN path. Also confirms the
-non-root Docker image builds end-to-end (never built here).
+Then: the 4 pending queries should generate within a tick, rehosting starts (demand-first,
+2048-capped, tombstoning dead sources), and the `curl -I <thumb_url>` seam check (DEPLOY
+Verify) proves the CDN path. Also confirms the non-root Docker image builds end-to-end
+(never built here). Stopgap if the box is delayed: one local `uv run wagmiphotos-backfill`
+run with `deploy/gmi/.env` sourced drains the 1k pool in a couple of hours.
 
 ### 2. Full-scale seed (1k → 12.5M) — needs batching work first
 Current seeding inserts D1 rows one REST call each — fine for thousands, days for millions.
 Before the big run: batch D1 inserts (D1 REST accepts multi-statement bodies), consider running
 the seed on the GMI box, and re-probe the floors after each big batch (coincidental similarity
 creeps up with scale). D1 headroom is fine (~4.4GB slim rows at 12.5M vs 10GB cap).
+Also parked for this milestone (same method, do together): switch rehost to **demand-only**
+(drop the trickle query — don't mirror 12M unrequested images) and add the batch-size guard —
+`WORKER_BATCH_SIZE` > ~50 would overflow the trickle query's `NOT IN` under D1's
+100-bound-param cap; nothing enforces the ceiling today (default is 5, so no current risk).
 
 ### 3. Hardening before real traffic (unchanged from reviews; none blocking)
 - Rehost host allowlist once `source_url` can be user-influenced (today: trusted PD12M only).
@@ -131,8 +156,13 @@ Devpost submission + demo video — see `TODO.md`.
 
 ## Design trail
 
+- `docs/superpowers/specs/2026-07-07-demand-rehost-tombstones-design.md` (+ plan) — demand-ranked
+  rehosting, tombstones, `live_assets` view (this session; 5 tasks, all reviews clean).
+- `docs/superpowers/specs/2026-07-07-large-cap-original-url-design.md` (+ plan) — 2048px large
+  cap + `original_url` API/playground exposure (this session; one review-caught CSS `[hidden]`
+  cascade bug fixed before merge).
 - `docs/superpowers/specs/2026-07-07-wagmiphotos-rename-and-scale-design.md` (+ plan) — the
-  rename, 3-shard Vectorize, derived URLs, semantic library search (this session).
+  rename, 3-shard Vectorize, derived URLs, semantic library search (launch session).
 - `docs/superpowers/specs/2026-07-06-bge-edge-embeddings.*` — BGE migration; its Task 6
   (live provisioning) was completed this session, with two live-only findings: Workers AI
   mean-pools, and D1 caps bound params at 100/statement.
@@ -141,8 +171,9 @@ Devpost submission + demo video — see `TODO.md`.
 
 ## Ground truth
 
-- Branch: `main`, pushed to origin. `git log --oneline -25` tells today's story: audit fix
-  sweep → rename/scale plan (13 reviewed tasks) → launch-gate fixes (mean pooling, D1 param
-  cap, floors 0.87/0.75) → live config.
+- Branch: `main`, pushed to origin. `git log --oneline -25` tells today's story: launch
+  (audit sweep → rename/scale → launch-gate fixes → live config) → large-cap + original_url
+  (spec/plan + 4 reviewed tasks) → demand-rehost + tombstones (spec/plan + 5 reviewed tasks,
+  migration 0008 applied, Worker deployed).
 - If resuming a multi-step build, use the superpowers brainstorm → writing-plans →
   subagent-driven-development flow (that's how everything above was built).
