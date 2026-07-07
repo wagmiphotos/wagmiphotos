@@ -29,7 +29,7 @@ class BackfillWorker:
     def __init__(self, d1, vectorize, embedder, generator, storage, *,
                  model: str,
                  floor_tolerance: float = DEFAULT_CACHE_TOLERANCE,
-                 floor_sim_max: float = 0.90, floor_sim_min: float = 0.72, batch_size: int = 5,
+                 floor_sim_max: float = 0.87, floor_sim_min: float = 0.75, batch_size: int = 5,
                  max_spend_usd: float = 5.0, price_usd: float = 0.04,
                  max_lifetime_spend_usd: float | None = None,
                  max_rehost_bytes: int = DEFAULT_MAX_REHOST_BYTES):

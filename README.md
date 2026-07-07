@@ -42,7 +42,7 @@
         the next identical/similar prompt is a HIT
 ```
 
-Similarity floors (`FLOOR_SIM_MAX=0.90` / `FLOOR_SIM_MIN=0.72`) and the default `cache_tolerance` (0.15) are pinned in the repo-root `contract.json`, which both the Worker and the backfill test suites assert against.
+Similarity floors (`FLOOR_SIM_MAX=0.87` / `FLOOR_SIM_MIN=0.75`) and the default `cache_tolerance` (0.15) are pinned in the repo-root `contract.json`, which both the Worker and the backfill test suites assert against.
 
 ### How the cache saves money
 
@@ -76,7 +76,7 @@ Generation providers (used only by the backfill, via Genblaze):
 | Google Imagen | via Genblaze | Optional alternative — set `GEMINI_API_KEY` |
 | GMICloud | via Genblaze | Optional alternative — set `GMICLOUD_API_KEY` |
 
-Semantic search uses **BGE** (`bge-base-en-v1.5`, 768-dim, text-to-text): the Worker embeds query prompts with Cloudflare **Workers AI** (`@cf/baai/bge-base-en-v1.5`), and the backfill embeds asset prompts/captions with a local `BAAI/bge-base-en-v1.5` — the same base model, so both live in one embedding space. There is no model parameter in the API; callers control only `cache_tolerance` and `generate_on_miss`. `GET /v1/library`'s search (`?q=`) is likewise **semantic** (BGE, shard fan-out, floor 0.72) — a plain SQL `LIKE` scan is only an automatic fallback if the semantic query errors.
+Semantic search uses **BGE** (`bge-base-en-v1.5`, 768-dim, text-to-text): the Worker embeds query prompts with Cloudflare **Workers AI** (`@cf/baai/bge-base-en-v1.5`), and the backfill embeds asset prompts/captions with a local `BAAI/bge-base-en-v1.5` — the same base model, so both live in one embedding space. There is no model parameter in the API; callers control only `cache_tolerance` and `generate_on_miss`. `GET /v1/library`'s search (`?q=`) is likewise **semantic** (BGE, shard fan-out, floor 0.75) — a plain SQL `LIKE` scan is only an automatic fallback if the semantic query errors.
 
 ---
 
@@ -191,7 +191,7 @@ The backfill worker is a long-running process that drains the demand-ranked miss
   the `model` extra) to embed asset prompts/captions — no external embedding endpoint or tunnel required.
 - **Cloudflare credentials**: `CF_ACCOUNT_ID`, `CF_API_TOKEN`, `D1_DATABASE_ID`, `VECTORIZE_INDEX_PREFIX` +
   `VECTORIZE_SHARDS` (must match the Worker's shards, `wagmiphotos-bge-0/1/2`).
-- **Similarity floor**: Tune `FLOOR_SIM_MAX` and `FLOOR_SIM_MIN` against the seeded pool (default: 0.90 / 0.72).
+- **Similarity floor**: Tune `FLOOR_SIM_MAX` and `FLOOR_SIM_MIN` against the seeded pool (default: 0.87 / 0.75).
 
 ---
 

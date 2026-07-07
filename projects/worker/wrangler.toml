@@ -40,8 +40,8 @@ simple = { limit = 10, period = 60 }
 # lane and console-logs magic links. Set it only in .dev.vars for local dev
 # (see .dev.vars.example).
 EMAIL_FROM = "noreply@mail.suppers.ai"   # verified Resend sending address (domain: mail.suppers.ai)
-FLOOR_SIM_MAX = "0.90"
-FLOOR_SIM_MIN = "0.72"
+FLOOR_SIM_MAX = "0.87"
+FLOOR_SIM_MIN = "0.75"
 IMAGE_PRICE_USD = "0.04"
 PUBLIC_SITE_URL = "https://wagmi.photos"           # canonical site origin (override per environment / .dev.vars)
 PUBLIC_API_BASE_URL = "https://api.wagmi.photos/v1"  # documented API base rendered into docs/examples

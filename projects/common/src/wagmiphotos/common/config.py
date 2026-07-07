@@ -29,5 +29,5 @@ class Settings(BaseSettings):
     vectorize_index_prefix: str = "wagmiphotos-bge-"
     vectorize_shards: int = 3
     bge_model_name: str = BGE_MODEL
-    floor_sim_max: float = 0.90
-    floor_sim_min: float = 0.72
+    floor_sim_max: float = 0.87
+    floor_sim_min: float = 0.75

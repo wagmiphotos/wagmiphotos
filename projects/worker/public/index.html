@@ -3290,8 +3290,8 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
               (<code>bge-base-en-v1.5</code> on Workers AI) is compared by cosine similarity
               against the stored prompt embedding of every library image. Your
               <code>cache_tolerance</code> (clamped to 0–1) maps linearly to the similarity
-              floor: <code>floor = 0.90 − tolerance × (0.90 − 0.72)</code>, so tolerance 0
-              → floor 0.90 and tolerance 1 → floor 0.72. The single nearest library
+              floor: <code>floor = 0.87 − tolerance × (0.87 − 0.75)</code>, so tolerance 0
+              → floor 0.87 and tolerance 1 → floor 0.75. The single nearest library
               prompt is compared against that floor — at or above it you get a
               <code>hit</code>, below it an <code>approximate</code>. Realistic scores live in
               the ~0.7–0.95 band. See <a href="#/matching" style="color: var(--red);">how
@@ -3484,12 +3484,12 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
             <p style="font-size: 0.8125rem; color: var(--muted);">Illustrative cosine-similarity scores — in practice they land in a fairly narrow ~0.7–0.95 band. The generic prompt lands squarely on an existing prompt; the very specific one only finds a distant cousin.</p>
 
             <h2>Tolerance sets the floor</h2>
-            <p>Your <code>cache_tolerance</code> (clamped to 0–1) maps linearly to the cosine-similarity floor a match must clear: <code>floor = 0.90 − tolerance × (0.90 − 0.72)</code>.</p>
+            <p>Your <code>cache_tolerance</code> (clamped to 0–1) maps linearly to the cosine-similarity floor a match must clear: <code>floor = 0.87 − tolerance × (0.87 − 0.75)</code>.</p>
             <div class="match-scale-wrap">
               <div class="match-scale"></div>
               <div class="match-scale-labels">
-                <span><b>tolerance 0</b> → floor 0.90 · strict, near-exact only</span>
-                <span>floor 0.72 · loose, more hits <b>← tolerance 1</b></span>
+                <span><b>tolerance 0</b> → floor 0.87 · strict, near-exact only</span>
+                <span>floor 0.75 · loose, more hits <b>← tolerance 1</b></span>
               </div>
             </div>
             <p>At or above the floor you get a <code>hit</code>. Below it, the closest image is still served as <code>approximate</code> and the prompt is queued to generate (unless you opted out).</p>

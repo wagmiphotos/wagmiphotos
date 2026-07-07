@@ -42,4 +42,4 @@ def test_cf_and_floor_defaults(monkeypatch):
     assert s.cf_account_id is None and s.d1_database_id is None
     assert s.vectorize_index_prefix == "wagmiphotos-bge-"
     assert s.vectorize_shards == 3
-    assert s.floor_sim_max == 0.90 and s.floor_sim_min == 0.72
+    assert s.floor_sim_max == 0.87 and s.floor_sim_min == 0.75
