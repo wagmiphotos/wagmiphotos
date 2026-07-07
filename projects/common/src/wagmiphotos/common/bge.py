@@ -1,7 +1,11 @@
 """BGE text embeddings (bge-base-en-v1.5). Shared contract with the Worker's
-Workers AI BGE: raw text, NO instruction prefix (symmetric similarity), CLS
-pooling, L2-normalized, 768-dim. Heavy deps (sentence-transformers/torch) are
-imported lazily so the workspace and unit tests stay light."""
+Workers AI BGE: raw text, NO instruction prefix (symmetric similarity), MEAN
+pooling, L2-normalized, 768-dim. Workers AI mean-pools (verified live
+2026-07-07: cosine 1.0000 vs local mean pooling on the drift fixtures, only
+~0.95-0.98 vs the CLS pooling BGE ships with), so the local side must
+mean-pool too — the DEPLOY.md drift check gates this. Heavy deps
+(sentence-transformers/torch) are imported lazily so the workspace and unit
+tests stay light."""
 import math
 from typing import Protocol
 
@@ -35,10 +39,32 @@ class BgeEmbedder:
                 "the model extra: pip install 'wagmiphotos-backfill[model]'") from e
 
         model = SentenceTransformer(model_name)
+        # BGE ships CLS pooling, but Workers AI's @cf/baai/bge-base-en-v1.5
+        # mean-pools — force mean so both runtimes share one vector space.
+        # sentence-transformers >= 5 stores a pooling_mode string; older
+        # versions use per-mode boolean flags. Fail loudly if neither is found
+        # rather than silently drifting back to CLS.
+        flipped = False
+        for module in model:
+            if hasattr(module, "pooling_mode"):
+                module.pooling_mode = "mean"
+                flipped = True
+            elif hasattr(module, "pooling_mode_cls_token"):
+                module.pooling_mode_cls_token = False
+                module.pooling_mode_mean_tokens = True
+                flipped = True
+        if not flipped:
+            raise RuntimeError(
+                "could not switch the sentence-transformers Pooling module to mean "
+                "pooling — the Workers AI parity contract requires it (see DEPLOY.md "
+                "drift check)")
 
         class _STEncoder:
             def encode(self, texts: list[str]) -> list[list[float]]:
                 # no prefix (symmetric); normalize for the contract
-                return model.encode(texts, normalize_embeddings=True).tolist()
+                out = model.encode(texts, normalize_embeddings=True)
+                return out if isinstance(out, list) else out.tolist()
 
-        return cls(_STEncoder())
+        embedder = cls(_STEncoder())
+        embedder._st_model = model  # exposed for pooling-mode verification in tests
+        return embedder

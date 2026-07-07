@@ -148,6 +148,12 @@ pairwise cosine **≥ 0.98**. If it fails, reconcile preprocessing (an accidenta
 prefix, wrong pooling, or a missing L2-normalize on one side). Code review can't verify
 this — Workers AI's internal pooling vs sentence-transformers' is only checkable live.
 
+> **Resolved 2026-07-07:** Workers AI's BGE **mean-pools** (not the CLS pooling BGE
+> ships with). `BgeEmbedder.from_pretrained` now forces mean pooling to match; the
+> check passes at cosine 1.0000 on all fixtures. If you swap the local embedding
+> stack, re-run this check — CLS pooling drifts to ~0.95–0.98 and silently degrades
+> every match.
+
 ```bash
 uv run python -m wagmiphotos.backfill.seed_pd12m --limit 100   # BGE captions → wagmiphotos-bge-{0,1,2} shards
 ```
