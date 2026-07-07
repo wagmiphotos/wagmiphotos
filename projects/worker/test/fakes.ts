@@ -13,6 +13,10 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
     assets: {
       getAsset: async (id) => assets.get(id) ?? null,
       searchAssets: async (i) => { searchCalls.push(i); return libraryRows.slice(i.offset, i.offset + i.limit); },
+      getAssetsByIds: async (ids) => ids.flatMap((id) => {
+        const r = assets.get(id);
+        return r ? [r as LibraryAssetRow] : [];
+      }),
     },
     queries: { recordQuery: async (i) => { recorded.push(i); return i.generate; } },
     keys: {

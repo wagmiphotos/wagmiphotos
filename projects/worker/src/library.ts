@@ -2,6 +2,9 @@ import type { Services, LibraryAssetRow } from "./types";
 import { assetUrls } from "./asset-urls";
 
 export interface LibraryCfg { assetBaseUrl?: string; }
+export interface LibrarySearchCfg extends LibraryCfg { floorSimMin: number; }
+
+export const SEARCH_TOP_K = 100; // Vectorize topK cap without values/metadata
 
 // The documented public shape for a library image (spec §GET /v1/library).
 // Internal columns (source_id, source_url, locally_cached) are intentionally dropped;
@@ -17,7 +20,7 @@ function publicAsset(r: LibraryAssetRow, baseUrl: string | undefined) {
 
 const MAX_Q_LEN = 200;
 
-export async function handleLibrarySearch(url: URL, s: Services, cfg: LibraryCfg): Promise<Response> {
+export async function handleLibrarySearch(url: URL, s: Services, cfg: LibrarySearchCfg): Promise<Response> {
   const q = url.searchParams.get("q") ?? "";
   if (q.length > MAX_Q_LEN) {
     return Response.json({ error: `q must be at most ${MAX_Q_LEN} characters` }, { status: 400 });
@@ -40,6 +43,27 @@ export async function handleLibrarySearch(url: URL, s: Services, cfg: LibraryCfg
     offset = n;
   }
 
+  if (q) {
+    try {
+      const vec = await s.embedder.textEmbed(q);
+      const matches = await s.vectorize.query(vec, SEARCH_TOP_K);
+      const relevant = matches.filter((m) => m.score >= cfg.floorSimMin);
+      const page = relevant.slice(offset, offset + limit);
+      const rows = await s.assets.getAssetsByIds(page.map((m) => m.id));
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      const images = page.flatMap((m) => {
+        const r = byId.get(m.id);
+        return r ? [publicAsset(r, cfg.assetBaseUrl)] : []; // orphan vector: skip
+      });
+      return Response.json({ images, has_more: relevant.length > offset + limit });
+    } catch (e) {
+      // Workers AI / Vectorize unavailable (offline dev) or transient failure:
+      // degrade to the LIKE scan rather than 500ing the library page.
+      console.warn("semantic library search failed; falling back to LIKE", e);
+    }
+  }
+
+  // browse (empty q) and fallback path: existing searchAssets LIKE + recency code
   const rows = await s.assets.searchAssets({ q, limit: limit + 1, offset });
   const has_more = rows.length > limit;
   return Response.json({ images: rows.slice(0, limit).map((r) => publicAsset(r, cfg.assetBaseUrl)), has_more });

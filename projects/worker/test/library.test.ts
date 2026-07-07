@@ -4,7 +4,7 @@ import { fakeServices } from "./fakes";
 import type { LibraryAssetRow } from "../src/types";
 
 const BASE = "https://cdn.example.com";
-const cfg = { assetBaseUrl: BASE };
+const cfg = { floorSimMin: 0.72, assetBaseUrl: BASE };
 
 function libRow(over: Partial<LibraryAssetRow> = {}): LibraryAssetRow {
   return { id: "a1", prompt: "a fox", source: "pd12m", source_id: null,
@@ -49,7 +49,9 @@ it("search: has_more true when a full extra row exists, images trimmed to limit"
 });
 
 it("search: passes q and offset through, clamps numeric limit to 1..60", async () => {
-  const s = fakeServices();
+  // non-empty q now goes through the semantic path first; force the fallback
+  // so this still exercises the LIKE call's limit/offset math.
+  const s = fakeServices({ embedder: { textEmbed: async () => { throw new Error("offline"); } } });
   await handleLibrarySearch(new URL("https://x/v1/library?q=fox&limit=999&offset=48"), s, cfg);
   expect((s as any)._searchCalls[0]).toEqual({ q: "fox", limit: 61, offset: 48 });
   await handleLibrarySearch(new URL("https://x/v1/library?limit=0"), s, cfg);
@@ -57,7 +59,8 @@ it("search: passes q and offset through, clamps numeric limit to 1..60", async (
 });
 
 it("search: q over 200 chars -> 400, q at the cap still searches", async () => {
-  const s = fakeServices();
+  // force the LIKE fallback (see note above) so the at-cap case still reaches searchAssets.
+  const s = fakeServices({ embedder: { textEmbed: async () => { throw new Error("offline"); } } });
   const tooLong = await handleLibrarySearch(new URL("https://x/v1/library?q=" + "a".repeat(201)), s, cfg);
   expect(tooLong.status).toBe(400);
   expect(typeof (await tooLong.json() as any).error).toBe("string");
@@ -76,6 +79,64 @@ it("search: non-numeric or fractional limit/offset and negative offset -> 400", 
     expect(typeof j.error).toBe("string");
   }
   expect((s as any)._searchCalls).toHaveLength(0);
+});
+
+it("semantic search: embeds q, merges shards, floors at floorSimMin, orders by similarity", async () => {
+  const s = fakeServices();
+  (s as any)._matches.push({ id: "b", score: 0.95 }, { id: "a", score: 0.80 }, { id: "junk", score: 0.60 });
+  (s as any)._assets.set("a", libRow({ id: "a" }));
+  (s as any)._assets.set("b", libRow({ id: "b" }));
+  (s as any)._assets.set("junk", libRow({ id: "junk" }));
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?q=cat"), s, { floorSimMin: 0.72 });
+  expect(res.status).toBe(200);
+  const body: any = await res.json();
+  expect(body.images.map((i: any) => i.id)).toEqual(["b", "a"]); // junk floored out
+});
+
+it("semantic search: offset/limit slice the merged window and set has_more", async () => {
+  const s = fakeServices();
+  (s as any)._matches.push({ id: "x1", score: 0.9 }, { id: "x2", score: 0.85 }, { id: "x3", score: 0.8 });
+  (s as any)._assets.set("x1", libRow({ id: "x1" }));
+  (s as any)._assets.set("x2", libRow({ id: "x2" }));
+  (s as any)._assets.set("x3", libRow({ id: "x3" }));
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?q=cat&limit=1&offset=1"), s, { floorSimMin: 0.72 });
+  const body: any = await res.json();
+  expect(body.images.map((i: any) => i.id)).toEqual(["x2"]); // the middle match
+  expect(body.has_more).toBe(true);
+});
+
+it("semantic search: ids missing from D1 are skipped (orphan vectors)", async () => {
+  const s = fakeServices();
+  (s as any)._matches.push({ id: "has-row", score: 0.9 }, { id: "orphan", score: 0.85 });
+  (s as any)._assets.set("has-row", libRow({ id: "has-row" }));
+  // "orphan" intentionally has no D1 row
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?q=cat"), s, { floorSimMin: 0.72 });
+  const body: any = await res.json();
+  expect(body.images.map((i: any) => i.id)).toEqual(["has-row"]);
+});
+
+it("falls back to LIKE search when the embedder throws", async () => {
+  const s = fakeServices({ embedder: { textEmbed: async () => { throw new Error("no AI binding"); } } });
+  (s as any)._libraryRows.push(libRow({ id: "like-hit" }));
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?q=cat"), s, { floorSimMin: 0.72 });
+  expect(res.status).toBe(200);
+  const body: any = await res.json();
+  expect((s as any)._searchCalls[0]).toEqual({ q: "cat", limit: 25, offset: 0 });
+  expect(body.images.map((i: any) => i.id)).toEqual(["like-hit"]);
+});
+
+it("empty q keeps the recency browse (vectorize and embedder never called)", async () => {
+  let vectorizeCalled = false;
+  let embedderCalled = false;
+  const s = fakeServices({
+    vectorize: { query: async () => { vectorizeCalled = true; return []; } },
+    embedder: { textEmbed: async () => { embedderCalled = true; return [0, 0, 0]; } },
+  });
+  (s as any)._libraryRows.push(libRow());
+  const res = await handleLibrarySearch(new URL("https://x/v1/library"), s, { floorSimMin: 0.72 });
+  expect(res.status).toBe(200);
+  expect(vectorizeCalled).toBe(false);
+  expect(embedderCalled).toBe(false);
 });
 
 function okUpstream(contentType: string | null = "image/webp"): (url: string) => Promise<Response> {

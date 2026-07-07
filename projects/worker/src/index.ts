@@ -97,7 +97,7 @@ export default {
         return await handleDeleteKey(id, request, env, services);
       }
 
-      const libraryCfg = { assetBaseUrl: env.ASSET_BASE_URL };
+      const libraryCfg = { floorSimMin: numEnv(env.FLOOR_SIM_MIN, FLOOR_SIM_MIN), assetBaseUrl: env.ASSET_BASE_URL };
 
       if (url.pathname === "/v1/library" && request.method === "GET") {
         if (!(await resolveApiPrincipal(request, env, services))) return Response.json({ error: "login required" }, { status: 401 });

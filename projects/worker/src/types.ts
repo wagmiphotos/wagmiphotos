@@ -12,6 +12,8 @@ export interface VectorizeStore { query(vector: number[], topK: number): Promise
 export interface AssetStore {
   getAsset(id: string): Promise<AssetRow | null>;
   searchAssets(i: { q: string; limit: number; offset: number }): Promise<LibraryAssetRow[]>;
+  /** Batch lookup for the semantic-search hydration path; missing ids are simply absent (no error). */
+  getAssetsByIds(ids: string[]): Promise<LibraryAssetRow[]>;
 }
 export interface QueryStore {
   /** Upserts the query row and returns the row's effective generate state after merging. */

@@ -141,6 +141,26 @@ it("searchAssets multi-word query: ANDs one LIKE clause per token", async () => 
   expect(calls[0].args).toEqual(["%flamingo%", "%sunset%", 24, 0]);
 });
 
+it("getAssetsByIds returns [] without querying when ids is empty", async () => {
+  const { db, calls } = fakeDb(null, []);
+  const { assets } = makeD1Stores(db);
+  expect(await assets.getAssetsByIds([])).toEqual([]);
+  expect(calls).toHaveLength(0);
+});
+
+it("getAssetsByIds selects rows by id IN (...), binding every id", async () => {
+  const rows = [
+    { id: "demo-2", prompt: "p2", source: "pd12m", source_id: null, model_used: null, width: null, height: null, mime: null, source_url: null, locally_cached: 0, created_at: "2026-07-03 00:00:00" },
+    { id: "demo-1", prompt: "p1", source: "pd12m", source_id: null, model_used: null, width: null, height: null, mime: null, source_url: null, locally_cached: 0, created_at: "2026-07-02 00:00:00" },
+  ];
+  const { db, calls } = fakeDb(null, rows);
+  const { assets } = makeD1Stores(db);
+  const got = await assets.getAssetsByIds(["demo-2", "demo-1"]);
+  expect(got).toEqual(rows);
+  expect(calls[0].sql).toContain("WHERE id IN (?,?)");
+  expect(calls[0].args).toEqual(["demo-2", "demo-1"]);
+});
+
 it("searchAssets whitespace-only query: browse mode (no WHERE)", async () => {
   const { db, calls } = fakeDb(null, []);
   const { assets } = makeD1Stores(db);

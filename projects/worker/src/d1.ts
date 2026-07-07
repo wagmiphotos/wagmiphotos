@@ -30,6 +30,14 @@ export function makeD1Stores(db: D1Database): {
       const { results } = await stmt.all<LibraryAssetRow>();
       return results ?? [];
     },
+    async getAssetsByIds(ids) {
+      if (ids.length === 0) return [];
+      const marks = ids.map(() => "?").join(",");
+      const { results } = await db.prepare(
+        `SELECT ${ASSET_COLS}, created_at FROM assets WHERE id IN (${marks})`
+      ).bind(...ids).all<LibraryAssetRow>();
+      return results ?? [];
+    },
   };
   const queries: QueryStore = {
     async recordQuery({ normalized, original, assetId, similarity, built, generate }) {
