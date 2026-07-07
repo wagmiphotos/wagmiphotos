@@ -92,6 +92,19 @@ it("resolveApiPrincipal: ownerless key -> null (rejected)", async () => {
   expect(r).toBeNull();
 });
 
+it("resolveApiPrincipal: invalid bearer is rejected even with a valid session cookie", async () => {
+  const stores = fakeStores({ sessions: { resolve: async () => ({ user_id: "usr_3" }), touch: async () => {} } });
+  const r = await resolveApiPrincipal(
+    reqWith({ cookie: "wagmi_session=tok", bearer: "sc-revoked" }), { MASTER_API_KEY: "master" } as any, stores
+  );
+  expect(r).toBeNull();
+});
+
+it("resolveApiPrincipal: invalid bearer is rejected even in DEV_MODE", async () => {
+  const r = await resolveApiPrincipal(reqWith({ bearer: "sc-bogus" }), { DEV_MODE: "true" } as any, fakeStores());
+  expect(r).toBeNull();
+});
+
 it("resolveApiPrincipal: cookie session also accepted (browser playground)", async () => {
   const stores = fakeStores({ sessions: { resolve: async () => ({ user_id: "usr_3" }), touch: async () => {} } });
   const r = await resolveApiPrincipal(reqWith({ cookie: "wagmi_session=tok" }), { MASTER_API_KEY: "master" } as any, stores);

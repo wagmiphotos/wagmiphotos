@@ -75,7 +75,9 @@ export async function resolveApiPrincipal(
     }
     const owner = await stores.keys.getKeyOwner(await sha256Hex(token));
     if (owner) return { userId: owner };
-    // a presented-but-unowned key is an explicit failure; fall through to cookie/dev
+    // A presented-but-unowned key is an explicit failure: never fall through to
+    // cookie/dev, or a revoked key would look valid from a logged-in browser.
+    return null;
   }
   const session = await resolveSession(request, env, stores.sessions);
   if (session) return session;
