@@ -20,19 +20,34 @@ cd projects/worker && npx wrangler login
 
 ## 1. Create D1 and wire its id
 
-D1 does **not** exist yet — `wrangler.toml` still has a placeholder id.
+D1 does **not** exist yet — `wrangler.toml`'s `database_id` is a placeholder
+(nothing has been created against live Cloudflare under any name).
 
 ```bash
-npx wrangler d1 create sharedcache        # copy the database_id it prints
+npx wrangler d1 create wagmiphotos        # copy the database_id it prints
 ```
 
-Edit `projects/worker/wrangler.toml` → replace `REPLACE_WITH_D1_DATABASE_ID`
+Edit `projects/worker/wrangler.toml` → replace the placeholder `database_id`
 (line ~9) with the id. (Ask Claude to make this edit if you paste the id.)
 
-## 2. Create the Vectorize index
+## 2. Create the three Vectorize shards
+
+Vectorize is sharded 3-ways (`fnv1a32(id) % 3` picks the write shard, pinned
+in `contract.json`); the Worker fans queries out to all three and merges by
+score:
 
 ```bash
-npx wrangler vectorize create wagmiphotos-bge --dimensions=768 --metric=cosine
+for i in 0 1 2; do
+  npx wrangler vectorize create "wagmiphotos-bge-$i" --dimensions=768 --metric=cosine
+done
+```
+
+If a single unsharded `wagmiphotos-bge` index was ever created (an earlier
+iteration of this repo, before sharding), delete it — it's superseded by the
+three shards above:
+
+```bash
+npx wrangler vectorize delete wagmiphotos-bge
 ```
 
 ## 3. Back up D1, then apply migrations remotely — **BEFORE any deploy**
@@ -40,7 +55,7 @@ npx wrangler vectorize create wagmiphotos-bge --dimensions=768 --metric=cosine
 Take a backup first (migrations are forward-only; this is the rollback path):
 
 ```bash
-npx wrangler d1 export sharedcache --remote --output=backup.sql
+npx wrangler d1 export wagmiphotos --remote --output=backup.sql
 ```
 
 Then apply all pending migrations. Deploying the Worker ahead of them breaks
@@ -54,9 +69,15 @@ demand tracking and **hard-errors the Python backfill**:
   users just request a new one.
 - `0006` — backfill reliability (query/rehost attempt tracking + `building`
   claims), the `meta` table (durable backfill spend cap), and a session-expiry index.
+- `0007` — drops the stored `thumb_url`/`medium_url`/`url`/`manifest_url` columns.
+  Asset URLs are now derived at read time: cached (`locally_cached=1`) assets
+  resolve to `{ASSET_BASE_URL}/{asset_paths[size]}` (paths pinned in
+  `contract.json`); everything else serves `source_url`. Set `ASSET_BASE_URL`
+  before/at deploy (see step 5) — without it, cached assets degrade to
+  `source_url` too.
 
 ```bash
-npx wrangler d1 migrations apply sharedcache --remote   # runs 0001 → 0006
+npx wrangler d1 migrations apply wagmiphotos --remote   # runs 0001 → 0007
 ```
 
 ## 4. Stand up the GMI box (backfill)
@@ -67,7 +88,7 @@ Full detail in `deploy/gmi/README.md`. Summary:
 2. Clone the repo on the box; create `deploy/gmi/.env` with the same variables
    as the repo-root `.env.example`:
    `CF_ACCOUNT_ID`, `CF_API_TOKEN`, `D1_DATABASE_ID` (from step 1),
-   `VECTORIZE_INDEX_NAME=wagmiphotos-bge`, `GMICLOUD_API_KEY`,
+   `VECTORIZE_INDEX_PREFIX=wagmiphotos-bge-`, `VECTORIZE_SHARDS=3`, `GMICLOUD_API_KEY`,
    `B2_KEY_ID`, `B2_APP_KEY`, `B2_BUCKET`, `B2_REGION`, `B2_PUBLIC_URL_BASE`,
    `FLOOR_SIM_MAX=0.90`, `FLOOR_SIM_MIN=0.72`.
 3. `cd deploy/gmi && docker compose up -d --build`
@@ -94,6 +115,19 @@ Local dev sets it in `projects/worker/.dev.vars` (gitignored; copy
 `.dev.vars.example`). Before deploying, confirm `DEV_MODE` appears nowhere in
 `wrangler.toml` `[vars]` or the dashboard.
 
+**Set `ASSET_BASE_URL`** in `wrangler.toml` `[vars]` (or the dashboard) to the
+B2 friendly-URL base for the public-read bucket — the same value as the
+backfill's `B2_PUBLIC_URL_BASE` (e.g.
+`https://f004.backblazeb2.com/file/<bucket-name>`). Cached (`locally_cached=1`)
+assets are served as `{ASSET_BASE_URL}/{asset_paths[size]}` (paths pinned in
+`contract.json`); without `ASSET_BASE_URL` set, cached assets degrade to
+`source_url` instead.
+
+**Worker name:** the Worker now deploys as `wagmiphotos-worker` (`wrangler.toml`
+`name`). A previously deployed `sharedcache-worker` would be a separate,
+orphaned Cloudflare Worker, not an in-place upgrade — this is a fresh deploy
+under the new name.
+
 Route **both** `wagmi.photos` (site + API) and `api.wagmi.photos` (documented
 API base) to this Worker in the Cloudflare dashboard, then:
 
@@ -109,19 +143,19 @@ embeds queries with Workers AI `@cf/baai/bge-base-en-v1.5`; the backfill embeds 
 local `BAAI/bge-base-en-v1.5`. They must produce vectors in the *same* space or every
 match is wrong. Embed a fixture of ~10 strings with **both** — the Worker's binding
 (a one-off `wrangler dev` request that returns the vector, or a temporary debug route)
-and `sharedcache.common.bge.BgeEmbedder.from_pretrained().text_embed(...)` — and assert
+and `wagmiphotos.common.bge.BgeEmbedder.from_pretrained().text_embed(...)` — and assert
 pairwise cosine **≥ 0.98**. If it fails, reconcile preprocessing (an accidental query
 prefix, wrong pooling, or a missing L2-normalize on one side). Code review can't verify
 this — Workers AI's internal pooling vs sentence-transformers' is only checkable live.
 
 ```bash
-uv run python -m sharedcache.backfill.seed_pd12m --limit 100   # BGE captions → wagmiphotos-bge
+uv run python -m wagmiphotos.backfill.seed_pd12m --limit 100   # BGE captions → wagmiphotos-bge-{0,1,2} shards
 ```
 
 Then **tune** `FLOOR_SIM_MAX` / `FLOOR_SIM_MIN` against the seeded pool. BGE
 text-to-text cosines run high (typically ~0.7–0.95) — the defaults (0.90 / 0.72)
 are a starting guess, not calibrated. Set them in both the Worker `wrangler.toml`
-`[vars]` and the backfill env (`sharedcache.common.config`).
+`[vars]` and the backfill env (`wagmiphotos.common.config`).
 
 ---
 
@@ -156,9 +190,10 @@ the loose ends to pick up when you resume. Full backlog + design trail: root
 
 ### BGE embeddings — provision at deploy (Task 6, not yet run — needs live CF + GMI)
 The BGE search layer is code-complete but has never touched live infra. At deploy:
-create the `wagmiphotos-bge` index (step 2), run the **embedding drift check**
-(Worker Workers-AI BGE vs local BGE, cosine ≥ 0.98 — step 6), seed the pool, then
-tune the floor. See `docs/superpowers/plans/2026-07-06-bge-edge-embeddings.md` Task 6.
+create the three `wagmiphotos-bge-0/1/2` shards (step 2), run the **embedding
+drift check** (Worker Workers-AI BGE vs local BGE, cosine ≥ 0.98 — step 6), seed
+the pool, then tune the floor. See
+`docs/superpowers/plans/2026-07-06-bge-edge-embeddings.md` Task 6.
 Also do a real `docker build` of the backfill image with `--extra model` (pulls CPU
 torch + BGE weights) — so far only verified via `uv sync --dry-run`.
 
@@ -186,8 +221,6 @@ torch + BGE weights) — so far only verified via `uv sync --dry-run`.
   off the hot path (repeat prompts are the whole premise).
 - **SPA smoke test** — a tiny Playwright test for the hit / approximate /
   pending render states (currently verified by inspection only).
-- **Branding:** the SPA reads `WagmiPhotos` / `wagmi.photos`; the repo/project
-  is `SharedCache`. Pick one and reconcile (see `HANDOFF.md` §2).
 
 ## Accounts + magic-link login
 

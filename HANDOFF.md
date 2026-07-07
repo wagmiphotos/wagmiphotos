@@ -1,13 +1,13 @@
-# SharedCache — Handoff / Resume Here
+# wagmi.photos — Handoff / Resume Here
 
 _Last updated: 2026-07-07. Everything below is merged to `main`, green
 (both offline test suites pass), and pushed to
 `github.com/wagmiphotos/wagmiphotos`. **Start here to resume:**
 [`docs/HANDOFF-2026-07-07.md`](docs/HANDOFF-2026-07-07.md) — magic-link auth + BGE
-edge embeddings shipped; deploy (BGE live provisioning) and the sharedcache→wagmiphotos
-rename are the next open items._
+edge embeddings shipped, and docs/deploy runbook reconciled to the wagmiphotos
+rename; live BGE provisioning (Task 6) is the next open item._
 
-## What SharedCache is
+## What wagmi.photos is
 
 An **OpenAI-compatible image-generation cache**. A prompt is BGE-embedded (text-to-text) and matched (cosine)
 against a pool of prompts/captions for already-generated images in **Cloudflare Vectorize**; a near match is
@@ -23,17 +23,17 @@ Two deployables over three shared stores:
   `POST /v1/auth/login`, `GET /v1/auth/verify`, `POST /v1/auth/logout`, `GET /v1/me`,
   `GET /v1/keys`, `DELETE /v1/keys/:id`, `POST /v1/keys/generate`, `GET /v1/meta/stars`,
   and `GET /healthz`; serves the playground SPA for every other path via **Workers Static Assets**. It authenticates, embeds the prompt with **Cloudflare
-  Workers AI (`@cf/baai/bge-base-en-v1.5`, text-to-text, 768d)**, queries Vectorize for the nearest asset,
-  reads/logs the query to D1, and returns the image URL. **It never generates.**
-  Branch outcomes: `hit` (≥ floor), `approximate` (< floor, nearest served anyway), `pending` (`202`, empty pool).
-- **Python backfill worker** (`projects/backfill/`, `python -m sharedcache.backfill`) — the "Hermes runner".
+  Workers AI (`@cf/baai/bge-base-en-v1.5`, text-to-text, 768d)**, queries Vectorize (3-shard fan-out,
+  merged by score) for the nearest asset, reads/logs the query to D1, and returns the image URL. **It never
+  generates.** Branch outcomes: `hit` (≥ floor), `approximate` (< floor, nearest served anyway), `pending` (`202`, empty pool).
+- **Python backfill worker** (`projects/backfill/`, `python -m wagmiphotos.backfill`) — the "Hermes runner".
   Polls D1 for pending queries (ranked by demand) and generates the most-requested missing images via
   Genblaze/GMI Cloud, **re-checking Vectorize first** so nothing is built twice; also rehosts seeded PD12M
   images to B2 in 3 webp sizes. Embeds asset prompts/captions with a **local** `BAAI/bge-base-en-v1.5`
   (in-process, `model` extra) — no external embedder or tunnel. Runs locally or in a GMI Cloud Hermes
   agentbox (Dockerfile included).
-- **Shared stores:** **D1** (query log + asset metadata + hashed api keys + users/sessions/login_tokens), **Vectorize** (768-dim BGE
-  `wagmiphotos-bge` index — prompt/caption text vectors), **Backblaze B2** (image bytes).
+- **Shared stores:** **D1** (query log + asset metadata + hashed api keys + users/sessions/login_tokens), **Vectorize** (768-dim BGE,
+  3 shards `wagmiphotos-bge-0/1/2`, write-routed by `fnv1a32(id) % 3` — prompt/caption text vectors), **Backblaze B2** (image bytes).
 
 Data flow: Worker logs demand → backfill builds top misses → Vectorize/D1 updated → next identical/similar
 request is a HIT. Similarity floor is **BGE text-to-text-calibrated** (`FLOOR_SIM_MAX/MIN` default 0.90/0.72 —
@@ -44,13 +44,13 @@ BGE text-to-text cosines run high; these are placeholders, tune against the real
 ```
 projects/
 ├── worker/        # Cloudflare Worker (TS) + public/index.html (the SPA)   — `npm test`, `npm run deploy`
-├── common/        # sharedcache-common     — models, config, floor, bge, D1/Vectorize REST clients
-├── generation/    # sharedcache-generation — Genblaze/GMI + Backblaze B2 + image processing
-└── backfill/      # sharedcache-backfill   — demand-ranked runner (worker.py, seed_pd12m, __main__, Dockerfile)
+├── common/        # wagmiphotos-common     — models, config, floor, bge, D1/Vectorize REST clients
+├── generation/    # wagmiphotos-generation — Genblaze/GMI + Backblaze B2 + image processing
+└── backfill/      # wagmiphotos-backfill   — demand-ranked runner (worker.py, seed_pd12m, __main__, Dockerfile)
 docs/superpowers/  # specs + plans (the full design/decision trail)
 pyproject.toml     # uv virtual workspace root ; uv.lock
 ```
-Python dep graph: `common ← generation ← backfill`. Imports are `sharedcache.common.*` / `.generation.*` / `.backfill.*` (PEP 420 namespace).
+Python dep graph: `common ← generation ← backfill`. Imports are `wagmiphotos.common.*` / `.generation.*` / `.backfill.*` (PEP 420 namespace).
 
 ## How to run / test / build
 
@@ -62,10 +62,10 @@ uv sync && uv run pytest -q
 cd projects/worker && npm install && npm test
 
 # Build each Python package into a wheel
-uv build --package sharedcache-{common,generation,backfill}
+uv build --package wagmiphotos-{common,generation,backfill}
 
 # Run the backfill once (needs real env for real work; stub/in-memory otherwise)
-uv run python -m sharedcache.backfill --once
+uv run wagmiphotos-backfill --once
 
 # Preview the Worker + SPA locally
 cd projects/worker && npx wrangler dev
@@ -105,27 +105,24 @@ cd projects/worker && npx wrangler dev
 
 ### 1. Live verification — needs real Cloudflare / Backblaze / GMI credentials
 This is the biggest open item: everything is verified offline with fakes; nothing has run against live infra.
-- Provision + migrate D1: `cd projects/worker && npx wrangler d1 create sharedcache`, set `database_id` in
-  `wrangler.toml`, `npx wrangler d1 migrations apply sharedcache`.
-- Create the Vectorize index: `npx wrangler vectorize create wagmiphotos-bge --dimensions=768 --metric=cosine`.
+- Provision + migrate D1: `cd projects/worker && npx wrangler d1 create wagmiphotos`, set `database_id` in
+  `wrangler.toml`, `npx wrangler d1 migrations apply wagmiphotos`.
+- Create the three Vectorize shards: `for i in 0 1 2; do npx wrangler vectorize create
+  "wagmiphotos-bge-$i" --dimensions=768 --metric=cosine; done`.
 - The Worker's query-prompt embedding uses the `[ai] binding = "AI"` Workers AI binding already declared in
   `wrangler.toml` (`@cf/baai/bge-base-en-v1.5`) — no external endpoint to wire. The backfill embeds
   prompts/captions with a local `BAAI/bge-base-en-v1.5` (see `deploy/gmi`).
-- Seed: `uv run python -m sharedcache.backfill.seed_pd12m --limit 100`.
+- Seed: `uv run python -m wagmiphotos.backfill.seed_pd12m --limit 100`.
 - **Tune `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN`** against the seeded pool (BGE text-to-text cosines run high, ~0.7–0.95).
 - **Deploy order dependency:** `cd projects/worker && npx wrangler d1 migrations apply
-  sharedcache` (remote) must run **before** `npm run deploy` — all migrations through `0006` must be live
+  wagmiphotos` (remote) must run **before** `npm run deploy` — all migrations through `0007` must be live
   first (see `DEPLOY.md` step 3 for the per-migration notes, including `0004`'s breaking anonymous-key
   wipe). Deploying the Worker ahead of them breaks demand tracking and hard-errors the Python backfill.
 - Deploy the Worker: `cd projects/worker && npm run deploy`; **confirm `wrangler deploy --dry-run` lists the
   `RATE_LIMITER` binding**; then check a request returns a nearest image and the SPA loads at `/`.
 - Verify the Vectorize v2 upsert/insert ndjson framing against one live call.
 
-### 2. Branding
-The SPA (`projects/worker/public/index.html`) still says **"WagmiPhotos"**; the rest of the project is
-**SharedCache**. Pick one and reconcile.
-
-### 3. Deferred hardening (from the reviews — none blocking, triage before real traffic)
+### 2. Deferred hardening (from the reviews — none blocking, triage before real traffic)
 Most items are now closed — see `docs/HANDOFF-2026-07-04.md` → "Addressed since". Remaining:
 - **Backfill:** rehost now has a 25 MB size cap, but still no host allowlist — add one _once user
   input can set `source_url`_ (today it's trusted PD12M seed data only).
@@ -133,7 +130,7 @@ Most items are now closed — see `docs/HANDOFF-2026-07-04.md` → "Addressed si
   here (torch/BGE weights) — do a `docker compose up --build` smoke check on the GMI box.
 - **Tooling:** dev-only `npm audit` findings in wrangler/vitest/esbuild transitive deps.
 
-### 4. Nice-to-haves
+### 3. Nice-to-haves
 - The SPA has no automated test harness (verified by inspection + live). A tiny Playwright smoke test could
   cover the hit/approximate/pending render states.
 - `projects/worker/public/index.html`: the API returns `sizes.thumb/medium`, but the SPA doesn't use them —

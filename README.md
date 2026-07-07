@@ -1,8 +1,8 @@
-# SharedCache
+# wagmi.photos
 
 **Generate once. Serve forever.**
 
-SharedCache (live as **wagmi.photos**) is an image-generation cache behind an OpenAI-compatible request shape. Every request is answered from a shared pool of already-generated images: the edge Worker embeds the prompt, finds the nearest cached image, and serves it instantly. **The request path never generates.** Novel prompts are queued and generated later by a demand-ranked background backfill — the library grows the more it is used, and the same spend is never paid twice.
+**wagmi.photos** is an image-generation cache behind an OpenAI-compatible request shape. Every request is answered from a shared pool of already-generated images: the edge Worker embeds the prompt, finds the nearest cached image, and serves it instantly. **The request path never generates.** Novel prompts are queued and generated later by a demand-ranked background backfill — the library grows the more it is used, and the same spend is never paid twice.
 
 ---
 
@@ -17,7 +17,7 @@ SharedCache (live as **wagmi.photos**) is an image-generation cache behind an Op
 │  authenticate (per-user API key) → validate the request              │
 │  embed the prompt: BGE @cf/baai/bge-base-en-v1.5 via Workers AI      │
 │    (src/embed.ts)                                                    │
-│  query Vectorize index `wagmiphotos-bge` (cosine) + D1 metadata      │
+│  query Vectorize (3-shard fan-out, cosine) + D1 metadata             │
 │                                                                      │
 │   similarity ≥ floor       below floor            empty pool         │
 │   ────────────────────     ────────────────────   ─────────────────  │
@@ -76,20 +76,21 @@ Generation providers (used only by the backfill, via Genblaze):
 | Google Imagen | via Genblaze | Optional alternative — set `GEMINI_API_KEY` |
 | GMICloud | via Genblaze | Optional alternative — set `GMICLOUD_API_KEY` |
 
-Semantic search uses **BGE** (`bge-base-en-v1.5`, 768-dim, text-to-text): the Worker embeds query prompts with Cloudflare **Workers AI** (`@cf/baai/bge-base-en-v1.5`), and the backfill embeds asset prompts/captions with a local `BAAI/bge-base-en-v1.5` — the same base model, so both live in one embedding space. There is no model parameter in the API; callers control only `cache_tolerance` and `generate_on_miss`.
+Semantic search uses **BGE** (`bge-base-en-v1.5`, 768-dim, text-to-text): the Worker embeds query prompts with Cloudflare **Workers AI** (`@cf/baai/bge-base-en-v1.5`), and the backfill embeds asset prompts/captions with a local `BAAI/bge-base-en-v1.5` — the same base model, so both live in one embedding space. There is no model parameter in the API; callers control only `cache_tolerance` and `generate_on_miss`. `GET /v1/library`'s search (`?q=`) is likewise **semantic** (BGE, shard fan-out, floor 0.72) — a plain SQL `LIKE` scan is only an automatic fallback if the semantic query errors.
 
 ---
 
 ## Architecture
 
-SharedCache is two deployables over three shared stores (**Cloudflare D1** for the query log + asset
+wagmi.photos is two deployables over three shared stores (**Cloudflare D1** for the query log + asset
 metadata, **Cloudflare Vectorize** for BGE vectors, **Backblaze B2** for image bytes):
 
 - **Cloudflare Worker** (`projects/worker/`, TypeScript) — the edge request path. Authenticates, embeds the
   prompt with **Cloudflare Workers AI (`@cf/baai/bge-base-en-v1.5`, text-to-text, 768d)**, queries Vectorize
-  for the nearest cached image, logs the query to D1, and returns an image URL.
+  (3-shard fan-out across `wagmiphotos-bge-0/1/2`, merged by score) for the nearest cached image, logs the
+  query to D1, and returns an image URL.
   It **never generates**. See **[Cloudflare Worker](#cloudflare-worker-edge-request-path)** below.
-- **Python backfill worker** (`projects/backfill/`, `python -m sharedcache.backfill`) — demand-ranked
+- **Python backfill worker** (`projects/backfill/`, `python -m wagmiphotos.backfill`) — demand-ranked
   generation for cache-misses (via Genblaze/GMI Cloud) plus PD12M→B2 rehosting. Runs locally or in a GMI
   Cloud Hermes agentbox. See **[Backfill worker](#backfill-worker)** below.
 
@@ -97,7 +98,7 @@ metadata, **Cloudflare Vectorize** for BGE vectors, **Backblaze B2** for image b
 
 ```bash
 # 1. Clone & install the Python backfill worker
-git clone <repo> && cd sharedcache && uv sync
+git clone <repo> && cd wagmiphotos && uv sync
 
 # 2. Configure .env  (full var lists are in the two runbooks below)
 cp .env.example .env
@@ -112,9 +113,9 @@ cp .env.example .env
 
 This is a uv monorepo with the following project structure:
 - **`projects/worker/`** — TypeScript Cloudflare Worker (edge request path)
-- **`projects/common/`** — Shared Python utilities (`sharedcache.common.*`)
-- **`projects/generation/`** — Image generation pipeline (`sharedcache.generation.*`)
-- **`projects/backfill/`** — Backfill service (`sharedcache.backfill.*`, includes Dockerfile)
+- **`projects/common/`** — Shared Python utilities (`wagmiphotos.common.*`)
+- **`projects/generation/`** — Image generation pipeline (`wagmiphotos.generation.*`)
+- **`projects/backfill/`** — Backfill service (`wagmiphotos.backfill.*`, includes Dockerfile)
 
 ---
 
@@ -154,29 +155,33 @@ The backfill worker is a long-running process that drains the demand-ranked miss
 
 ### Setup
 
-1. **Apply the D1 migrations** (schema for assets/queries, accounts, and backfill reliability — currently `0001` → `0006`):
+1. **Apply the D1 migrations** (schema for assets/queries, accounts, backfill reliability, and derived asset
+   URLs — currently `0001` → `0007`):
    ```bash
-   wrangler d1 migrations apply sharedcache
+   wrangler d1 migrations apply wagmiphotos
    ```
 
-2. **Create the Vectorize index** (BGE embeddings, 768 dimensions, cosine similarity):
+2. **Create the three Vectorize shards** (BGE embeddings, 768 dimensions, cosine similarity; writes are
+   routed by `fnv1a32(id) % 3`, queries fan out and merge — see `contract.json`):
    ```bash
-   wrangler vectorize create wagmiphotos-bge --dimensions=768 --metric=cosine
+   for i in 0 1 2; do
+     wrangler vectorize create "wagmiphotos-bge-$i" --dimensions=768 --metric=cosine
+   done
    ```
 
 3. **Seed the cache pool** (populates D1 with initial assets and embeddings):
    ```bash
-   uv run python -m sharedcache.backfill.seed_pd12m
+   uv run python -m wagmiphotos.backfill.seed_pd12m
    ```
 
 4. **Run the backfill**:
    - **Locally** (one pass over the queue, then exit):
      ```bash
-     uv run python -m sharedcache.backfill --once
+     uv run wagmiphotos-backfill --once
      ```
    - **In Hermes agentbox** (continuous, runs as a container):
      ```bash
-     docker build -f projects/backfill/Dockerfile -t sharedcache-backfill .
+     docker build -f projects/backfill/Dockerfile -t wagmiphotos-backfill .
      # Push image to registry and deploy to Hermes with agentbox runtime
      ```
 
@@ -184,15 +189,15 @@ The backfill worker is a long-running process that drains the demand-ranked miss
 
 - **Local BGE embedding**: the backfill loads `BAAI/bge-base-en-v1.5` in-process (via `sentence-transformers`,
   the `model` extra) to embed asset prompts/captions — no external embedding endpoint or tunnel required.
-- **Cloudflare credentials**: `CF_ACCOUNT_ID`, `CF_API_TOKEN`, `D1_DATABASE_ID`, `VECTORIZE_INDEX_NAME` (must
-  match the Worker's index, `wagmiphotos-bge`).
+- **Cloudflare credentials**: `CF_ACCOUNT_ID`, `CF_API_TOKEN`, `D1_DATABASE_ID`, `VECTORIZE_INDEX_PREFIX` +
+  `VECTORIZE_SHARDS` (must match the Worker's shards, `wagmiphotos-bge-0/1/2`).
 - **Similarity floor**: Tune `FLOOR_SIM_MAX` and `FLOOR_SIM_MIN` against the seeded pool (default: 0.90 / 0.72).
 
 ---
 
 ## Cloudflare Worker (edge request path)
 
-The Worker handles incoming image-generation requests at the edge, answering each with a cache **hit**, the closest **approximate** match, or a `202` **pending** — it never generates in-request. It shares the same D1 database and Vectorize index that the Python backfill populates.
+The Worker handles incoming image-generation requests at the edge, answering each with a cache **hit**, the closest **approximate** match, or a `202` **pending** — it never generates in-request. It shares the same D1 database and Vectorize shards that the Python backfill populates.
 
 ### Deploy runbook
 
@@ -203,18 +208,20 @@ The Worker handles incoming image-generation requests at the edge, answering eac
 
 2. **Create the D1 database**:
    ```bash
-   wrangler d1 create sharedcache
+   wrangler d1 create wagmiphotos
    ```
-   Copy the returned `database_id` and set it in `projects/worker/wrangler.toml` (replace `REPLACE_WITH_D1_DATABASE_ID`).
+   Copy the returned `database_id` and set it in `projects/worker/wrangler.toml` (replace the placeholder `database_id`).
 
-3. **Apply the D1 migrations** (currently `0001` → `0006`):
+3. **Apply the D1 migrations** (currently `0001` → `0007`):
    ```bash
-   wrangler d1 migrations apply sharedcache
+   wrangler d1 migrations apply wagmiphotos
    ```
 
-4. **Create the Vectorize index** (BGE embeddings, 768 dimensions, cosine similarity):
+4. **Create the three Vectorize shards** (BGE embeddings, 768 dimensions, cosine similarity):
    ```bash
-   wrangler vectorize create wagmiphotos-bge --dimensions=768 --metric=cosine
+   for i in 0 1 2; do
+     wrangler vectorize create "wagmiphotos-bge-$i" --dimensions=768 --metric=cosine
+   done
    ```
 
 5. **Set secrets** (one-time; Cloudflare stores these securely):
@@ -275,13 +282,14 @@ Everything above is verified offline with fakes. Before a real deploy, validate 
 Cloudflare/Backblaze/GMI credentials:
 
 1. **Provision stores + seed** — follow **[Backfill worker → Setup](#setup)**: `wrangler d1 migrations apply`,
-   `wrangler vectorize create wagmiphotos-bge --dimensions=768 --metric=cosine`, then
-   `uv run python -m sharedcache.backfill.seed_pd12m` (confirm the local-BGE caption embeddings load, not zeros).
+   create the three `wagmiphotos-bge-{0,1,2}` shards (`wrangler vectorize create … --dimensions=768
+   --metric=cosine`), then `uv run python -m wagmiphotos.backfill.seed_pd12m` (confirm the local-BGE caption
+   embeddings load, not zeros).
 2. **Tune the floor** — BGE text-to-text cosine scores run high; tune `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN` against
    the seeded pool so hits land in the intended range.
 3. **Deploy the Worker** — follow **[Cloudflare Worker → Deploy runbook](#deploy-runbook)**; confirm
    `wrangler deploy --dry-run` lists the `RATE_LIMITER` binding, then a first request returns a nearest
-   image and the backfill (`python -m sharedcache.backfill --once`) generates the top-ranked misses.
+   image and the backfill (`uv run wagmiphotos-backfill --once`) generates the top-ranked misses.
 
 A **public-read B2 bucket** (`B2_PUBLIC_URL_BASE`) is required so returned image URLs resolve in the browser.
 

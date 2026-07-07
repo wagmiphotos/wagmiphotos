@@ -1,9 +1,9 @@
 ---
 name: running-locally
-description: Use when asked to run, start, serve, or locally test the SharedCache / wagmi.photos app — the Cloudflare Worker and its playground SPA (projects/worker). Covers the local wrangler dev boot, the demo library seed, and why the generation path can't run offline.
+description: Use when asked to run, start, serve, or locally test the wagmi.photos app (formerly SharedCache) — the Cloudflare Worker and its playground SPA (projects/worker). Covers the local wrangler dev boot, the demo library seed, and why the generation path can't run offline.
 ---
 
-# Running SharedCache locally
+# Running wagmi.photos locally
 
 ## Overview
 
@@ -63,9 +63,16 @@ curl -s --retry 30 --retry-delay 1 --retry-connrefused http://127.0.0.1:8787/hea
 
 To exercise generation you need the deployed backend, not local mode: either follow
 `DEPLOY.md`, or `wrangler dev --remote --experimental-vectorize-bind-to-prod` after
-setting a real `database_id` in `wrangler.toml`, a live+seeded `wagmiphotos-bge`
-Vectorize index, and a Cloudflare account with Workers AI enabled (the `[ai]` binding
-needs no separate secret).
+setting a real `database_id` in `wrangler.toml`, the three live+seeded
+`wagmiphotos-bge-0/1/2` Vectorize shards, and a Cloudflare account with Workers AI
+enabled (the `[ai]` binding needs no separate secret).
+
+**Library search (`GET /v1/library?q=`) degrades instead of failing.** It's semantic
+(BGE, same Vectorize/Workers AI deps as generation) with a plain SQL `LIKE` scan as
+an automatic fallback (`src/library.ts`). Locally, every search request logs a
+`semantic library search failed; falling back to LIKE …` line to the `wrangler dev`
+console — that's expected offline (no local Vectorize/Workers AI), not a bug. The
+search still returns results, just LIKE-matched instead of semantically ranked.
 
 ## Auth in local dev (magic-link login)
 

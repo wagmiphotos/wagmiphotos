@@ -1,4 +1,4 @@
-# SharedCache / wagmi.photos — TODO
+# wagmi.photos — TODO
 
 Semantic image-generation cache for the **Backblaze Generative Media Hackathon**
 (deadline **Aug 3, 2026, 5:00 pm EDT**; judging Aug 5–11). Requires Backblaze
@@ -14,15 +14,18 @@ Where things live:
 ## 1. Deploy / live verification (the big open item)
 
 Everything is verified offline with fakes; nothing has run against live infra.
-Follow `DEPLOY.md` in order — it covers D1 create + migrations (through `0006`),
-the Vectorize index, the BGE embedding drift check, seeding, and floor tuning.
+Follow `DEPLOY.md` in order — it covers D1 create + migrations (through `0007`),
+the three Vectorize shards, the BGE embedding drift check, seeding, and floor tuning.
 
-- [ ] **Task 6 — BGE live provisioning:** create `wagmiphotos-bge`, run the
-      drift check (Workers AI BGE vs local BGE, cosine ≥ 0.98), seed the pool,
-      tune `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN`.
+- [ ] **Task 6 — BGE live provisioning:** create the three `wagmiphotos-bge-0/1/2`
+      shards, run the drift check (Workers AI BGE vs local BGE, cosine ≥ 0.98),
+      seed the pool, tune `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN`.
       (`docs/superpowers/plans/2026-07-06-bge-edge-embeddings.md` Task 6.)
-- [ ] **sharedcache → wagmiphotos rename:** reconcile the repo/project naming
-      with the wagmi.photos brand (the GitHub origin is already renamed).
+- [x] **wagmiphotos rename:** worker (`wagmiphotos-worker`), D1 (`wagmiphotos`),
+      Vectorize shards (`wagmiphotos-bge-0/1/2`), Python packages
+      (`wagmiphotos-common`/`-generation`/`-backfill`), and docs (README/DEPLOY/
+      HANDOFF/.env.example/skills) all reconciled to the wagmi.photos brand —
+      the GitHub origin was already renamed.
 
 ## 2. Hackathon submission
 
