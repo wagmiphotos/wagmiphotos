@@ -32,7 +32,7 @@ def test_migrations_create_tables_and_columns(conn):
             for t in ("assets", "queries", "api_keys", "meta")}
     assert {"id", "prompt", "source", "source_id", "model_used", "content_hash", "width",
             "height", "mime", "source_url", "locally_cached", "created_at",
-            "rehost_attempts"} <= cols["assets"]
+            "rehost_attempts", "dead_at", "dead_reason"} <= cols["assets"]
     # 0007: URLs are derived from (id, locally_cached, source_url) — no longer stored.
     assert not ({"thumb_url", "medium_url", "url", "manifest_url"} & cols["assets"])
     assert {"normalized_prompt", "original_prompt", "count", "status", "last_asset_id",
@@ -177,3 +177,16 @@ def test_existing_source_ids_sql(conn):
     sql = d1_client.existing_source_ids_sql(2)
     rows = conn.execute(sql, ["pd12m", "7", "8"]).fetchall()
     assert [r[0] for r in rows] == ["7"]
+
+
+def test_0008_view_and_index(conn):
+    views = {r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='view'")}
+    assert "live_assets" in views
+    idx = {r[1] for r in conn.execute("PRAGMA index_list(assets)")}
+    assert any("rehostable" in name for name in idx)
+    # the view filters dead rows and exposes the same columns as assets
+    conn.execute(d1_client.INSERT_ASSET_SQL, ASSET_PARAMS)
+    assert conn.execute("SELECT id FROM live_assets").fetchall() == [("a1",)]
+    conn.execute("UPDATE assets SET dead_at=datetime('now') WHERE id='a1'")
+    assert conn.execute("SELECT id FROM live_assets").fetchall() == []
