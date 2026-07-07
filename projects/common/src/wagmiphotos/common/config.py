@@ -15,10 +15,10 @@ class Settings(BaseSettings):
     b2_region: str = "us-west-004"
     b2_public_url_base: str | None = None
     embedding_dims: int = 768
-    default_image_model: str = "gpt-image-1"
+    default_image_model: str = "Z-Image-Turbo"
     hf_token: str | None = None
     default_provider: str = "gmicloud"
-    image_price_usd: float = 0.04
+    image_price_usd: float = 0.01
     worker_interval_seconds: int = 300
     worker_batch_size: int = 5
     worker_max_spend_usd: float = 5.0

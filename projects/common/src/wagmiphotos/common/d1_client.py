@@ -50,7 +50,8 @@ RECORD_QUERY_FAILURE_SQL = (
 
 INSERT_ASSET_SQL = (
     "INSERT INTO assets (id, prompt, source, source_id, model_used, content_hash, width, "
-    "height, mime, source_url, locally_cached) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+    "height, mime, source_url, locally_cached, price_usd, provider) "
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
 
 ASSET_EXISTS_SQL = "SELECT 1 FROM live_assets WHERE id=? LIMIT 1"
 
@@ -145,7 +146,8 @@ class D1Client:
         self._query(
             INSERT_ASSET_SQL,
             [rec.id, rec.prompt, rec.source, rec.source_id, rec.model_used, rec.content_hash,
-             rec.width, rec.height, rec.mime, rec.source_url, 1 if rec.locally_cached else 0])
+             rec.width, rec.height, rec.mime, rec.source_url, 1 if rec.locally_cached else 0,
+             rec.price_usd, rec.provider])
 
     def asset_exists(self, asset_id: str) -> bool:
         return bool(self._query(ASSET_EXISTS_SQL, [asset_id]))

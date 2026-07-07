@@ -86,7 +86,7 @@ class StubGenerator:
         key = f"assets/{content_hash}/original.png"
         url = self._storage.put(key, data, "image/png")
 
-        _, inner_model = parse_model_id(model)
+        provider_name, inner_model = parse_model_id(model)
 
         manifest = {
             "schema_version": "1.5",
@@ -109,6 +109,7 @@ class StubGenerator:
             manifest_json=manifest_json,
             manifest_hash=manifest_hash,
             storage_key=key,
+            provider=provider_name,
         )
 
 
@@ -173,4 +174,5 @@ class GenblazeGenerator:
             manifest_json=manifest_json,
             manifest_hash=result.manifest.canonical_hash,
             storage_key=key,
+            provider=provider_name,
         )

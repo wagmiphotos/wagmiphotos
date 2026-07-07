@@ -63,7 +63,7 @@ def test_insert_asset_binds_all_columns(monkeypatch):
     c, calls = _client(monkeypatch, [[]])
     rec = AssetRecord(id="i1", prompt="p", model_used="m", source="generated", source_id=None,
                       content_hash="h", width=1, height=2, mime="image/webp", created_at="t",
-                      source_url=None, locally_cached=True)
+                      source_url=None, locally_cached=True, price_usd=0.01, provider="gmicloud")
     c.insert_asset(rec)
     sql, params = calls[0]
     assert "INSERT INTO assets" in sql and "source_url" in sql
@@ -71,6 +71,9 @@ def test_insert_asset_binds_all_columns(monkeypatch):
     columns = {c.strip() for c in sql.split("(", 1)[1].split(")", 1)[0].split(",")}
     # 0007: no stored-URL columns are bound (source_url is the only survivor)
     assert not (columns & {"url", "thumb_url", "medium_url", "manifest_url"})
+    # 0009: per-image cost + provider are bound so the row is self-describing.
+    assert {"price_usd", "provider"} <= columns
+    assert 0.01 in params and "gmicloud" in params
     # model_used survives the slimming — the worker serves it (shared_cache
     # + library publicAsset), so inserts must keep populating it.
     assert "model_used" in columns and "m" in params

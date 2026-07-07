@@ -17,8 +17,22 @@ def test_asset_record_has_no_stored_urls():
 def test_generated_fields():
     g = Generated(url="u", content_hash="h", width=1, height=1, mime="image/webp",
                   model_used="m", source="generated", manifest_json="{}", manifest_hash="x",
-                  storage_key="k")
+                  storage_key="k", provider="gmicloud")
     assert g.model_used == "m"
+    assert g.provider == "gmicloud"
+
+
+def test_asset_record_carries_price_and_provider():
+    # Generated assets record the price paid and the backend that made them, so
+    # the row stays self-describing even after the price constant or model changes.
+    r = AssetRecord(id="1", prompt="p", model_used="Z-Image-Turbo", source="generated",
+                    source_id=None, content_hash="h", width=1, height=1, mime="image/webp",
+                    created_at="t", price_usd=0.01, provider="gmicloud")
+    assert r.price_usd == 0.01 and r.provider == "gmicloud"
+    # rehosted/seed assets have no cost and no provider — the fields default away.
+    seed = AssetRecord(id="2", prompt="p", model_used=None, source="pd12m", source_id="s",
+                       content_hash="h", width=1, height=1, mime="image/webp", created_at="t")
+    assert seed.price_usd is None and seed.provider is None
 
 def test_generation_result_is_gone():
     # dead code: nothing produced or consumed it (the worker never returns

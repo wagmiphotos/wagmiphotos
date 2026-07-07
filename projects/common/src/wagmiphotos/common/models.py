@@ -14,6 +14,8 @@ class AssetRecord:
     created_at: str
     source_url: str | None = None
     locally_cached: bool = True
+    price_usd: float | None = None   # cost charged at generation; None for seed/rehost
+    provider: str | None = None      # generation backend; None for seed/rehost
 
 @dataclass
 class Generated:
@@ -27,3 +29,4 @@ class Generated:
     manifest_json: str
     manifest_hash: str
     storage_key: str
+    provider: str | None = None

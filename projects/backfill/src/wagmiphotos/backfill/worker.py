@@ -128,7 +128,8 @@ class BackfillWorker:
             json.dumps(manifest, sort_keys=True).encode("utf-8"), "application/json")
         rec = AssetRecord(id=asset_id, prompt=q.original_prompt, model_used=gen.model_used,
                           source="generated", source_id=None, content_hash=gen.content_hash,
-                          width=w, height=h, mime="image/webp", created_at="", locally_cached=True)
+                          width=w, height=h, mime="image/webp", created_at="", locally_cached=True,
+                          price_usd=self._price, provider=gen.provider)
         # D1 first: if the vector upsert fails we're left with a
         # servable-but-unindexed asset instead of a dangling vector.
         self._d1.insert_asset(rec)

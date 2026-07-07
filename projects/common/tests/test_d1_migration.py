@@ -32,9 +32,13 @@ def test_migrations_create_tables_and_columns(conn):
             for t in ("assets", "queries", "api_keys", "meta")}
     assert {"id", "prompt", "source", "source_id", "model_used", "content_hash", "width",
             "height", "mime", "source_url", "locally_cached", "created_at",
-            "rehost_attempts", "dead_at", "dead_reason"} <= cols["assets"]
+            "rehost_attempts", "dead_at", "dead_reason", "price_usd", "provider"} <= cols["assets"]
     # 0007: URLs are derived from (id, locally_cached, source_url) — no longer stored.
     assert not ({"thumb_url", "medium_url", "url", "manifest_url"} & cols["assets"])
+    # 0009: the live_assets view was recreated (0008's SELECT * must re-expand)
+    # so the new columns are visible through the read path, not just the base table.
+    live_cols = {r[1] for r in conn.execute("PRAGMA table_info(live_assets)")}
+    assert {"price_usd", "provider"} <= live_cols
     assert {"normalized_prompt", "original_prompt", "count", "status", "last_asset_id",
             "last_similarity", "first_seen", "last_seen", "generate", "attempts",
             "last_error", "claimed_at"} <= cols["queries"]
@@ -69,7 +73,7 @@ def _seed_demand(conn, prompt, asset_id, count):
 
 
 ASSET_PARAMS = ["a1", "a fox", "generated", None, "gpt-image-1", "hash", 1024, 1024,
-                "image/webp", None, 1]
+                "image/webp", None, 1, 0.01, "gmicloud"]
 LOCALLY_CACHED_IDX = 10  # position of locally_cached in ASSET_PARAMS
 
 
@@ -142,6 +146,9 @@ def test_insert_asset_and_asset_exists_sql(conn):
     row = conn.execute("SELECT source, locally_cached, model_used FROM assets "
                        "WHERE id='a1'").fetchone()
     assert row == ("generated", 1, "gpt-image-1")
+    # 0009: per-image price + provider round-trip through the slim insert.
+    assert conn.execute("SELECT price_usd, provider FROM assets WHERE id='a1'"
+                        ).fetchone() == (0.01, "gmicloud")
 
 
 def test_old_insert_asset_sql_with_url_fails_after_0007(conn):

@@ -66,6 +66,10 @@ async def test_generate_pass_builds_pending_and_upserts(monkeypatch):
     # freshly generated assets are an exact answer for the prompt
     assert d1.similarities["popular"] == 1.0
     assert d1.claims == {}                         # no claims left dangling
+    # each generated asset records the price paid and the provider that made it
+    # (TEST_MODEL is wagmiphotos-gmicloud-...), captured per-image at gen time.
+    assert all(a.price_usd == 0.04 for a in d1.inserted)
+    assert all(a.provider == "gmicloud" for a in d1.inserted)
 
 @pytest.mark.asyncio
 async def test_generate_pass_rechecks_and_skips(monkeypatch):
