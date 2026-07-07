@@ -1,8 +1,12 @@
 # DEPLOY — going live
 
-Ordered runbook for the first production deploy. Everything is verified offline
-with fakes; nothing below has run against live infra yet. Run the steps **in
-order** — several have hard dependencies (noted inline).
+Ordered runbook for the production deploy. **Status 2026-07-07: steps 0–3 and
+5–6 are DONE and live** (wagmi.photos + api.wagmi.photos serve the Worker; D1
+migrated 0001–0007; three shards seeded with 1k PD12M rows; drift check passed
+at cosine 1.0000; floors tuned 0.87/0.75; assets route via CF-proxied
+`images.wagmi.photos`). **Step 4 (the GMI backfill box) is NOT up yet** — queued
+generations and rehosting wait on it. Kept in full as the rebuild-from-scratch
+reference; run steps **in order** — several have hard dependencies.
 
 Prereqs: a Cloudflare account, a Backblaze B2 bucket, a GMI Cloud (CPU) box with
 Docker, and a GMI Cloud generation API key. All commands are run from the repo
@@ -202,18 +206,18 @@ Everything is code-complete and green (both test suites pass offline); these are
 the loose ends to pick up when you resume. Full backlog + design trail: root
 `HANDOFF.md` and `docs/HANDOFF-2026-07-07.md`.
 
-### BGE embeddings — provision at deploy (Task 6, not yet run — needs live CF + GMI)
-The BGE search layer is code-complete but has never touched live infra. At deploy:
-create the three `wagmiphotos-bge-0/1/2` shards (step 2), run the **embedding
-drift check** (Worker Workers-AI BGE vs local BGE, cosine ≥ 0.98 — step 6), seed
-the pool, then tune the floor. See
-`docs/superpowers/plans/2026-07-06-bge-edge-embeddings.md` Task 6.
-Also do a real `docker build` of the backfill image with `--extra model` (pulls CPU
-torch + BGE weights) — so far only verified via `uv sync --dry-run`.
+### BGE embeddings — Task 6 ✅ DONE 2026-07-07 (except the GMI box)
+Shards created (`wagmiphotos-bge-0/1/2`), drift check PASSED at cosine 1.0000
+(after forcing mean pooling — see the Resolved note in step 6), 1k PD12M rows
+seeded from the local parquet download (`seed_pd12m --metadata-dir`, shard
+balance 333/343/324), floors tuned 0.87/0.75 and deployed. Still owed from this
+task: a real `docker build` of the backfill image with `--extra model` on the
+GMI box (pulls CPU torch + BGE weights) — so far only verified via `uv sync`.
 
 ### During / right after deploy
-- **Tune the floor** (step 6): set `FLOOR_SIM_MAX`/`FLOOR_SIM_MIN` from the real
-  seeded pool (BGE text-to-text cosines run high, ~0.7–0.95), not the 0.87/0.75 guess.
+- **Re-probe the floor at scale**: 0.87/0.75 were tuned against the 1k seed;
+  coincidental similarity creeps up as the pool grows toward 12.5M — re-run the
+  probe after each big seed batch.
 - **Build-verify the non-root images** — they pass `docker build --check` but
   were never built here (torch/BGE weights). On the box:
   `cd deploy/gmi && docker compose up -d --build`, then
