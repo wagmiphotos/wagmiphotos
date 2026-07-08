@@ -39,7 +39,7 @@ class BackfillWorker:
                  max_rehost_bytes: int = DEFAULT_MAX_REHOST_BYTES,
                  generation_size: str = "1024x1024",
                  generation_min_requests: int = 1,
-                 denylist=None):
+                 denylist=None, moderator=None):
         self._d1 = d1
         self._vec = vectorize
         self._embedder = embedder
@@ -57,6 +57,7 @@ class BackfillWorker:
         self._gen_size = generation_size
         self._min_requests = generation_min_requests
         self._denylist = denylist
+        self._moderator = moderator
 
     # -- spend accounting ---------------------------------------------------
 
@@ -90,6 +91,20 @@ class BackfillWorker:
                     logger.warning("denied prompt %r matched %r — not generating",
                                    q.normalized_prompt, term)
                     self._d1.deny_query(q.normalized_prompt, f"denied: {term}")
+                    continue
+            # Safety moderation (best-effort). On error, skip this tick rather than
+            # risk generating unsafe content — it's re-checked next tick.
+            if self._moderator is not None:
+                try:
+                    category = await self._moderator.flagged(q.original_prompt)
+                except Exception:
+                    logger.exception("moderation failed for %r — skipping this tick",
+                                     q.normalized_prompt)
+                    continue
+                if category is not None:
+                    logger.warning("unsafe prompt %r flagged %r — not generating",
+                                   q.normalized_prompt, category)
+                    self._d1.deny_query(q.normalized_prompt, f"unsafe: {category}")
                     continue
             # Claim before doing any work so two workers (or one worker racing
             # Vectorize's eventual consistency) can't double-generate a prompt.
@@ -223,6 +238,7 @@ class BackfillWorker:
 def build_worker_from_settings(s) -> "BackfillWorker":
     from wagmiphotos.common.bge import BgeEmbedder
     from wagmiphotos.common.denylist import Denylist
+    from wagmiphotos.common.moderation import OpenAIModerator
     from wagmiphotos.common.d1_client import D1Client
     from wagmiphotos.common.vectorize_client import VectorizeClient
     from wagmiphotos.generation import storage as storage_mod
@@ -260,4 +276,5 @@ def build_worker_from_settings(s) -> "BackfillWorker":
                           max_lifetime_spend_usd=s.worker_max_lifetime_spend_usd,
                           price_usd=s.image_price_usd, generation_size=s.generation_size,
                           generation_min_requests=s.generation_min_requests,
-                          denylist=Denylist.from_spec(s.denylist_terms))
+                          denylist=Denylist.from_spec(s.denylist_terms),
+                          moderator=OpenAIModerator(s.openai_api_key) if s.openai_api_key else None)

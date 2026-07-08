@@ -107,6 +107,22 @@ async def test_generate_pass_denies_trademarked_prompt():
 
 
 @pytest.mark.asyncio
+async def test_generate_pass_denies_unsafe_prompt():
+    # Safety guardrail: flagged prompts are opted out, not generated.
+    class FakeModerator:
+        async def flagged(self, text):
+            return "violence" if "gun" in text else None
+    d1, vec = FakeD1(), FakeVectorize()
+    d1.pending = [QueryRow("a gun", "a gun scene", 20), QueryRow("a cat", "a cat", 20)]
+    w = _worker(d1, vec, batch_size=5, max_spend_usd=100.0, price_usd=0.04,
+                moderator=FakeModerator())
+    built = await w.generate_pass()
+    assert built == 1                                      # only 'a cat' built
+    assert d1.denied and d1.denied[0][0] == "a gun"
+    assert "unsafe" in d1.denied[0][1] and "violence" in d1.denied[0][1]
+
+
+@pytest.mark.asyncio
 async def test_generate_pass_skips_below_min_requests():
     # Demand gate: don't spend on one-off prompts — only build ones requested
     # at least generation_min_requests times.
