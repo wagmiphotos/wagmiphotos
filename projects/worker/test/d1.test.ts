@@ -227,3 +227,44 @@ it("loginTokens.create sets 15-min TTL + nonce_hash; consume is nonce-guarded, s
   expect(calls[1].sql).toContain("RETURNING email");
   expect(calls[1].args).toEqual(["h1", "n1"]);
 });
+
+const USER_ROW = {
+  id: "usr_1", email: "a@b.co", created_at: "x", last_login: null,
+  tos_version: null, tos_accepted_at: null,
+  stripe_customer_id: "cus_1", stripe_subscription_id: "sub_1",
+  plan_status: "active", plan_current_period_end: "2027-07-08T00:00:00.000Z",
+};
+
+it("getById selects the subscription columns", async () => {
+  const { db, calls } = fakeDb(USER_ROW);
+  const { users } = makeD1Stores(db);
+  const u = await users.getById("usr_1");
+  expect(u?.plan_status).toBe("active");
+  expect(calls[0].sql).toContain("plan_status");
+  expect(calls[0].sql).toContain("stripe_customer_id");
+});
+
+it("getByStripeCustomerId looks up by customer id", async () => {
+  const { db, calls } = fakeDb(USER_ROW);
+  const { users } = makeD1Stores(db);
+  const u = await users.getByStripeCustomerId("cus_1");
+  expect(u?.id).toBe("usr_1");
+  expect(calls[0].sql).toContain("WHERE stripe_customer_id = ?");
+  expect(calls[0].args).toEqual(["cus_1"]);
+});
+
+it("setStripeCustomer updates the customer id for a user", async () => {
+  const { db, calls } = fakeDb();
+  const { users } = makeD1Stores(db);
+  await users.setStripeCustomer("usr_1", "cus_9");
+  expect(calls[0].sql).toContain("UPDATE users SET stripe_customer_id = ?");
+  expect(calls[0].args).toEqual(["cus_9", "usr_1"]);
+});
+
+it("setSubscriptionByCustomer writes status keyed by customer id", async () => {
+  const { db, calls } = fakeDb();
+  const { users } = makeD1Stores(db);
+  await users.setSubscriptionByCustomer("cus_1", { subscriptionId: "sub_2", planStatus: "active", currentPeriodEnd: "2027-01-01T00:00:00.000Z" });
+  expect(calls[0].sql).toContain("WHERE stripe_customer_id = ?");
+  expect(calls[0].args).toEqual(["sub_2", "active", "2027-01-01T00:00:00.000Z", "cus_1"]);
+});

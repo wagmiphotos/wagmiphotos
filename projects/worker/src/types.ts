@@ -19,11 +19,19 @@ export interface QueryStore {
   /** Upserts the query row and returns the row's effective generate state after merging. */
   recordQuery(i: { normalized: string; original: string; assetId: string | null; similarity: number; built: boolean; generate: boolean }): Promise<boolean>;
 }
-export interface User { id: string; email: string; created_at: string; last_login: string | null; tos_version: string | null; tos_accepted_at: string | null; }
+export interface User {
+  id: string; email: string; created_at: string; last_login: string | null;
+  tos_version: string | null; tos_accepted_at: string | null;
+  stripe_customer_id: string | null; stripe_subscription_id: string | null;
+  plan_status: string | null; plan_current_period_end: string | null;
+}
 export interface UserStore {
   upsertByEmail(id: string, email: string): Promise<{ id: string; email: string }>;
   getById(id: string): Promise<User | null>;
   acceptTos(userId: string, version: string, ip: string | null, userAgent: string | null): Promise<void>;
+  getByStripeCustomerId(customerId: string): Promise<User | null>;
+  setStripeCustomer(userId: string, customerId: string): Promise<void>;
+  setSubscriptionByCustomer(customerId: string, f: { subscriptionId: string | null; planStatus: string; currentPeriodEnd: string | null }): Promise<void>;
 }
 export interface SessionStore {
   create(userId: string, tokenHash: string): Promise<void>;
