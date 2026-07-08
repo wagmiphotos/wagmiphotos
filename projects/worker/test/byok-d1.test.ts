@@ -74,3 +74,17 @@ it("patch updates only the provided fields", async () => {
   expect(calls[0].sql).toContain("monthly_cap = ?");
   expect(calls[0].sql).not.toContain("enabled = ?");
 });
+
+it("insertGenerated writes a byok asset row satisfying legacy NOT NULLs", async () => {
+  const { db, calls } = fakeDb();
+  const { assets } = makeD1Stores(db);
+  await assets.insertGenerated({
+    id: "gen-1", prompt: "a red fox", sourceUrl: "https://byok.example/byok/gen-1/original.png",
+    mime: "image/png", width: 1024, height: 1024, modelUsed: "gpt-image-1", provider: "openai", priceUsd: 0.04,
+  });
+  expect(calls[0].sql).toContain("INSERT INTO assets");
+  expect(calls[0].sql).toContain("'byok'");
+  // legacy url column mirrors source_url until the rehost pipeline derives sizes
+  expect(calls[0].args).toEqual(["gen-1", "a red fox", "gpt-image-1", 1024, 1024, "image/png",
+    "https://byok.example/byok/gen-1/original.png", "https://byok.example/byok/gen-1/original.png", 0.04, "openai"]);
+});

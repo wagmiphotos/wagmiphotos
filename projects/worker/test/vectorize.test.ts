@@ -26,4 +26,15 @@ describe("makeVectorize (sharded)", () => {
     const store = makeVectorize([({ query: async () => ({}) }) as any, shard([{ id: "x", score: 0.6 }])]);
     expect(await store.query([0.1], 2)).toEqual([{ id: "x", score: 0.6 }]);
   });
+  it("upsert routes to the fnv1a32(id) % shards binding", async () => {
+    const upserts: { shard: number; rows: any[] }[] = [];
+    const mk = (shard: number): any => ({
+      query: async () => ({ matches: [] }),
+      upsert: async (rows: any[]) => { upserts.push({ shard, rows }); },
+    });
+    const store = makeVectorize([mk(0), mk(1), mk(2)]);
+    // contract.json shard_fixtures pins "demo-3" -> shard 1
+    await store.upsert("demo-3", [0.1, 0.2]);
+    expect(upserts).toEqual([{ shard: 1, rows: [{ id: "demo-3", values: [0.1, 0.2] }] }]);
+  });
 });

@@ -1,4 +1,5 @@
 import type { VectorizeStore, Match } from "./types";
+import { shardFor } from "./shard";
 
 // One logical store over N shard indexes: queries fan out to every shard and
 // merge by score (cosine scores from identically-configured indexes are
@@ -18,6 +19,9 @@ export function makeVectorize(bindings: VectorizeIndex[]): VectorizeStore {
         .map(([id, score]): Match => ({ id, score }))
         .sort((a, b) => b.score - a.score)
         .slice(0, topK);
+    },
+    async upsert(id, vector) {
+      await bindings[shardFor(id, bindings.length)].upsert([{ id, values: vector }]);
     },
   };
 }

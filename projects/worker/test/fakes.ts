@@ -7,11 +7,15 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   const recorded: any[] = [];
   const keyOwners = new Map<string, string>();
   const matches: Match[] = [];
+  const upserted: { id: string; vector: number[] }[] = [];
   const byokRows = new Map<string, ByokRow>();
   const byokUsage = new Map<string, { count: number; est_spend_usd: number }>();
   const base: Services = {
     embedder: { textEmbed: async () => [0.1, 0.2, 0.3] },
-    vectorize: { query: async () => matches },
+    vectorize: {
+      query: async () => matches,
+      upsert: async (id: string, vector: number[]) => { upserted.push({ id, vector }); },
+    },
     assets: {
       getAsset: async (id) => assets.get(id) ?? null,
       searchAssets: async (i) => { searchCalls.push(i); return libraryRows.slice(i.offset, i.offset + i.limit); },
@@ -19,6 +23,12 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
         const r = assets.get(id);
         return r ? [r as LibraryAssetRow] : [];
       }),
+      insertGenerated: async (a) => {
+        assets.set(a.id, {
+          id: a.id, prompt: a.prompt, source: "byok", source_id: null, model_used: a.modelUsed,
+          width: a.width, height: a.height, mime: a.mime, source_url: a.sourceUrl, locally_cached: 0,
+        });
+      },
     },
     queries: { recordQuery: async (i) => { recorded.push(i); return i.generate; } },
     keys: {
@@ -63,6 +73,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   (base as any)._searchCalls = searchCalls;
   (base as any)._recorded = recorded;
   (base as any)._matches = matches;
+  (base as any)._upserted = upserted;
   (base as any)._keyOwners = keyOwners;
   (base as any)._byokRows = byokRows;
   (base as any)._byokUsage = byokUsage;

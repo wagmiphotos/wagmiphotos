@@ -42,6 +42,14 @@ export function makeD1Stores(db: D1Database): {
       ).bind(...ids).all<LibraryAssetRow>();
       return results ?? [];
     },
+    async insertGenerated(a) {
+      // url (legacy NOT NULL) mirrors source_url; assetUrls() ignores it for
+      // non-locally_cached rows and serves source_url directly.
+      await db.prepare(
+        `INSERT INTO assets (id, prompt, source, model_used, width, height, mime, source_url, url, locally_cached, price_usd, provider)
+         VALUES (?, ?, 'byok', ?, ?, ?, ?, ?, ?, 0, ?, ?)`
+      ).bind(a.id, a.prompt, a.modelUsed, a.width, a.height, a.mime, a.sourceUrl, a.sourceUrl, a.priceUsd, a.provider).run();
+    },
   };
   const queries: QueryStore = {
     async recordQuery({ normalized, original, assetId, similarity, built, generate }) {

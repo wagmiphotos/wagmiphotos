@@ -8,12 +8,19 @@ export interface AssetRow {
 export interface LibraryAssetRow extends AssetRow { created_at: string; }
 export interface Match { id: string; score: number; }
 export interface Embedder { textEmbed(prompt: string): Promise<number[]>; }
-export interface VectorizeStore { query(vector: number[], topK: number): Promise<Match[]>; }
+export interface VectorizeStore {
+  query(vector: number[], topK: number): Promise<Match[]>;
+  /** Shard-routed write (fnv1a32(id) % shards) — BYOK in-request ingest. */
+  upsert(id: string, vector: number[]): Promise<void>;
+}
 export interface AssetStore {
   getAsset(id: string): Promise<AssetRow | null>;
   searchAssets(i: { q: string; limit: number; offset: number }): Promise<LibraryAssetRow[]>;
   /** Batch lookup for the semantic-search hydration path; missing ids are simply absent (no error). */
   getAssetsByIds(ids: string[]): Promise<LibraryAssetRow[]>;
+  /** Insert a BYOK-generated asset. source='byok'; the row serves from
+   *  source_url until the demand-first rehost derives B2 sizes (0008). */
+  insertGenerated(a: { id: string; prompt: string; sourceUrl: string; mime: string; width: number | null; height: number | null; modelUsed: string; provider: string; priceUsd: number }): Promise<void>;
 }
 export interface QueryStore {
   /** Upserts the query row and returns the row's effective generate state after merging. */
