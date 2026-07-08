@@ -11,6 +11,8 @@ import { makeEmailSender } from "./email";
 import { makeStripe } from "./stripe";
 import { resolveApiPrincipal, resolveSession } from "./session";
 import { handleLoginRequest, handleVerify, handleMe, handleLogout, handleAcceptTos, handleListKeys, handleDeleteKey } from "./auth-routes";
+import { handleCheckout, handlePortal, handleStripeWebhook } from "./stripe-routes";
+import { isPaid } from "./entitlement";
 
 function buildServices(env: Env): Services {
   const { assets, queries, keys, users, sessions, loginTokens } = makeD1Stores(env.DB);
@@ -107,6 +109,13 @@ export default {
         return await handleDeleteKey(id, request, env, services);
       }
 
+      if (url.pathname === "/v1/billing/checkout" && request.method === "POST")
+        return await handleCheckout(request, env, services);
+      if (url.pathname === "/v1/billing/portal" && request.method === "POST")
+        return await handlePortal(request, env, services);
+      if (url.pathname === "/v1/stripe/webhook" && request.method === "POST")
+        return await handleStripeWebhook(request, env, services);
+
       const libraryCfg = { floorSimMin: numEnv(env.FLOOR_SIM_MIN, FLOOR_SIM_MIN), assetBaseUrl: env.ASSET_BASE_URL };
 
       if (url.pathname === "/v1/library" && request.method === "GET") {
@@ -129,15 +138,24 @@ export default {
       if (url.pathname === "/v1/keys/generate" && request.method === "POST") {
         const principal = await resolveSession(request, env, services.sessions);
         if (!principal) return Response.json({ error: "login required" }, { status: 401 });
+        const user = await services.users.getById(principal.userId);
+        if (!isPaid(user)) return Response.json({ error: "Unlimited plan required", upgrade_url: `${verifyBase}/#/account` }, { status: 402 });
         return await handleKeygen(request, services, genKey, principal.userId);
       }
 
       if (url.pathname === "/v1/images/generations" && request.method === "POST") {
         const principal = await resolveApiPrincipal(request, env, services);
         if (!principal) return Response.json({ error: "Invalid API Key" }, { status: 401 });
-        // Throttle the expensive path (embed + Vectorize) per authenticated
-        // principal, namespaced so it doesn't share a bucket with keygen.
-        if (!(await services.rateLimiter.limit(`gen:${principal.userId}`))) {
+        // The programmatic (bearer-key) API is the paid surface; the session
+        // playground stays free. Master/dev bypass and use the higher limiter.
+        let paid = principal.via === "master" || principal.via === "dev";
+        if (principal.via === "key") {
+          const owner = await services.users.getById(principal.userId);
+          if (!isPaid(owner)) return Response.json({ error: "Unlimited plan required", upgrade_url: `${verifyBase}/#/account` }, { status: 402 });
+          paid = true;
+        }
+        const limiter = paid ? services.rateLimiterPaid : services.rateLimiter;
+        if (!(await limiter.limit(`gen:${principal.userId}`))) {
           return Response.json({ error: "Too many requests" }, { status: 429 });
         }
         let body: GenBody;

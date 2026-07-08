@@ -67,9 +67,11 @@ it("generate: empty pool -> 202 (open dev, embedder mocked)", async () => {
 });
 
 it("generate: 429 when the rate limiter denies the request", async () => {
+  // Default fakeEnv has no bearer/session, so this hits the dev-open lane,
+  // which bypasses the paid gate and uses the paid (higher-tier) limiter.
   const res = await worker.fetch(
     new Request("https://x/v1/images/generations", { method: "POST", body: JSON.stringify({ prompt: "hi" }) }),
-    fakeEnv({ RATE_LIMITER: { limit: async () => ({ success: false }) } })
+    fakeEnv({ RATE_LIMITER_PAID: { limit: async () => ({ success: false }) } })
   );
   expect(res.status).toBe(429);
 });
@@ -209,4 +211,85 @@ it("serves SPA HTML with env-configured public URLs substituted", async () => {
   });
   const res = await worker.fetch(new Request("https://x/"), env);
   expect(await res.text()).toBe('<a href="https://api.dev.wagmi.photos/v1">docs</a>');
+});
+
+// DB stub that returns a key owner for api_keys queries and a user row (with a
+// given plan_status) for users queries — enough to drive the paid gate.
+function billingDb({ owner = "usr_1", planStatus = null as string | null } = {}) {
+  return {
+    prepare: (sql: string) => ({
+      bind: () => ({
+        first: async () => {
+          if (sql.includes("FROM api_keys")) return { user_id: owner };
+          if (sql.includes("FROM users")) return { id: owner, email: "a@b.co", created_at: "x", last_login: null, tos_version: null, tos_accepted_at: null, stripe_customer_id: "cus_1", stripe_subscription_id: "sub_1", plan_status: planStatus, plan_current_period_end: null };
+          return null;
+        },
+        run: async () => ({ success: true }),
+        all: async () => ({ results: [] }),
+      }),
+    }),
+  };
+}
+
+it("generate via bearer key: 402 when the owner is not paid", async () => {
+  const res = await worker.fetch(
+    new Request("https://x/v1/images/generations", { method: "POST", headers: { Authorization: "Bearer sc-free" }, body: JSON.stringify({ prompt: "hi" }) }),
+    fakeEnv({ DB: billingDb({ planStatus: null }), DEV_MODE: undefined }),
+  );
+  expect(res.status).toBe(402);
+});
+
+it("generate via bearer key: allowed when the owner is paid", async () => {
+  const res = await worker.fetch(
+    new Request("https://x/v1/images/generations", { method: "POST", headers: { Authorization: "Bearer sc-paid" }, body: JSON.stringify({ prompt: "hi" }) }),
+    fakeEnv({ DB: billingDb({ planStatus: "active" }), DEV_MODE: undefined }),
+  );
+  expect(res.status).toBe(202); // empty pool -> pending (paid gate passed)
+});
+
+it("paid generation consults the paid rate limiter", async () => {
+  const res = await worker.fetch(
+    new Request("https://x/v1/images/generations", { method: "POST", headers: { Authorization: "Bearer sc-paid" }, body: JSON.stringify({ prompt: "hi" }) }),
+    fakeEnv({ DB: billingDb({ planStatus: "active" }), DEV_MODE: undefined, RATE_LIMITER_PAID: { limit: async () => ({ success: false }) } }),
+  );
+  expect(res.status).toBe(429);
+});
+
+it("keygen: 402 for a free user, ok for a paid user", async () => {
+  // resolveSession reads sessions via env.DB; billingDb returns a user for FROM users.
+  const free = await worker.fetch(
+    new Request("https://x/v1/keys/generate", { method: "POST", body: "{}", headers: { Cookie: "wagmi_session=s" } }),
+    fakeEnv({ DB: sessionDb({ planStatus: null }) }),
+  );
+  expect(free.status).toBe(402);
+  const paid = await worker.fetch(
+    new Request("https://x/v1/keys/generate", { method: "POST", body: "{}", headers: { Cookie: "wagmi_session=s" } }),
+    fakeEnv({ DB: sessionDb({ planStatus: "active" }) }),
+  );
+  expect(paid.status).toBe(200);
+});
+
+// Session-authed variant: sessions.resolve reads `FROM sessions`.
+function sessionDb({ planStatus = null as string | null } = {}) {
+  return {
+    prepare: (sql: string) => ({
+      bind: () => ({
+        first: async () => {
+          if (sql.includes("FROM sessions")) return { user_id: "usr_1" };
+          if (sql.includes("FROM users")) return { id: "usr_1", email: "a@b.co", created_at: "x", last_login: null, tos_version: null, tos_accepted_at: null, stripe_customer_id: "cus_1", stripe_subscription_id: null, plan_status: planStatus, plan_current_period_end: null };
+          return null;
+        },
+        run: async () => ({ success: true }),
+        all: async () => ({ results: [] }),
+      }),
+    }),
+  };
+}
+
+it("webhook route: 400 on an unsigned body", async () => {
+  const res = await worker.fetch(
+    new Request("https://x/v1/stripe/webhook", { method: "POST", body: "{}" }),
+    fakeEnv({ STRIPE_WEBHOOK_SECRET: "whsec_test" }),
+  );
+  expect(res.status).toBe(400);
 });

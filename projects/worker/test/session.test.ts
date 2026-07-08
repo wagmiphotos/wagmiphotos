@@ -78,13 +78,13 @@ it("resolveSession returns null without a cookie", async () => {
 
 it("resolveApiPrincipal: master key wins", async () => {
   const r = await resolveApiPrincipal(reqWith({ bearer: "master" }), { MASTER_API_KEY: "master" } as any, fakeStores());
-  expect(r).toEqual({ userId: MASTER_USER_ID });
+  expect(r).toEqual({ userId: MASTER_USER_ID, via: "master" });
 });
 
 it("resolveApiPrincipal: owned bearer key resolves to its owner", async () => {
   const stores = fakeStores({ keys: { getKeyOwner: async () => "usr_7", addKey: async () => {}, listByUser: async () => [] } });
   const r = await resolveApiPrincipal(reqWith({ bearer: "sc-x" }), { MASTER_API_KEY: "master" } as any, stores);
-  expect(r).toEqual({ userId: "usr_7" });
+  expect(r).toEqual({ userId: "usr_7", via: "key" });
 });
 
 it("resolveApiPrincipal: ownerless key -> null (rejected)", async () => {
@@ -108,7 +108,7 @@ it("resolveApiPrincipal: invalid bearer is rejected even in DEV_MODE", async () 
 it("resolveApiPrincipal: cookie session also accepted (browser playground)", async () => {
   const stores = fakeStores({ sessions: { resolve: async () => ({ user_id: "usr_3" }), touch: async () => {} } });
   const r = await resolveApiPrincipal(reqWith({ cookie: "wagmi_session=tok" }), { MASTER_API_KEY: "master" } as any, stores);
-  expect(r).toEqual({ userId: "usr_3" });
+  expect(r).toEqual({ userId: "usr_3", via: "session" });
 });
 
 it("resolveApiPrincipal: MASTER_API_KEY absence alone no longer opens the API (fail closed)", async () => {
@@ -117,8 +117,8 @@ it("resolveApiPrincipal: MASTER_API_KEY absence alone no longer opens the API (f
 });
 
 it("resolveApiPrincipal: dev-open lane requires DEV_MODE", async () => {
-  expect(await resolveApiPrincipal(reqWith(), { DEV_MODE: "true" } as any, fakeStores())).toEqual({ userId: DEV_USER_ID });
-  expect(await resolveApiPrincipal(reqWith(), { DEV_MODE: "1" } as any, fakeStores())).toEqual({ userId: DEV_USER_ID });
+  expect(await resolveApiPrincipal(reqWith(), { DEV_MODE: "true" } as any, fakeStores())).toEqual({ userId: DEV_USER_ID, via: "dev" });
+  expect(await resolveApiPrincipal(reqWith(), { DEV_MODE: "1" } as any, fakeStores())).toEqual({ userId: DEV_USER_ID, via: "dev" });
   expect(await resolveApiPrincipal(reqWith(), { DEV_MODE: "false" } as any, fakeStores())).toBeNull();
 });
 

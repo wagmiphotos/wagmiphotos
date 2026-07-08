@@ -35,6 +35,14 @@ type = "ratelimit"
 namespace_id = "1001"
 simple = { limit = 10, period = 60 }
 
+# Higher generation limit for paid (bearer-key) traffic. namespace_id must be
+# unique across the account's ratelimit namespaces.
+[[unsafe.bindings]]
+name = "RATE_LIMITER_PAID"
+type = "ratelimit"
+namespace_id = "1002"
+simple = { limit = 120, period = 60 }
+
 [vars]
 # DEV_MODE must NEVER be set in production: it opens the unauthenticated dev API
 # lane and console-logs magic links. Set it only in .dev.vars for local dev
@@ -47,7 +55,8 @@ PUBLIC_SITE_URL = "https://wagmi.photos"           # canonical site origin (over
 PUBLIC_API_BASE_URL = "https://api.wagmi.photos/v1"  # documented API base rendered into docs/examples
 GITHUB_REPO = "wagmiphotos/wagmiphotos"            # repo for the header star-count badge
 ASSET_BASE_URL = "https://images.wagmi.photos/file/wagmi-photos-library"  # CF-proxied B2 (free egress + cache rule); MUST equal backfill B2_PUBLIC_URL_BASE
-# Secrets (set with `wrangler secret put`): MASTER_API_KEY, RESEND_API_KEY
+STRIPE_PRICE_ID = "price_REPLACE_ME"   # recurring annual $24 Price id (sandbox now, live at launch)
+# Secrets (set with `wrangler secret put`): MASTER_API_KEY, RESEND_API_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
 
 [assets]
 directory = "./public"

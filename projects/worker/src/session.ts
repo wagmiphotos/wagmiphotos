@@ -65,24 +65,26 @@ export async function resolveSession(request: Request, _env: Env, sessions: Sess
   return { userId: row.user_id };
 }
 
+export type Principal = { userId: string; via: "key" | "session" | "master" | "dev" };
+
 export async function resolveApiPrincipal(
   request: Request, env: Env, stores: { sessions: SessionStore; keys: KeyStore }
-): Promise<{ userId: string } | null> {
+): Promise<Principal | null> {
   const token = bearer(request);
   if (token) {
     if (env.MASTER_API_KEY && constantTimeEqual(await sha256Hex(token), await sha256Hex(env.MASTER_API_KEY))) {
-      return { userId: MASTER_USER_ID };
+      return { userId: MASTER_USER_ID, via: "master" };
     }
     const owner = await stores.keys.getKeyOwner(await sha256Hex(token));
-    if (owner) return { userId: owner };
+    if (owner) return { userId: owner, via: "key" };
     // A presented-but-unowned key is an explicit failure: never fall through to
     // cookie/dev, or a revoked key would look valid from a logged-in browser.
     return null;
   }
   const session = await resolveSession(request, env, stores.sessions);
-  if (session) return session;
+  if (session) return { userId: session.userId, via: "session" };
   // Dev-open API lane: requires an explicit DEV_MODE opt-in AND no configured
   // master key. Absence of MASTER_API_KEY alone must never open the API.
-  if (!env.MASTER_API_KEY && isDevMode(env)) return { userId: DEV_USER_ID };
+  if (!env.MASTER_API_KEY && isDevMode(env)) return { userId: DEV_USER_ID, via: "dev" };
   return null;
 }
