@@ -48,6 +48,11 @@ RECORD_QUERY_FAILURE_SQL = (
     "UPDATE queries SET status='pending', claimed_at=NULL, attempts=attempts+1, "
     "last_error=? WHERE normalized_prompt=?")
 
+# Denylist guardrail: opt a prompt out of generation (generate=0 drops it from
+# the pending queue) and record why. Reversible by re-enabling generate.
+DENY_QUERY_SQL = (
+    "UPDATE queries SET generate=0, last_error=? WHERE normalized_prompt=?")
+
 INSERT_ASSET_SQL = (
     "INSERT INTO assets (id, prompt, source, source_id, model_used, content_hash, width, "
     "height, mime, source_url, locally_cached, price_usd, provider) "
@@ -141,6 +146,10 @@ class D1Client:
 
     def record_query_failure(self, normalized_prompt: str, error: str) -> None:
         self._query(RECORD_QUERY_FAILURE_SQL, [error, normalized_prompt])
+
+    def deny_query(self, normalized_prompt: str, reason: str) -> None:
+        """Opt a denylisted prompt out of generation (generate=0) with a reason."""
+        self._query(DENY_QUERY_SQL, [reason, normalized_prompt])
 
     def insert_asset(self, rec: AssetRecord) -> None:
         self._query(

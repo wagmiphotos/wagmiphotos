@@ -38,7 +38,8 @@ class BackfillWorker:
                  max_lifetime_spend_usd: float | None = None,
                  max_rehost_bytes: int = DEFAULT_MAX_REHOST_BYTES,
                  generation_size: str = "1024x1024",
-                 generation_min_requests: int = 1):
+                 generation_min_requests: int = 1,
+                 denylist=None):
         self._d1 = d1
         self._vec = vectorize
         self._embedder = embedder
@@ -55,6 +56,7 @@ class BackfillWorker:
         self._model = model
         self._gen_size = generation_size
         self._min_requests = generation_min_requests
+        self._denylist = denylist
 
     # -- spend accounting ---------------------------------------------------
 
@@ -81,6 +83,14 @@ class BackfillWorker:
         built = 0
         self._pass_spent = 0.0
         for q in self._d1.pending_queries(self._batch, self._min_requests):
+            # Guardrail: never generate/redistribute trademarked/branded content.
+            if self._denylist is not None:
+                term = self._denylist.matched(q.original_prompt)
+                if term is not None:
+                    logger.warning("denied prompt %r matched %r — not generating",
+                                   q.normalized_prompt, term)
+                    self._d1.deny_query(q.normalized_prompt, f"denied: {term}")
+                    continue
             # Claim before doing any work so two workers (or one worker racing
             # Vectorize's eventual consistency) can't double-generate a prompt.
             if not self._d1.claim_query(q.normalized_prompt):
@@ -212,6 +222,7 @@ class BackfillWorker:
 
 def build_worker_from_settings(s) -> "BackfillWorker":
     from wagmiphotos.common.bge import BgeEmbedder
+    from wagmiphotos.common.denylist import Denylist
     from wagmiphotos.common.d1_client import D1Client
     from wagmiphotos.common.vectorize_client import VectorizeClient
     from wagmiphotos.generation import storage as storage_mod
@@ -248,4 +259,5 @@ def build_worker_from_settings(s) -> "BackfillWorker":
                           batch_size=s.worker_batch_size, max_spend_usd=s.worker_max_spend_usd,
                           max_lifetime_spend_usd=s.worker_max_lifetime_spend_usd,
                           price_usd=s.image_price_usd, generation_size=s.generation_size,
-                          generation_min_requests=s.generation_min_requests)
+                          generation_min_requests=s.generation_min_requests,
+                          denylist=Denylist.from_spec(s.denylist_terms))

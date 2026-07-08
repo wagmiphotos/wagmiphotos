@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     default_provider: str = "gmicloud"
     image_price_usd: float = 0.055   # gpt-image-2-generate @ 1024x1024 medium; quality-dependent
     generation_min_requests: int = 10   # backfill only builds prompts requested >= this many times
+    # Comma-separated prompt denylist (case-insensitive, word-bounded). A blunt
+    # starter guardrail against generating trademarked/branded/character content —
+    # NOT exhaustive; curate for your jurisdiction. Providers disclaim infringement.
+    denylist_terms: str = (
+        "disney,mickey mouse,minnie mouse,pikachu,pokemon,mario,luigi,nintendo,"
+        "marvel,spider-man,iron man,batman,superman,star wars,darth vader,"
+        "coca-cola,pepsi,nike,adidas,gucci,prada,louis vuitton,chanel,rolex,"
+        "hello kitty,harry potter,sonic the hedgehog,minecraft,fortnite")
     worker_interval_seconds: int = 300
     worker_batch_size: int = 5
     worker_max_spend_usd: float = 5.0

@@ -12,6 +12,7 @@ class FakeD1:
         self.built: list[tuple[str, str]] = []
         self.similarities: dict[str, float | None] = {}
         self.inserted: list = []
+        self.denied: list[tuple] = []
         self.rehost_marks: list[tuple] = []
         self.failures: list[tuple[str, str]] = []
         self.attempts: dict[str, int] = {}
@@ -44,6 +45,9 @@ class FakeD1:
         self.similarities[normalized_prompt] = similarity
         self.claims.pop(normalized_prompt, None)
         self.pending = [q for q in self.pending if q.normalized_prompt != normalized_prompt]
+
+    def deny_query(self, normalized_prompt, reason):
+        self.denied.append((normalized_prompt, reason))
 
     def record_query_failure(self, normalized_prompt, error):
         self.failures.append((normalized_prompt, error))

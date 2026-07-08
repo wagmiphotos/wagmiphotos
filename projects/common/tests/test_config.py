@@ -26,6 +26,12 @@ def test_new_defaults(monkeypatch):
     assert s.worker_batch_size == 5
     assert s.worker_max_spend_usd == 5.0
 
+def test_default_denylist_blocks_a_sample_trademark():
+    from wagmiphotos.common.denylist import Denylist
+    s = Settings(_env_file=None)
+    assert Denylist.from_spec(s.denylist_terms).matched("a wild pikachu") is not None
+
+
 def test_dead_settings_are_gone():
     for name in ("database_url", "embedder_type", "api_key",
                  "keygen_rate_per_hour", "worker_enabled"):

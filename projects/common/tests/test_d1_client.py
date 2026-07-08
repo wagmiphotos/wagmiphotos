@@ -60,6 +60,14 @@ def test_record_query_failure_resets_and_increments(monkeypatch):
     assert "last_error=?" in sql and "claimed_at=NULL" in sql
     assert params == ["boom", "a fox"]
 
+def test_deny_query_sets_generate_zero(monkeypatch):
+    c, calls = _client(monkeypatch, [[]])
+    c.deny_query("a pikachu", "denied: pikachu")
+    sql, params = calls[0]
+    assert "UPDATE queries SET generate=0" in sql and "last_error=?" in sql
+    assert params == ["denied: pikachu", "a pikachu"]
+
+
 def test_insert_asset_binds_all_columns(monkeypatch):
     c, calls = _client(monkeypatch, [[]])
     rec = AssetRecord(id="i1", prompt="p", model_used="m", source="generated", source_id=None,

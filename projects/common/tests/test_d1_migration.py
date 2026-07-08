@@ -91,6 +91,17 @@ def test_pending_queries_sql_selects_and_filters(conn):
     assert got == {"a fox", "stale claim"}
 
 
+def test_deny_query_sql_opts_out(conn):
+    _seed_query(conn, "a pikachu")
+    conn.execute(d1_client.DENY_QUERY_SQL, ["denied: pikachu", "a pikachu"])
+    row = conn.execute("SELECT generate, last_error FROM queries "
+                       "WHERE normalized_prompt='a pikachu'").fetchone()
+    assert row == (0, "denied: pikachu")
+    # a denied prompt drops out of the pending queue (generate=0)
+    rows = conn.execute(d1_client.PENDING_QUERIES_SQL, [1, 10]).fetchall()
+    assert "a pikachu" not in {r[0] for r in rows}
+
+
 def test_pending_queries_sql_min_count_threshold(conn):
     _seed_query(conn, "hot", count=12)
     _seed_query(conn, "warm", count=10)

@@ -92,6 +92,21 @@ async def test_generate_pass_uses_configured_generation_size():
 
 
 @pytest.mark.asyncio
+async def test_generate_pass_denies_trademarked_prompt():
+    # Guardrail: never generate/redistribute images for denylisted prompts.
+    from wagmiphotos.common.denylist import Denylist
+    d1, vec = FakeD1(), FakeVectorize()
+    d1.pending = [QueryRow("a pikachu", "a pikachu", 20)]
+    w = _worker(d1, vec, batch_size=5, max_spend_usd=100.0, price_usd=0.04,
+                denylist=Denylist(["pikachu"]))
+    built = await w.generate_pass()
+    assert built == 0                                      # not generated
+    assert len(d1.inserted) == 0                            # nothing stored
+    assert d1.denied and d1.denied[0][0] == "a pikachu"     # opted out...
+    assert "pikachu" in d1.denied[0][1]                     # ...with an audit reason
+
+
+@pytest.mark.asyncio
 async def test_generate_pass_skips_below_min_requests():
     # Demand gate: don't spend on one-off prompts — only build ones requested
     # at least generation_min_requests times.
