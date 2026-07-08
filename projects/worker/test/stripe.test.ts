@@ -81,3 +81,30 @@ it("entitlementFromEvent maps subscription.deleted to canceled", () => {
 it("entitlementFromEvent ignores unrelated events", () => {
   expect(entitlementFromEvent({ type: "invoice.created", data: { object: {} } })).toBeNull();
 });
+
+import { vi, afterEach } from "vitest";
+import { makeStripe } from "../src/stripe";
+
+afterEach(() => vi.unstubAllGlobals());
+
+it("makeStripe.createCheckoutSession posts form-encoded to Stripe with auth", async () => {
+  const seen: any = {};
+  vi.stubGlobal("fetch", async (url: string, init: any) => {
+    seen.url = url; seen.init = init;
+    return new Response(JSON.stringify({ id: "cs_1", url: "https://checkout.stripe/x" }), { status: 200 });
+  });
+  const stripe = makeStripe({ STRIPE_SECRET_KEY: "sk_test_x" } as any);
+  const out = await stripe.createCheckoutSession({ customerId: "cus_1", userId: "usr_1", priceId: "price_1", successUrl: "https://s/ok", cancelUrl: "https://s/no" });
+  expect(out.url).toBe("https://checkout.stripe/x");
+  expect(seen.url).toBe("https://api.stripe.com/v1/checkout/sessions");
+  expect(seen.init.headers.Authorization).toBe("Bearer sk_test_x");
+  expect(seen.init.headers["Content-Type"]).toBe("application/x-www-form-urlencoded");
+  expect(seen.init.body).toContain("mode=subscription");
+  expect(seen.init.body).toContain(encodeURIComponent("line_items[0][price]") + "=price_1");
+});
+
+it("makeStripe throws on a non-2xx Stripe response", async () => {
+  vi.stubGlobal("fetch", async () => new Response("bad", { status: 400 }));
+  const stripe = makeStripe({ STRIPE_SECRET_KEY: "sk_test_x" } as any);
+  await expect(stripe.createCustomer({ email: "a@b.co", userId: "usr_1" })).rejects.toThrow(/stripe/);
+});

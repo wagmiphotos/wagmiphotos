@@ -8,6 +8,7 @@ import { rewritePublicUrls } from "./rewrite";
 import { numEnv } from "./config";
 import { FLOOR_SIM_MAX, FLOOR_SIM_MIN } from "./floor";
 import { makeEmailSender } from "./email";
+import { makeStripe } from "./stripe";
 import { resolveApiPrincipal, resolveSession } from "./session";
 import { handleLoginRequest, handleVerify, handleMe, handleLogout, handleAcceptTos, handleListKeys, handleDeleteKey } from "./auth-routes";
 
@@ -20,11 +21,18 @@ function buildServices(env: Env): Services {
       return success;
     },
   };
+  const rateLimiterPaid: RateLimiter = {
+    async limit(key) {
+      if (!env.RATE_LIMITER_PAID) return true; // no binding in dev
+      const { success } = await env.RATE_LIMITER_PAID.limit({ key });
+      return success;
+    },
+  };
   return {
     embedder: { textEmbed: (p) => bgeTextEmbed(p, env) },
     vectorize: makeVectorize([env.VECTORIZE_0, env.VECTORIZE_1, env.VECTORIZE_2]),
-    assets, queries, keys, rateLimiter,
-    users, sessions, loginTokens, email: makeEmailSender(env),
+    assets, queries, keys, rateLimiter, rateLimiterPaid,
+    users, sessions, loginTokens, email: makeEmailSender(env), stripe: makeStripe(env),
   };
 }
 

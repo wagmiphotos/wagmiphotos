@@ -1,4 +1,5 @@
 import { constantTimeEqual } from "./auth";
+import type { Env, StripeClient } from "./types";
 
 // Stripe's REST API expects application/x-www-form-urlencoded with nested keys
 // like line_items[0][price]. Arrays iterate as index keys via Object.entries.
@@ -80,4 +81,43 @@ export function entitlementFromEvent(event: any): Entitlement {
     default:
       return null;
   }
+}
+
+const STRIPE_API = "https://api.stripe.com/v1";
+
+async function stripePost(env: Env, path: string, body: Record<string, any>): Promise<any> {
+  const res = await fetch(`${STRIPE_API}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: formEncode(body),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`stripe ${path} ${res.status}: ${detail.slice(0, 300)}`);
+  }
+  return res.json();
+}
+
+export function makeStripe(env: Env): StripeClient {
+  return {
+    async createCustomer({ email, userId }) {
+      const c = await stripePost(env, "/customers", { email, metadata: { user_id: userId } });
+      return { id: c.id as string };
+    },
+    async createCheckoutSession({ customerId, userId, priceId, successUrl, cancelUrl }) {
+      const s = await stripePost(env, "/checkout/sessions", {
+        mode: "subscription", customer: customerId, client_reference_id: userId,
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: successUrl, cancel_url: cancelUrl, allow_promotion_codes: true,
+      });
+      return { url: s.url as string };
+    },
+    async createPortalSession({ customerId, returnUrl }) {
+      const s = await stripePost(env, "/billing_portal/sessions", { customer: customerId, return_url: returnUrl });
+      return { url: s.url as string };
+    },
+  };
 }

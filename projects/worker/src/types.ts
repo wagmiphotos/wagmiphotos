@@ -56,14 +56,20 @@ export interface KeyStore {
 export interface RateLimiter { limit(key: string): Promise<boolean>; }
 /** Minimal structural type for the unsafe `ratelimit` binding (no exported type in workers-types). */
 export interface RateLimitBinding { limit(opts: { key: string }): Promise<{ success: boolean }>; }
+export interface StripeClient {
+  createCustomer(a: { email: string; userId: string }): Promise<{ id: string }>;
+  createCheckoutSession(a: { customerId: string; userId: string; priceId: string; successUrl: string; cancelUrl: string }): Promise<{ url: string }>;
+  createPortalSession(a: { customerId: string; returnUrl: string }): Promise<{ url: string }>;
+}
 export interface Services {
   embedder: Embedder; vectorize: VectorizeStore; assets: AssetStore; queries: QueryStore;
-  keys: KeyStore; rateLimiter: RateLimiter;
+  keys: KeyStore; rateLimiter: RateLimiter; rateLimiterPaid: RateLimiter;
   users: UserStore; sessions: SessionStore; loginTokens: LoginTokenStore;
-  email: EmailSender;
+  email: EmailSender; stripe: StripeClient;
 }
 export interface Env {
   DB: D1Database; VECTORIZE_0: VectorizeIndex; VECTORIZE_1: VectorizeIndex; VECTORIZE_2: VectorizeIndex; AI: Ai; RATE_LIMITER?: RateLimitBinding;
+  RATE_LIMITER_PAID?: RateLimitBinding;
   ASSETS: { fetch(request: Request): Promise<Response> };
   MASTER_API_KEY?: string;
   /** "true"/"1" opens dev-only lanes (dev API principal, console magic links). NEVER set in production. */
@@ -74,4 +80,5 @@ export interface Env {
   PUBLIC_SITE_URL?: string; PUBLIC_API_BASE_URL?: string;
   /** Base URL for locally_cached asset objects (B2/CDN origin); see asset-urls.ts. */
   ASSET_BASE_URL?: string;
+  STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; STRIPE_PRICE_ID?: string;
 }
