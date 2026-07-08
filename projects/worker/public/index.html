@@ -3106,6 +3106,12 @@
         </div>
       </div>
 
+      <!-- Plan Card -->
+      <div class="glass-card">
+        <h2 class="card-title">Plan</h2>
+        <div id="plan-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
+      </div>
+
       <!-- Credentials Card -->
       <div class="glass-card">
         <h2 class="card-title">Credentials &amp; authentication</h2>
@@ -3122,7 +3128,8 @@
           <span style="font-size: 0.75rem; color: var(--muted); margin: 2px 0 12px; display: block;">
             For calling the wagmi.photos API from your own code (<code style="font-family: var(--font-mono);">Authorization: Bearer sc-…</code>). The playground here is already authenticated by your login.
           </span>
-          <button class="btn btn-primary" style="height: 40px; width: auto; padding: 0 18px; font-size: 0.875rem;" onclick="openCreateKey()">Create API key</button>
+          <button id="create-key-btn" class="btn btn-primary" style="height: 40px; width: auto; padding: 0 18px; font-size: 0.875rem;" onclick="openCreateKey()">Create API key</button>
+          <span id="key-gate-hint" hidden style="display:block;margin-top:10px;font-size:0.75rem;color:var(--muted);">API keys are an Unlimited feature — <a href="#" onclick="document.getElementById('plan-body')?.scrollIntoView({behavior:'smooth'});return false;" style="color:var(--red);">upgrade to create one</a>.</span>
           <div id="account-keys-list" style="font-size: 0.8125rem; color: var(--muted); margin-top: 16px;">No keys yet.</div>
         </div>
       </div>
@@ -3866,11 +3873,18 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       '#/pricing':    { view: 'view-pricing', link: 'nav-pricing' },
       '#/library':    { view: 'view-library', link: 'nav-library', onShow: initLibrary },
       '#/playground': { view: 'view-playground', link: 'nav-playground' },
-      '#/account':    { view: 'view-account', onShow: () => {
+      '#/account':    { view: 'view-account', onShow: async () => {
         const emailEl = document.getElementById('account-email');
         if (emailEl) emailEl.textContent = currentUser ? currentUser.email : '—';
         updateStats();
         loadKeys();
+        const q = new URLSearchParams(location.hash.split('?')[1] || '');
+        if (q.get('checkout') === 'success') {
+          await fetchMe();              // webhook may already have granted access
+          showToast("You're on Unlimited 🎉", 'success');
+          history.replaceState(null, '', '#/account');
+        }
+        renderPlan();
       } },
       '#/terms':      { view: 'view-terms' },
       '#/privacy':    { view: 'view-privacy' },
@@ -3912,6 +3926,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
     const GATED = new Set(['#/playground', '#/library', '#/account']);
     let currentUser = null;
+    let currentPlan = null;
 
     function showRoute(route) {
       const path = route.split('?')[0];
@@ -3967,9 +3982,9 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     async function fetchMe() {
       try {
         const r = await fetch('/v1/me', { credentials: 'same-origin' });
-        if (r.ok) { const me = await r.json(); currentUser = me.user; showTosGate(me.tos); }
-        else { currentUser = null; }
-      } catch { currentUser = null; }
+        if (r.ok) { const me = await r.json(); currentUser = me.user; currentPlan = me.plan || null; showTosGate(me.tos); }
+        else { currentUser = null; currentPlan = null; }
+      } catch { currentUser = null; currentPlan = null; }
       renderAuthNav();
     }
     // Acceptable-Use gate: block the signed-in experience until the current AUP is accepted.
@@ -4032,7 +4047,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     async function logout() {
       closeMenus();
       await fetch('/v1/auth/logout', { method: 'POST', credentials: 'same-origin' });
-      currentUser = null; renderAuthNav(); location.hash = '#/';
+      currentUser = null; currentPlan = null; renderAuthNav(); location.hash = '#/';
     }
 
     window.addEventListener('hashchange', () => navigateTo(window.location.hash));
@@ -4315,6 +4330,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
           body: JSON.stringify(name ? { label: name } : {}),
         });
         if (r.status === 401) { closeCreateKey(); location.hash = '#/login'; return; }
+        if (r.status === 402) { closeCreateKey(); await fetchMe(); renderPlan(); showToast('Upgrade to Unlimited to create API keys', 'error'); return; }
         if (!r.ok) throw new Error('Failed to create key');
         const data = await r.json();
         _lastGeneratedKey = data.key;
@@ -4340,6 +4356,54 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     function formatKeyDate(raw) {
       const d = new Date(String(raw).replace(' ', 'T') + 'Z');
       return isNaN(d.getTime()) ? raw : d.toLocaleString();
+    }
+
+    function renderPlan() {
+      const el = document.getElementById('plan-body');
+      if (!el) return;
+      const active = !!(currentPlan && currentPlan.active);
+      if (active) {
+        const until = currentPlan.current_period_end ? new Date(currentPlan.current_period_end) : null;
+        const when = until && !isNaN(until.getTime()) ? until.toLocaleDateString() : null;
+        el.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+          <div><b style="color:var(--ink);">Unlimited</b>${when ? ` · renews ${escapeHtml(when)}` : ''}</div>
+          <button class="btn" style="height:38px;width:auto;padding:0 16px;" onclick="openPortal(this)">Manage billing</button>
+        </div>`;
+      } else {
+        el.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+          <div><b style="color:var(--ink);">Free</b> · playground &amp; closest-match search</div>
+          <button class="btn btn-primary" style="height:40px;width:auto;padding:0 18px;" onclick="startCheckout(this)">Upgrade to Unlimited — $24/yr</button>
+        </div>`;
+      }
+      // Gate the "Create API key" button for free users.
+      const keyBtn = document.getElementById('create-key-btn');
+      if (keyBtn) {
+        keyBtn.disabled = !active;
+        keyBtn.title = active ? '' : 'Upgrade to Unlimited to create API keys';
+      }
+      const keyHint = document.getElementById('key-gate-hint');
+      if (keyHint) keyHint.hidden = active;
+    }
+
+    async function startCheckout(btn) {
+      if (btn) { btn.disabled = true; btn.textContent = 'Redirecting…'; }
+      try {
+        const r = await fetch('/v1/billing/checkout', { method: 'POST', credentials: 'same-origin' });
+        if (r.status === 401) { location.hash = '#/login'; return; }
+        if (!r.ok) throw new Error('checkout failed');
+        const { url } = await r.json();
+        location.assign(url);
+      } catch { if (btn) { btn.disabled = false; btn.textContent = 'Upgrade to Unlimited — $24/yr'; } showToast('Could not start checkout', 'error'); }
+    }
+
+    async function openPortal(btn) {
+      if (btn) { btn.disabled = true; btn.textContent = 'Opening…'; }
+      try {
+        const r = await fetch('/v1/billing/portal', { method: 'POST', credentials: 'same-origin' });
+        if (!r.ok) throw new Error('portal failed');
+        const { url } = await r.json();
+        location.assign(url);
+      } catch { if (btn) { btn.disabled = false; btn.textContent = 'Manage billing'; } showToast('Could not open billing portal', 'error'); }
     }
 
     async function loadKeys() {
