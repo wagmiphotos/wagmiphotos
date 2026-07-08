@@ -270,3 +270,34 @@ prefetched verify link alone can't log anyone in. Deploy steps:
 - **Token/session GC:** expired `login_tokens`/`sessions` rows are now purged
   opportunistically during login requests; a scheduled GC (cron trigger) remains
   optional hardening for long idle periods.
+
+## Stripe billing
+
+Annual ($24/yr) subscription via hosted Stripe Checkout + the Stripe Customer
+Portal — no client-side Stripe Elements, so **the Stripe publishable key is
+intentionally unused**. Deploy steps:
+
+1. **Apply migration `0012` to remote D1 before deploying the Worker** — covered
+   by step 3 above (billing tables + the derived paid/free entitlement).
+2. **Set the Stripe secrets:**
+   ```bash
+   npx wrangler secret put STRIPE_SECRET_KEY
+   npx wrangler secret put STRIPE_WEBHOOK_SECRET
+   ```
+3. **Set `STRIPE_PRICE_ID`** in `wrangler.toml` `[vars]` — currently the sandbox
+   placeholder `price_REPLACE_ME`; replace it with the live Price id from step 6
+   below before launch.
+4. **`RATE_LIMITER_PAID`** — a second, higher-limit `[[unsafe.bindings]]` ratelimit
+   binding for bearer/paid traffic (120/min vs. 10/min) is already declared in
+   `wrangler.toml` alongside `RATE_LIMITER`, with its own unique `namespace_id`.
+   The step 5 `wrangler deploy --dry-run` check should list **both**
+   `RATE_LIMITER` and `RATE_LIMITER_PAID` bindings.
+5. **Create the dashboard webhook endpoint**: `https://api.wagmi.photos/v1/stripe/webhook`,
+   subscribed to `checkout.session.completed` and `customer.subscription.created` /
+   `.updated` / `.deleted`. Copy its signing secret into `STRIPE_WEBHOOK_SECRET`
+   (step 2).
+6. **Create the live Product/Price**: a recurring Price with `unit_amount=2400`,
+   `currency=usd`, `recurring[interval]=year` (the $24/yr plan). Put the returned
+   `price_...` into `STRIPE_PRICE_ID` (step 3).
+7. **Enable the live Customer Portal** (Stripe dashboard → Settings → Billing →
+   Customer portal) so `#/account` → "Manage billing" works for real subscribers.
