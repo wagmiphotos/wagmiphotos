@@ -247,3 +247,35 @@ library is part of the free experience.
    `STRIPE_WEBHOOK_SECRET`.
 5. Create the live Product/Price and enable the live Customer Portal; put the live Price
    id in `STRIPE_PRICE_ID`.
+6. **Pin the webhook endpoint's Stripe API version** to one where the subscription object
+   still carries a top-level `current_period_end` (or accept that the "renews `<date>`"
+   line is omitted) — see follow-up (b) below.
+
+## Known follow-ups (post-launch, tracked from the final review)
+
+These were reviewed and consciously deferred; none blocks launch.
+
+(a) **Concurrent-checkout customer-link race.** `handleCheckout` creates+links a Stripe
+customer per initiation. If a user starts two checkouts before either links (two tabs /
+double-submit), the user row keeps the *last* customer id; completing the *other* session
+makes its `customer.subscription.created` update 0 rows (silent no-op), so the user can be
+briefly stranded as `plan_status = NULL` (free) despite paying. The
+`checkout.session.completed` `link` event relinks the customer but does **not** set
+`plan_status`, so recovery depends on a later `subscription.updated`. Low probability and
+largely self-repairing. Fix options (pick one when addressed): have the `link` reducer also
+persist subscription status (fetch/expand the session's subscription); or fall back to
+`client_reference_id` when a subscription webhook's customer lookup misses; or return 500
+(force Stripe retry) instead of 200 on a 0-row subscription update — weighing the
+retry-storm risk for genuinely-unlinked customers.
+
+(b) **`current_period_end` on newer Stripe API versions.** Stripe moved `current_period_end`
+off the top-level subscription object (onto `items.data[]`) in 2025 API versions. Entitlement
+is unaffected (`isPaid` never reads it), but the account "renews `<date>`" line silently
+omits. Pin the webhook endpoint's API version (deploy step 6) or read
+`items.data[0].current_period_end` if the renewal date matters.
+
+(c) **Cheap test/robustness nits** (deferred): add a webhook test for the unknown-event→200
+and apply-throws→500 paths; a `stripePost` fast-fail on a missing `STRIPE_SECRET_KEY`; and
+minor DRY (a `paymentRequired()` helper for the two 402 sites, a shared `site` const).
+Portal `return_url` does not re-fetch `/v1/me` (stale card until next load) — cosmetic since
+cancel-at-period-end keeps `status = active`.
