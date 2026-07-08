@@ -1,0 +1,67 @@
+import { it, expect } from "vitest";
+import { providerFor, ProviderAuthError } from "../src/providers";
+
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]).buffer;
+const okJson = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+
+it("openai: posts gpt-image-1 and decodes b64_json", async () => {
+  const calls: any[] = [];
+  const fetchFn = (async (url: any, init: any) => {
+    calls.push({ url: String(url), body: JSON.parse(init.body) });
+    return okJson({ data: [{ b64_json: btoa("\x89PNG") }] });
+  }) as unknown as typeof fetch;
+  const img = await providerFor("openai", fetchFn).generate("a red fox", "sk-user");
+  expect(calls[0].url).toBe("https://api.openai.com/v1/images/generations");
+  expect(calls[0].body).toEqual({ model: "gpt-image-1", prompt: "a red fox", n: 1, size: "1024x1024" });
+  expect(img.mime).toBe("image/png");
+  expect(new Uint8Array(img.bytes)).toEqual(new Uint8Array(PNG));
+});
+
+it("openai: 401 throws ProviderAuthError", async () => {
+  const fetchFn = (async () => new Response("no", { status: 401 })) as unknown as typeof fetch;
+  await expect(providerFor("openai", fetchFn).generate("x", "bad")).rejects.toBeInstanceOf(ProviderAuthError);
+});
+
+it("openai: validateKey pings /models", async () => {
+  const fetchFn = (async (url: any) => {
+    expect(String(url)).toBe("https://api.openai.com/v1/models");
+    return okJson({ data: [] });
+  }) as unknown as typeof fetch;
+  expect(await providerFor("openai", fetchFn).validateKey("sk-user")).toBe(true);
+});
+
+it("gmicloud: submits to the request queue, polls to success, fetches the image", async () => {
+  let polls = 0;
+  const fetchFn = (async (url: any, init?: any) => {
+    const u = String(url);
+    if (u.endsWith("/requests") && init?.method === "POST") {
+      expect(JSON.parse(init.body)).toEqual({ model: "gpt-image-2-generate", payload: { prompt: "a red fox", size: "1024x1024" } });
+      return okJson({ request_id: "req-1" });
+    }
+    if (u.endsWith("/requests/req-1")) {
+      polls += 1;
+      return polls < 2
+        ? okJson({ status: "running" })
+        : okJson({ status: "success", outcome: { media_urls: [{ url: "https://cdn.gmi/img.png" }] } });
+    }
+    if (u === "https://cdn.gmi/img.png") return new Response(PNG, { status: 200, headers: { "Content-Type": "image/png" } });
+    throw new Error(`unexpected fetch ${u}`);
+  }) as unknown as typeof fetch;
+  const gmi = providerFor("gmicloud", fetchFn, async () => {}); // no-op sleep
+  const img = await gmi.generate("a red fox", "gmi-key");
+  expect(img.mime).toBe("image/png");
+  expect(polls).toBe(2);
+});
+
+it("gmicloud: failed status throws a plain error (not auth)", async () => {
+  const fetchFn = (async (url: any, init?: any) => {
+    if (init?.method === "POST") return okJson({ request_id: "req-1" });
+    return okJson({ status: "failed", error: "boom" });
+  }) as unknown as typeof fetch;
+  const gmi = providerFor("gmicloud", fetchFn, async () => {});
+  await expect(gmi.generate("x", "k")).rejects.toThrow(/failed/);
+});
+
+it("unknown provider throws", () => {
+  expect(() => providerFor("google")).toThrow(/unknown provider/);
+});
