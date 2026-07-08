@@ -1,4 +1,4 @@
-import type { Services, AssetRow, LibraryAssetRow, Match } from "../src/types";
+import type { Services, AssetRow, LibraryAssetRow, Match, ByokRow } from "../src/types";
 
 export function fakeServices(overrides: Partial<Services> = {}): Services {
   const assets = new Map<string, AssetRow>();
@@ -7,6 +7,8 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   const recorded: any[] = [];
   const keyOwners = new Map<string, string>();
   const matches: Match[] = [];
+  const byokRows = new Map<string, ByokRow>();
+  const byokUsage = new Map<string, { count: number; est_spend_usd: number }>();
   const base: Services = {
     embedder: { textEmbed: async () => [0.1, 0.2, 0.3] },
     vectorize: { query: async () => matches },
@@ -43,6 +45,17 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
       createCheckoutSession: async () => ({ url: "https://checkout.stripe/fake" }),
       createPortalSession: async () => ({ url: "https://portal.stripe/fake" }),
     },
+    byok: {
+      get: async (u) => byokRows.get(u) ?? null,
+      put: async (i) => { byokRows.set(i.userId, { user_id: i.userId, provider: i.provider as ByokRow["provider"], key_ciphertext: i.keyCiphertext, key_last4: i.keyLast4, enabled: i.enabled ? 1 : 0, monthly_cap: i.monthlyCap, last_error: null, created_at: "x", updated_at: "x" }); },
+      patch: async (u, f) => { const r = byokRows.get(u); if (!r) return; if (f.enabled != null) r.enabled = f.enabled ? 1 : 0; if (f.monthlyCap != null) r.monthly_cap = f.monthlyCap; },
+      delete: async (u) => { byokRows.delete(u); },
+      disable: async (u, err) => { const r = byokRows.get(u); if (r) { r.enabled = 0; r.last_error = err; } },
+      getUsage: async (u, m) => ({ ...(byokUsage.get(`${u}:${m}`) ?? { count: 0, est_spend_usd: 0 }) }),
+      reserve: async (u, m, cap) => { const k = `${u}:${m}`; const cur = byokUsage.get(k) ?? { count: 0, est_spend_usd: 0 }; if (cur.count >= cap) return false; cur.count += 1; byokUsage.set(k, cur); return true; },
+      refund: async (u, m) => { const cur = byokUsage.get(`${u}:${m}`); if (cur) cur.count = Math.max(0, cur.count - 1); },
+      addSpend: async (u, m, usd) => { const k = `${u}:${m}`; const cur = byokUsage.get(k) ?? { count: 0, est_spend_usd: 0 }; cur.est_spend_usd += usd; byokUsage.set(k, cur); },
+    },
   };
   // expose internals for assertions
   (base as any)._assets = assets;
@@ -51,5 +64,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   (base as any)._recorded = recorded;
   (base as any)._matches = matches;
   (base as any)._keyOwners = keyOwners;
+  (base as any)._byokRows = byokRows;
+  (base as any)._byokUsage = byokUsage;
   return { ...base, ...overrides };
 }

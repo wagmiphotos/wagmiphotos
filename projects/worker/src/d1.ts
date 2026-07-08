@@ -1,6 +1,7 @@
 import type {
   AssetRow, AssetStore, LibraryAssetRow, QueryStore, KeyStore,
   User, UserStore, SessionStore, LoginTokenStore,
+  ByokRow, ByokStore, ByokUsage,
 } from "./types";
 
 // Reads select FROM live_assets (migration 0008): the view owns the
@@ -15,6 +16,7 @@ function escapeLike(s: string): string {
 export function makeD1Stores(db: D1Database): {
   assets: AssetStore; queries: QueryStore; keys: KeyStore;
   users: UserStore; sessions: SessionStore; loginTokens: LoginTokenStore;
+  byok: ByokStore;
 } {
   const assets: AssetStore = {
     async getAsset(id) {
@@ -171,5 +173,64 @@ export function makeD1Stores(db: D1Database): {
     },
   };
 
-  return { assets, queries, keys, users, sessions, loginTokens };
+  const byok: ByokStore = {
+    async get(userId) {
+      const row = await db.prepare(
+        "SELECT user_id, provider, key_ciphertext, key_last4, enabled, monthly_cap, last_error, created_at, updated_at FROM byok_keys WHERE user_id = ?"
+      ).bind(userId).first<ByokRow>();
+      return row ?? null;
+    },
+    async put({ userId, provider, keyCiphertext, keyLast4, monthlyCap, enabled }) {
+      await db.prepare(
+        `INSERT INTO byok_keys (user_id, provider, key_ciphertext, key_last4, enabled, monthly_cap)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET
+           provider = excluded.provider, key_ciphertext = excluded.key_ciphertext,
+           key_last4 = excluded.key_last4, enabled = excluded.enabled,
+           monthly_cap = excluded.monthly_cap, last_error = NULL, updated_at = datetime('now')`
+      ).bind(userId, provider, keyCiphertext, keyLast4, enabled ? 1 : 0, monthlyCap).run();
+    },
+    async patch(userId, f) {
+      const sets: string[] = ["updated_at = datetime('now')"];
+      const args: unknown[] = [];
+      if (f.enabled != null) { sets.push("enabled = ?"); args.push(f.enabled ? 1 : 0); }
+      if (f.monthlyCap != null) { sets.push("monthly_cap = ?"); args.push(f.monthlyCap); }
+      await db.prepare(`UPDATE byok_keys SET ${sets.join(", ")} WHERE user_id = ?`).bind(...args, userId).run();
+    },
+    async delete(userId) {
+      await db.prepare("DELETE FROM byok_keys WHERE user_id = ?").bind(userId).run();
+    },
+    async disable(userId, err) {
+      await db.prepare(
+        "UPDATE byok_keys SET enabled = 0, last_error = ?, updated_at = datetime('now') WHERE user_id = ?"
+      ).bind(err, userId).run();
+    },
+    async getUsage(userId, month) {
+      const row = await db.prepare(
+        "SELECT count, est_spend_usd FROM byok_usage WHERE user_id = ? AND month = ?"
+      ).bind(userId, month).first<ByokUsage>();
+      return row ?? { count: 0, est_spend_usd: 0 };
+    },
+    async reserve(userId, month, cap) {
+      await db.prepare("INSERT OR IGNORE INTO byok_usage (user_id, month) VALUES (?, ?)").bind(userId, month).run();
+      // Single guarded UPDATE = the atomic cap check; two concurrent requests
+      // cannot both pass a spent cap.
+      const row = await db.prepare(
+        "UPDATE byok_usage SET count = count + 1 WHERE user_id = ? AND month = ? AND count < ? RETURNING count"
+      ).bind(userId, month, cap).first();
+      return !!row;
+    },
+    async refund(userId, month) {
+      await db.prepare(
+        "UPDATE byok_usage SET count = MAX(count - 1, 0) WHERE user_id = ? AND month = ?"
+      ).bind(userId, month).run();
+    },
+    async addSpend(userId, month, usd) {
+      await db.prepare(
+        "UPDATE byok_usage SET est_spend_usd = est_spend_usd + ? WHERE user_id = ? AND month = ?"
+      ).bind(usd, userId, month).run();
+    },
+  };
+
+  return { assets, queries, keys, users, sessions, loginTokens, byok };
 }

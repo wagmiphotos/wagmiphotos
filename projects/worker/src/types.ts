@@ -53,6 +53,24 @@ export interface KeyStore {
   listByUser(userId: string): Promise<{ id: string; label: string | null; created_at: string }[]>;
   deleteKey(userId: string, id: string): Promise<void>;
 }
+export interface ByokRow {
+  user_id: string; provider: "openai" | "gmicloud"; key_ciphertext: string; key_last4: string;
+  enabled: number; monthly_cap: number; last_error: string | null; created_at: string; updated_at: string;
+}
+export interface ByokUsage { count: number; est_spend_usd: number; }
+export interface ByokStore {
+  get(userId: string): Promise<ByokRow | null>;
+  put(i: { userId: string; provider: string; keyCiphertext: string; keyLast4: string; monthlyCap: number; enabled: boolean }): Promise<void>;
+  patch(userId: string, f: { enabled?: boolean; monthlyCap?: number }): Promise<void>;
+  delete(userId: string): Promise<void>;
+  /** Auth failure at the provider: flip enabled off and record why. */
+  disable(userId: string, err: string): Promise<void>;
+  getUsage(userId: string, month: string): Promise<ByokUsage>;
+  /** Atomically take one unit of quota; false when the cap is already spent. */
+  reserve(userId: string, month: string, cap: number): Promise<boolean>;
+  refund(userId: string, month: string): Promise<void>;
+  addSpend(userId: string, month: string, usd: number): Promise<void>;
+}
 export interface RateLimiter { limit(key: string): Promise<boolean>; }
 /** Minimal structural type for the unsafe `ratelimit` binding (no exported type in workers-types). */
 export interface RateLimitBinding { limit(opts: { key: string }): Promise<{ success: boolean }>; }
@@ -65,7 +83,7 @@ export interface Services {
   embedder: Embedder; vectorize: VectorizeStore; assets: AssetStore; queries: QueryStore;
   keys: KeyStore; rateLimiter: RateLimiter; rateLimiterPaid: RateLimiter;
   users: UserStore; sessions: SessionStore; loginTokens: LoginTokenStore;
-  email: EmailSender; stripe: StripeClient;
+  email: EmailSender; stripe: StripeClient; byok: ByokStore;
 }
 export interface Env {
   DB: D1Database; VECTORIZE_0: VectorizeIndex; VECTORIZE_1: VectorizeIndex; VECTORIZE_2: VectorizeIndex; AI: Ai; RATE_LIMITER?: RateLimitBinding;
