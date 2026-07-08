@@ -93,8 +93,12 @@ export function makeD1Stores(db: D1Database): {
       return row as { id: string; email: string };
     },
     async getById(id) {
-      const row = await db.prepare("SELECT id, email, created_at, last_login FROM users WHERE id = ?").bind(id).first<User>();
+      const row = await db.prepare("SELECT id, email, created_at, last_login, tos_version, tos_accepted_at FROM users WHERE id = ?").bind(id).first<User>();
       return row ?? null;
+    },
+    async acceptTos(userId, version) {
+      await db.prepare("UPDATE users SET tos_version = ?, tos_accepted_at = datetime('now') WHERE id = ?")
+        .bind(version, userId).run();
     },
   };
 

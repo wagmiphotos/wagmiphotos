@@ -26,7 +26,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
       deleteKey: async (u, id) => { if (keyOwners.get(id) === u) keyOwners.delete(id); },
     },
     rateLimiter: { limit: async () => true },
-    users: { upsertByEmail: async (id, email) => ({ id, email }), getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null }) },
+    users: { upsertByEmail: async (id, email) => ({ id, email }), getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null, tos_version: null, tos_accepted_at: null }), acceptTos: async () => {} },
     sessions: { create: async () => {}, resolve: async () => null, touch: async () => {}, delete: async () => {}, purgeExpired: async () => {} },
     loginTokens: { create: async (_hash: string, _email: string, _nonceHash: string) => {}, consume: async (_hash: string, _nonceHash: string) => null, purgeExpired: async () => {} },
     email: { sendMagicLink: async () => {} },

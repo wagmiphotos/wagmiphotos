@@ -64,12 +64,30 @@ export async function handleVerify(url: URL, request: Request, env: Env, s: Serv
   return new Response(null, { status: 302, headers });
 }
 
+// Current Acceptable-Use Policy version. Bump when docs/legal/acceptable-use-policy.md
+// materially changes — users whose accepted version is older must re-accept.
+export const TOS_VERSION = "2026-07-08";
+
 export async function handleMe(request: Request, env: Env, s: Services): Promise<Response> {
   const principal = await resolveSession(request, env, s.sessions);
   if (!principal) return Response.json({ error: "not authenticated" }, { status: 401 });
   const user = await s.users.getById(principal.userId);
   if (!user) return Response.json({ error: "not authenticated" }, { status: 401 });
-  return Response.json({ user: { id: user.id, email: user.email } });
+  return Response.json({
+    user: { id: user.id, email: user.email },
+    tos: {
+      current_version: TOS_VERSION,
+      accepted: user.tos_version === TOS_VERSION,
+      accepted_version: user.tos_version,
+    },
+  });
+}
+
+export async function handleAcceptTos(request: Request, env: Env, s: Services): Promise<Response> {
+  const principal = await resolveSession(request, env, s.sessions);
+  if (!principal) return Response.json({ error: "not authenticated" }, { status: 401 });
+  await s.users.acceptTos(principal.userId, TOS_VERSION);
+  return Response.json({ status: "ok", tos_version: TOS_VERSION });
 }
 
 export async function handleLogout(request: Request, env: Env, s: Services): Promise<Response> {

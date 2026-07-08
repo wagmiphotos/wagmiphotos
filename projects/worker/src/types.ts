@@ -19,10 +19,11 @@ export interface QueryStore {
   /** Upserts the query row and returns the row's effective generate state after merging. */
   recordQuery(i: { normalized: string; original: string; assetId: string | null; similarity: number; built: boolean; generate: boolean }): Promise<boolean>;
 }
-export interface User { id: string; email: string; created_at: string; last_login: string | null; }
+export interface User { id: string; email: string; created_at: string; last_login: string | null; tos_version: string | null; tos_accepted_at: string | null; }
 export interface UserStore {
   upsertByEmail(id: string, email: string): Promise<{ id: string; email: string }>;
   getById(id: string): Promise<User | null>;
+  acceptTos(userId: string, version: string): Promise<void>;
 }
 export interface SessionStore {
   create(userId: string, tokenHash: string): Promise<void>;

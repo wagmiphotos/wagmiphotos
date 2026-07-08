@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { handleLoginRequest, handleVerify, handleMe, handleLogout, normalizeEmail, isValidEmail } from "../src/auth-routes";
+import { handleLoginRequest, handleVerify, handleMe, handleLogout, handleAcceptTos, TOS_VERSION, normalizeEmail, isValidEmail } from "../src/auth-routes";
 import { sha256Hex } from "../src/auth";
 import { serializeSessionCookie, SESSION_COOKIE, LOGIN_NONCE_COOKIE } from "../src/session";
 
@@ -162,6 +162,30 @@ it("me: 200 with user when session resolves, 401 otherwise", async () => {
   expect(ok.status).toBe(200);
   const anon = await handleMe(new Request("https://x/v1/me"), {} as any, svc());
   expect(anon.status).toBe(401);
+});
+
+it("me: reports ToS acceptance status against the current version", async () => {
+  const req = new Request("https://x/v1/me", { headers: { Cookie: `${SESSION_COOKIE}=tok` } });
+  const notYet = svc({ users: { getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null, tos_version: null, tos_accepted_at: null }) } });
+  const b1 = await (await handleMe(req, {} as any, notYet)).json() as any;
+  expect(b1.tos.current_version).toBe(TOS_VERSION);
+  expect(b1.tos.accepted).toBe(false);
+
+  const done = svc({ users: { getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null, tos_version: TOS_VERSION, tos_accepted_at: "2026-07-08" }) } });
+  const b2 = await (await handleMe(req, {} as any, done)).json() as any;
+  expect(b2.tos.accepted).toBe(true);
+});
+
+it("accept-tos: records acceptance of the current version for the session user; 401 anon", async () => {
+  let recorded: any = null;
+  const s = svc({ users: { getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null, tos_version: null, tos_accepted_at: null }), acceptTos: async (uid: string, v: string) => { recorded = { uid, v }; } } });
+  const ok = await handleAcceptTos(new Request("https://x/v1/auth/accept-tos", { method: "POST", headers: { Cookie: `${SESSION_COOKIE}=tok` } }), {} as any, s);
+  expect(ok.status).toBe(200);
+  expect(recorded).toEqual({ uid: "usr_1", v: TOS_VERSION });
+
+  const anon = svc({ sessions: { resolve: async () => null, touch: async () => {}, create: async () => {}, delete: async () => {}, purgeExpired: async () => {} } });
+  const res = await handleAcceptTos(new Request("https://x/v1/auth/accept-tos", { method: "POST" }), {} as any, anon);
+  expect(res.status).toBe(401);
 });
 
 it("logout: clears cookie + deletes session", async () => {
