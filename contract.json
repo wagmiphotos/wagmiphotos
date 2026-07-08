@@ -1,5 +1,5 @@
 {
-  "_comment": "Cross-language contract shared by the edge worker (TypeScript) and the backfill (Python). Both test suites pin their constants against this file (projects/worker/test/contract.test.ts, projects/common/tests/test_contract.py). Change values HERE first; a mismatch on either side must fail tests. The two BGE ids must name the same base model so edge queries and backfill upserts live in one embedding space. Vectorize shard routing uses fnv1a32(id) % vectorize_shards; shard_fixtures pins the hash on both sides.",
+  "_comment": "Cross-language contract shared by the edge worker (TypeScript) and the backfill (Python). Both test suites pin their constants against this file (projects/worker/test/contract.test.ts, projects/common/tests/test_contract.py). Change values HERE first; a mismatch on either side must fail tests. The two BGE ids must name the same base model so edge queries and backfill upserts live in one embedding space. Vectorize shard routing uses fnv1a32(id) % vectorize_shards; shard_fixtures pins the hash on both sides. byok_providers pins the fixed model + price estimate per BYOK provider; denylist_terms is the shared prompt denylist (worker + backfill).",
   "floor_sim_max": 0.87,
   "floor_sim_min": 0.75,
   "default_cache_tolerance": 0.15,
@@ -22,5 +22,16 @@
     "medium": "assets/{id}/medium.webp",
     "thumb": "assets/{id}/thumb.webp",
     "manifest": "assets/{id}/manifest.json"
-  }
+  },
+  "byok_providers": {
+    "openai":   { "model": "gpt-image-1",          "price_per_image_usd": 0.04 },
+    "gmicloud": { "model": "gpt-image-2-generate", "price_per_image_usd": 0.055 }
+  },
+  "denylist_terms": [
+    "disney", "mickey mouse", "minnie mouse", "pikachu", "pokemon", "mario",
+    "luigi", "nintendo", "marvel", "spider-man", "iron man", "batman",
+    "superman", "star wars", "darth vader", "coca-cola", "pepsi", "nike",
+    "adidas", "gucci", "prada", "louis vuitton", "chanel", "rolex",
+    "hello kitty", "harry potter", "sonic the hedgehog", "minecraft", "fortnite"
+  ]
 }

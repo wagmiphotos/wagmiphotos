@@ -64,3 +64,15 @@ def test_asset_paths_match_contract():
 
 def test_asset_key_substitutes_id():
     assert asset_key("thumb", "abc") == "assets/abc/thumb.webp"
+
+
+def test_denylist_terms_match_contract():
+    from wagmiphotos.common.config import Settings
+    config_terms = [t.strip() for t in Settings().denylist_terms.split(",") if t.strip()]
+    assert config_terms == CONTRACT["denylist_terms"]
+
+
+def test_byok_gmicloud_price_matches_image_price():
+    from wagmiphotos.common.config import Settings
+    assert CONTRACT["byok_providers"]["gmicloud"]["price_per_image_usd"] == Settings().image_price_usd
+    assert CONTRACT["byok_providers"]["gmicloud"]["model"] == "gpt-image-2-generate"

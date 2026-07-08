@@ -34,6 +34,18 @@ it("fnv1a32 reference value", () => {
   expect(fnv1a32("demo-1")).toBe(207613968);
 });
 
+it("byok provider pins: fixed model + price estimate per provider", () => {
+  expect(contract.byok_providers.openai.model).toBe("gpt-image-1");
+  expect(contract.byok_providers.gmicloud.model).toBe("gpt-image-2-generate");
+  expect(contract.byok_providers.openai.price_per_image_usd).toBeGreaterThan(0);
+  expect(contract.byok_providers.gmicloud.price_per_image_usd).toBeGreaterThan(0);
+});
+
+it("denylist_terms is a non-empty lowercase list", () => {
+  expect(contract.denylist_terms.length).toBeGreaterThan(20);
+  for (const t of contract.denylist_terms) expect(t).toBe(t.toLowerCase().trim());
+});
+
 it("wrangler.toml [[vectorize]] bindings match contract.json (shard count + index names)", () => {
   const toml = readFileSync(join(__dirname, "../wrangler.toml"), "utf8");
   const blocks = toml.split("[[vectorize]]").slice(1);
