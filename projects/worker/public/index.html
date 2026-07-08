@@ -1049,108 +1049,99 @@
 
     .flow-trio p { font-size: 0.8125rem; color: var(--muted); line-height: 1.55; }
 
-    /* ---- Price / speed comparison charts ---- */
-    .chart-duo {
-      margin-top: 18px;
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 18px;
-      align-items: stretch;
-    }
-
-    @media (min-width: 960px) { .chart-duo { grid-template-columns: 1fr 1fr; } }
-
-    .price-chart {
+    /* ============ Compare: Faster. Cheaper. Better. ============ */
+    .compare {
+      margin-top: 8px;
       background: var(--card);
       border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 26px 24px;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .price-chart .price-foot { margin-top: auto; padding-top: 16px; }
-
-    .price-chart-head {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 6px 16px;
-      margin-bottom: 20px;
-    }
-
-    .price-chart-head h3 {
-      font-family: var(--font-display);
-      font-size: 1.0625rem;
-      font-weight: 700;
-      color: var(--ink);
-    }
-
-    .price-chart-head span { font-size: 0.75rem; color: var(--muted); }
-
-    .price-rows { display: flex; flex-direction: column; gap: 12px; }
-
-    .price-row {
+      border-radius: 24px;
+      padding: 16px;
       display: grid;
-      grid-template-columns: 152px 1fr 52px;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .price-label {
-      font-size: 0.8125rem;
-      font-weight: 600;
-      color: var(--ink-soft);
-      white-space: nowrap;
+      grid-template-columns: 1fr;
+      gap: 8px;
       overflow: hidden;
-      text-overflow: ellipsis;
     }
+    @media (min-width: 900px) { .compare { grid-template-columns: 0.8fr 1.55fr; gap: 24px; padding: 20px; } }
 
-    .price-track { height: 18px; display: flex; align-items: center; }
-
-    .price-bar {
-      height: 18px;
-      background: #6f6c69;
-      border-radius: 0 4px 4px 0;
-      min-width: 3px;
-      transition: filter 0.15s ease;
+    .compare-mascot {
+      position: relative;
+      border-radius: 18px;
+      background: linear-gradient(155deg, rgba(237, 20, 30, 0.11), rgba(237, 20, 30, 0.03));
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      overflow: hidden;
+      min-height: 230px;
     }
+    .compare-mascot img { width: 100%; height: 100%; object-fit: cover; object-position: center 26%; display: block; }
 
-    .price-row:hover .price-bar { filter: brightness(1.18); }
+    .compare-body { padding: 14px 12px 6px; min-width: 0; display: flex; flex-direction: column; }
+    @media (min-width: 900px) { .compare-body { padding: 20px 22px 8px 6px; } }
 
-    .price-row.is-hit .price-bar { background: var(--red); }
-    .price-row.is-hit .price-label { color: var(--ink); font-weight: 700; }
-
-    .price-val {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--ink);
-      text-align: right;
+    .compare-brand {
+      display: flex; align-items: center; gap: 10px;
+      font-family: var(--font-display); font-weight: 800; font-size: 1.0625rem; color: var(--ink);
+      margin-bottom: 14px;
     }
+    .compare-mark { width: 32px; height: 32px; border-radius: 9px; background: var(--red); display: grid; place-items: center; }
+    .compare-mark img { width: 20px; height: 20px; filter: brightness(0) invert(1); }
 
-    .price-foot {
-      font-size: 0.75rem;
-      color: var(--muted);
-      line-height: 1.6;
+    .compare-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.9rem, 4.2vw, 3rem);
+      font-weight: 800; letter-spacing: -0.02em; line-height: 1.0; color: var(--ink);
     }
+    .compare-sub { color: var(--muted); font-size: 1.0625rem; line-height: 1.5; margin: 14px 0 24px; max-width: 32em; }
 
-    .price-sources {
-      margin-top: 12px;
-      padding-top: 12px;
-      border-top: 1px dashed var(--line);
-      font-size: 0.6875rem;
-      color: var(--muted);
-      line-height: 1.7;
+    .compare-cards { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 600px) { .compare-cards { grid-template-columns: 1fr 1fr; } }
+
+    .metric-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 20px 18px;
+      display: flex; flex-direction: column;
     }
-
-    .price-sources a {
-      color: var(--muted);
-      text-decoration: underline;
-      text-underline-offset: 2px;
+    .metric-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .metric-icon {
+      width: 40px; height: 40px; flex-shrink: 0; border-radius: 11px;
+      background: rgba(237, 20, 30, 0.10); color: var(--red);
+      display: grid; place-items: center;
     }
+    .metric-head h3 { font-family: var(--font-display); font-size: 1.0625rem; font-weight: 800; color: var(--ink); line-height: 1.15; }
+    .metric-head span { font-size: 0.75rem; color: var(--muted); }
 
-    .price-sources a:hover { color: var(--red); }
+    .metric-rows { display: flex; flex-direction: column; gap: 3px; margin-bottom: 16px; }
+    .metric-row {
+      display: grid; grid-template-columns: 82px 1fr auto; align-items: center; gap: 10px;
+      padding: 7px 9px; border-radius: 9px;
+    }
+    .metric-row.is-hit { background: rgba(237, 20, 30, 0.07); }
+    .metric-label { font-size: 0.75rem; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .metric-row.is-hit .metric-label { color: var(--red); font-weight: 800; }
+    .metric-track { height: 8px; display: flex; align-items: center; }
+    .metric-bar { height: 8px; background: #d4d1cd; border-radius: 99px; min-width: 6px; }
+    .metric-row.is-hit .metric-bar { background: var(--red); }
+    .metric-val { font-family: var(--font-mono); font-size: 0.78rem; font-weight: 600; color: var(--ink); text-align: right; }
+    .metric-row.is-hit .metric-val { color: var(--red); }
+
+    .metric-pill {
+      margin-top: auto;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: rgba(14, 138, 77, 0.10); color: var(--success);
+      font-family: var(--font-display); font-weight: 700; font-size: 0.9375rem;
+      padding: 12px; border-radius: 12px;
+    }
+    .metric-pill svg { flex-shrink: 0; }
+
+    .compare-foot {
+      display: flex; align-items: baseline; gap: 8px;
+      margin-top: 20px; font-size: 0.75rem; color: var(--muted); line-height: 1.65;
+    }
+    .compare-foot .spk { color: var(--red); flex-shrink: 0; transform: translateY(2px); }
+    .compare-foot a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+    .compare-foot a:hover { color: var(--red); }
 
     /* ============ API sample ============ */
     .api-grid {
@@ -1185,79 +1176,6 @@
       box-shadow: 0 24px 48px rgba(28, 28, 27, 0.18);
     }
 
-    .code-topbar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 18px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .code-topbar .dots { display: flex; gap: 6px; }
-    .code-topbar .dots i { width: 10px; height: 10px; border-radius: 50%; display: block; }
-    .code-topbar .dots i:nth-child(1) { background: var(--red); }
-    .code-topbar .dots i:nth-child(2) { background: rgba(255,255,255,0.25); }
-    .code-topbar .dots i:nth-child(3) { background: rgba(255,255,255,0.12); }
-
-    .code-topbar .endpoint {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: rgba(255, 255, 255, 0.65);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .code-topbar .status-chip {
-      margin-left: auto;
-      font-family: var(--font-mono);
-      font-size: 0.6875rem;
-      font-weight: 500;
-      color: #6fdc9c;
-      background: rgba(111, 220, 156, 0.12);
-      border-radius: 6px;
-      padding: 3px 8px;
-      white-space: nowrap;
-    }
-
-    .code-cols { display: grid; grid-template-columns: 1fr; }
-    @media (min-width: 760px) { .code-cols { grid-template-columns: 1fr 1fr; } }
-
-    .code-col { padding: 18px 20px 22px; min-width: 0; }
-    @media (min-width: 760px) {
-      .code-col + .code-col { border-left: 1px solid rgba(255, 255, 255, 0.08); }
-    }
-    @media (max-width: 759px) {
-      .code-col + .code-col { border-top: 1px solid rgba(255, 255, 255, 0.08); }
-    }
-
-    .code-col h4 {
-      font-family: var(--font-inter);
-      font-size: 0.6875rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: rgba(255, 255, 255, 0.45);
-      margin-bottom: 12px;
-    }
-
-    .code-tabs {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 12px;
-    }
-
-    .code-tabs .tabs-label {
-      font-family: var(--font-inter);
-      font-size: 0.6875rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: rgba(255, 255, 255, 0.45);
-      margin-right: 6px;
-    }
-
     .code-tab {
       background: transparent;
       border: 1px solid rgba(255, 255, 255, 0.16);
@@ -1279,22 +1197,70 @@
       color: #fff;
     }
 
-    .code-col pre[hidden] { display: none; }
+    /* ============ API redesign: pills, tabbar, line numbers, cache callout ============ */
+    .api-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+    .api-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      border: 1px solid var(--line); border-radius: 99px;
+      padding: 6px 12px; font-size: 0.8125rem; font-weight: 600; color: var(--ink-soft);
+      background: var(--card);
+    }
+    .api-pill svg { color: var(--red); flex-shrink: 0; }
 
-    .code-col pre {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      line-height: 1.7;
-      color: #d9d7d4;
-      overflow-x: auto;
+    .code-wrap { position: relative; }
+
+    .code-tabbar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .code-tabbar .dots { display: flex; gap: 6px; margin-right: 4px; }
+    .code-tabbar .dots i { width: 10px; height: 10px; border-radius: 50%; display: block; }
+    .code-tabbar .dots i:nth-child(1) { background: var(--red); }
+    .code-tabbar .dots i:nth-child(2) { background: rgba(255, 255, 255, 0.25); }
+    .code-tabbar .dots i:nth-child(3) { background: rgba(255, 255, 255, 0.12); }
+
+    .code-body { padding: 18px 20px 22px; }
+    .code-body pre { font-family: var(--font-mono); font-size: 0.75rem; line-height: 1.75; color: #d9d7d4; overflow-x: auto; margin: 0; }
+    .code-body pre[hidden] { display: none; }
+    .code-body .tk-cmd { color: #ffffff; }
+    .code-body .tk-flag { color: rgba(255, 255, 255, 0.55); }
+    .code-body .tk-str { color: #ff9da2; }
+    .code-body .tk-key { color: #f0eeeb; }
+    .code-body .tk-num { color: #f5c518; }
+    .code-body .tk-hit { color: #6fdc9c; font-weight: 500; }
+
+    .code-numbered { white-space: normal; counter-reset: ln; }
+    .code-numbered .cl { display: block; white-space: pre; position: relative; padding-left: 2.8em; min-height: 1.31em; }
+    .code-numbered .cl::before {
+      counter-increment: ln; content: counter(ln);
+      position: absolute; left: 0; width: 1.7em; text-align: right;
+      color: rgba(255, 255, 255, 0.26); font-variant-numeric: tabular-nums;
     }
 
-    .code-col .tk-cmd { color: #ffffff; }
-    .code-col .tk-flag { color: rgba(255, 255, 255, 0.55); }
-    .code-col .tk-str { color: #ff9da2; }
-    .code-col .tk-key { color: #f0eeeb; }
-    .code-col .tk-num { color: #f5c518; }
-    .code-col .tk-hit { color: #6fdc9c; font-weight: 500; }
+    .cache-callout {
+      margin-top: 16px;
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 14px; padding: 13px 15px;
+      box-shadow: 0 18px 40px rgba(28, 28, 27, 0.16);
+    }
+    @media (min-width: 960px) {
+      .cache-callout { position: absolute; right: -14px; bottom: -26px; width: 292px; margin-top: 0; z-index: 2; }
+    }
+    .cache-callout-head {
+      display: flex; align-items: center; gap: 7px;
+      font-family: var(--font-display); font-weight: 700; font-size: 0.8125rem; color: var(--success);
+      margin-bottom: 9px;
+    }
+    .cache-callout pre { font-family: var(--font-mono); font-size: 0.6875rem; line-height: 1.7; color: var(--ink-soft); overflow-x: auto; margin: 0; }
+    .cache-callout .tk-key { color: var(--ink); }
+    .cache-callout .tk-str { color: var(--red-deep); }
+    .cache-callout .tk-num { color: #b26a00; }
+    .cache-callout .tk-hit { color: var(--success); font-weight: 600; }
+
+    .code-scribble { display: none; }
+    @media (min-width: 960px) {
+      .code-scribble { display: block; position: absolute; right: -32px; bottom: 104px; color: var(--red); z-index: 3; }
+    }
 
     /* ============ Pricing (shared by home section + pricing view) ============ */
     .pricing-grid {
@@ -2706,74 +2672,52 @@
 
       <!-- Features -->
       <section class="section" id="why-it-wins">
-        <div class="section-head">
-          <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>Why it wins</div>
-          <h2 class="section-title">Built for speed and price.</h2>
-        </div>
+        <div class="compare">
+          <div class="compare-mascot">
+            <img src="/assets/grandpa-thumbs-up.webp" width="880" height="880" loading="lazy"
+                 alt="A smiling man giving a thumbs up — nice!">
+          </div>
+          <div class="compare-body">
+            <div class="compare-brand">
+              <span class="compare-mark"><img src="/assets/logo.webp" alt="" width="20" height="20"></span>
+              wagmi.photos
+            </div>
+            <h2 class="compare-title">Faster. Cheaper. Better.</h2>
+            <p class="compare-sub">Built for speed and efficiency, so you create more for less — and every cache hit is served free from the shared library.</p>
 
-        <!-- Price & speed comparison -->
-        <div class="chart-duo">
-        <div class="price-chart">
-          <div class="price-chart-head">
-            <h3>What one image costs</h3>
-            <span>List price per 1024&times;1024 image &middot; July 2026</span>
-          </div>
-          <div class="price-rows">
-            <div class="price-row">
-              <span class="price-label">GPT Image 1 (medium)</span>
-              <div class="price-track"><div class="price-bar" style="width: 100%;"></div></div>
-              <span class="price-val">$0.042</span>
+            <div class="compare-cards">
+              <!-- Speed -->
+              <div class="metric-card">
+                <div class="metric-head">
+                  <span class="metric-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="14" r="8"/><path d="M12 10v4l2.5 1.5"/><path d="M9 2h6"/></svg></span>
+                  <div><h3>Speed</h3><span>Average time per image</span></div>
+                </div>
+                <div class="metric-rows">
+                  <div class="metric-row is-hit"><span class="metric-label">wagmi hit</span><div class="metric-track"><div class="metric-bar" style="width: 6px;"></div></div><span class="metric-val">0.1 s</span></div>
+                  <div class="metric-row"><span class="metric-label">FLUX schnell</span><div class="metric-track"><div class="metric-bar" style="width: 6%;"></div></div><span class="metric-val">~1.5 s</span></div>
+                  <div class="metric-row"><span class="metric-label">Imagen 4</span><div class="metric-track"><div class="metric-bar" style="width: 30%;"></div></div><span class="metric-val">~9 s</span></div>
+                  <div class="metric-row"><span class="metric-label">GPT Image 1</span><div class="metric-track"><div class="metric-bar" style="width: 100%;"></div></div><span class="metric-val">~30 s</span></div>
+                </div>
+                <div class="metric-pill"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 3 14h7l-1 8 11-13h-8l1-7z"/></svg> Instant on a cache hit</div>
+              </div>
+              <!-- Price -->
+              <div class="metric-card">
+                <div class="metric-head">
+                  <span class="metric-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+                  <div><h3>Price</h3><span>List price per image</span></div>
+                </div>
+                <div class="metric-rows">
+                  <div class="metric-row is-hit"><span class="metric-label">wagmi hit</span><div class="metric-track"><div class="metric-bar" style="width: 6px;"></div></div><span class="metric-val">$0.000</span></div>
+                  <div class="metric-row"><span class="metric-label">FLUX schnell</span><div class="metric-track"><div class="metric-bar" style="width: 7%;"></div></div><span class="metric-val">$0.003</span></div>
+                  <div class="metric-row"><span class="metric-label">Imagen 4</span><div class="metric-track"><div class="metric-bar" style="width: 95%;"></div></div><span class="metric-val">$0.040</span></div>
+                  <div class="metric-row"><span class="metric-label">GPT Image 1</span><div class="metric-track"><div class="metric-bar" style="width: 100%;"></div></div><span class="metric-val">$0.042</span></div>
+                </div>
+                <div class="metric-pill"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42zM7.5 8A1.5 1.5 0 1 1 7.5 5a1.5 1.5 0 0 1 0 3z"/></svg> Free on a cache hit</div>
+              </div>
             </div>
-            <div class="price-row">
-              <span class="price-label">Imagen 4 (standard)</span>
-              <div class="price-track"><div class="price-bar" style="width: 95%;"></div></div>
-              <span class="price-val">$0.040</span>
-            </div>
-            <div class="price-row">
-              <span class="price-label">FLUX.1 [schnell]</span>
-              <div class="price-track"><div class="price-bar" style="width: 7%;"></div></div>
-              <span class="price-val">$0.003</span>
-            </div>
-            <div class="price-row is-hit">
-              <span class="price-label">wagmi.photos hit</span>
-              <div class="price-track"><div class="price-bar" style="width: 4px;"></div></div>
-              <span class="price-val">$0.000</span>
-            </div>
-          </div>
-          <p class="price-foot">A cache hit serves an existing image from the shared library — no generation fee, no egress. A truly new prompt is generated once at the model's price, then it's free for everyone after. Library access needs a wagmi.photos plan (from $0/mo) — you pay for access, never per image.</p>
-          <p class="price-sources">Sources: <a href="https://platform.openai.com/docs/pricing" target="_blank" rel="noopener">OpenAI API pricing</a> · <a href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noopener">Google Gemini API pricing</a> · <a href="https://fal.ai/models/fal-ai/flux/schnell" target="_blank" rel="noopener">fal.ai — FLUX.1 [schnell]</a> · retrieved July 2026</p>
-        </div>
 
-        <div class="price-chart">
-          <div class="price-chart-head">
-            <h3>How long one image takes</h3>
-            <span>Typical generation time &middot; July 2026</span>
+            <p class="compare-foot"><span class="spk"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg></span>Times and prices vary with model, load, and settings; a cache hit skips generation entirely. Sources: <a href="https://platform.openai.com/docs/pricing" target="_blank" rel="noopener">OpenAI</a> · <a href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noopener">Google</a> · <a href="https://fal.ai/models/fal-ai/flux/schnell" target="_blank" rel="noopener">fal.ai</a> · <a href="https://artificialanalysis.ai/image" target="_blank" rel="noopener">Artificial Analysis</a>.</p>
           </div>
-          <div class="price-rows">
-            <div class="price-row">
-              <span class="price-label">GPT Image 1</span>
-              <div class="price-track"><div class="price-bar" style="width: 100%;"></div></div>
-              <span class="price-val">~30 s</span>
-            </div>
-            <div class="price-row">
-              <span class="price-label">Imagen 4</span>
-              <div class="price-track"><div class="price-bar" style="width: 30%;"></div></div>
-              <span class="price-val">~9 s</span>
-            </div>
-            <div class="price-row">
-              <span class="price-label">FLUX.1 [schnell]</span>
-              <div class="price-track"><div class="price-bar" style="width: 5%;"></div></div>
-              <span class="price-val">~1.5 s</span>
-            </div>
-            <div class="price-row is-hit">
-              <span class="price-label">wagmi.photos hit</span>
-              <div class="price-track"><div class="price-bar" style="width: 4px;"></div></div>
-              <span class="price-val">0.1 s</span>
-            </div>
-          </div>
-          <p class="price-foot">Generation times vary with load and settings. A cache hit skips generation entirely — one vector search at the edge, and the image is on its way.</p>
-          <p class="price-sources">Source: <a href="https://artificialanalysis.ai/image" target="_blank" rel="noopener">Artificial Analysis generation-time benchmarks</a> · retrieved July 2026. Cache-hit latency is the wagmi.photos edge target.</p>
-        </div>
         </div>
       </section>
 
@@ -2814,87 +2758,68 @@
       <section class="section" id="the-api">
         <div class="api-grid">
           <div class="api-copy">
-            <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>The API</div>
-            <h2 class="section-title">One endpoint. Cache included.</h2>
+            <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>OpenAI compatible</div>
+            <h2 class="section-title">Use the OpenAI SDK.<br>Get wagmi caching.</h2>
             <p>
-              Point the official OpenAI SDK at a new base URL — no other changes. You get back the
-              OpenAI response shape plus a
-              <code style="font-family: var(--font-mono); font-size: 0.85em;">shared_cache</code> block
-              telling you whether it was a hit, how close the match was, and what it saved you.
+              No new SDK, no custom response format. Point your existing image-generation requests at
+              wagmi.photos and we return OpenAI-compatible responses with an extra
+              <code style="font-family: var(--font-mono); font-size: 0.85em;">shared_cache</code> block.
             </p>
             <a href="#/playground" class="api-link">Try it in the playground →</a>
+            <div class="api-pills">
+              <span class="api-pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m8 6-6 6 6 6"/><path d="m16 6 6 6-6 6"/></svg> Same SDK</span>
+              <span class="api-pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"/><path d="M16 3h1a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2 2 2 0 0 0-2 2v5a2 2 0 0 1-2 2h-1"/></svg> Same response shape</span>
+              <span class="api-pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg> Cache metadata</span>
+            </div>
           </div>
 
-          <div class="code-panel">
-            <div class="code-topbar">
-              <div class="dots"><i></i><i></i><i></i></div>
-              <span class="endpoint">POST /v1/images/generations</span>
-              <span class="status-chip">200 OK · 41 ms</span>
+          <div class="code-wrap">
+            <div class="code-panel">
+              <div class="code-tabbar">
+                <div class="dots"><i></i><i></i><i></i></div>
+                <button type="button" class="code-tab active" onclick="showCodeTab('python', this)">OpenAI SDK</button>
+                <button type="button" class="code-tab" onclick="showCodeTab('curl', this)">cURL</button>
+                <button type="button" class="code-tab" onclick="showCodeTab('response', this)">Response</button>
+              </div>
+              <div class="code-body">
+                <pre class="code-example code-numbered" data-lang="python"><span class="cl"><span class="tk-flag">from</span> openai <span class="tk-flag">import</span> OpenAI</span>
+<span class="cl"></span>
+<span class="cl">client = OpenAI(</span>
+<span class="cl">    base_url=<span class="tk-str">"https://api.wagmi.photos/v1"</span>,</span>
+<span class="cl">    api_key=<span class="tk-str">"YOUR_WAGMI_KEY"</span>,</span>
+<span class="cl">)</span>
+<span class="cl"></span>
+<span class="cl">img = client.images.generate(</span>
+<span class="cl">    prompt=<span class="tk-str">"a corgi wearing sunglasses on a beach"</span>,</span>
+<span class="cl">    extra_body={<span class="tk-str">"cache_tolerance"</span>: <span class="tk-num">0.15</span>,</span>
+<span class="cl">                <span class="tk-str">"generate_on_miss"</span>: <span class="tk-num">True</span>},</span>
+<span class="cl">)</span>
+<span class="cl"><span class="tk-cmd">print</span>(img.data[<span class="tk-num">0</span>].url)</span></pre>
+                <pre class="code-example code-numbered" data-lang="curl" hidden><span class="cl"><span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://api.wagmi.photos/v1/images/generations <span class="tk-flag">\</span></span>
+<span class="cl">  <span class="tk-flag">-H</span> <span class="tk-str">"Authorization: Bearer $WAGMI_KEY"</span> <span class="tk-flag">\</span></span>
+<span class="cl">  <span class="tk-flag">-H</span> <span class="tk-str">"Content-Type: application/json"</span> <span class="tk-flag">\</span></span>
+<span class="cl">  <span class="tk-flag">-d</span> <span class="tk-str">'{"prompt": "a corgi wearing sunglasses on a beach",</span></span>
+<span class="cl">       <span class="tk-str">"cache_tolerance": 0.15, "generate_on_miss": true}'</span></span></pre>
+                <pre class="code-example code-numbered" data-lang="response" hidden><span class="cl">{</span>
+<span class="cl">  <span class="tk-key">"data"</span>: [{ <span class="tk-key">"url"</span>: <span class="tk-str">"https://cdn.wagmi.photos/img/pd12m-8f31…"</span> }],</span>
+<span class="cl">  <span class="tk-key">"shared_cache"</span>: {</span>
+<span class="cl">    <span class="tk-key">"result"</span>: <span class="tk-hit">"hit"</span>,</span>
+<span class="cl">    <span class="tk-key">"similarity"</span>: <span class="tk-num">0.9312</span>,</span>
+<span class="cl">    <span class="tk-key">"source"</span>: <span class="tk-str">"pd12m"</span>,</span>
+<span class="cl">    <span class="tk-key">"model_used"</span>: <span class="tk-str">"flux-schnell"</span>,</span>
+<span class="cl">    <span class="tk-key">"cost_saved_usd"</span>: <span class="tk-num">0.055</span></span>
+<span class="cl">  }</span>
+<span class="cl">}</span></pre>
+              </div>
             </div>
-            <div class="code-cols">
-              <div class="code-col">
-                <div class="code-tabs">
-                  <span class="tabs-label">Request</span>
-                  <button type="button" class="code-tab active" onclick="showCodeTab('curl', this)">cURL</button>
-                  <button type="button" class="code-tab" onclick="showCodeTab('python', this)">Python</button>
-                  <button type="button" class="code-tab" onclick="showCodeTab('js', this)">JavaScript</button>
-                </div>
-                <pre class="code-example" data-lang="curl"><span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://api.wagmi.photos/v1/images/generations <span class="tk-flag">\</span>
-  <span class="tk-flag">-H</span> <span class="tk-str">"Authorization: Bearer $WAGMI_KEY"</span> <span class="tk-flag">\</span>
-  <span class="tk-flag">-H</span> <span class="tk-str">"Content-Type: application/json"</span> <span class="tk-flag">\</span>
-  <span class="tk-flag">-d</span> <span class="tk-str">'{
-    "prompt": "a vintage bicycle against
-               a brick wall",
-    "cache_tolerance": 0.15,
-    "generate_on_miss": true
-  }'</span></pre>
-                <pre class="code-example" data-lang="python" hidden><span class="tk-flag">from</span> openai <span class="tk-flag">import</span> OpenAI
-
-client = OpenAI(
-    base_url=<span class="tk-str">"https://api.wagmi.photos/v1"</span>,
-    api_key=<span class="tk-str">"sc-your-key"</span>,
-)
-
-img = client.images.generate(
-    prompt=<span class="tk-str">"a vintage bicycle "</span>
-           <span class="tk-str">"against a brick wall"</span>,
-    extra_body={
-        <span class="tk-str">"cache_tolerance"</span>: <span class="tk-num">0.15</span>,
-        <span class="tk-str">"generate_on_miss"</span>: <span class="tk-num">True</span>},
-)
-<span class="tk-cmd">print</span>(img.data[<span class="tk-num">0</span>].url)</pre>
-                <pre class="code-example" data-lang="js" hidden><span class="tk-flag">import</span> OpenAI <span class="tk-flag">from</span> <span class="tk-str">"openai"</span>;
-
-<span class="tk-flag">const</span> client = <span class="tk-flag">new</span> OpenAI({
-  baseURL: <span class="tk-str">"https://api.wagmi.photos/v1"</span>,
-  apiKey: <span class="tk-str">"sc-your-key"</span>,
-});
-
-<span class="tk-flag">const</span> img = <span class="tk-flag">await</span> client.images
-  .generate({
-    prompt: <span class="tk-str">"a vintage bicycle "</span> +
-            <span class="tk-str">"against a brick wall"</span>,
-    cache_tolerance: <span class="tk-num">0.15</span>,
-    generate_on_miss: <span class="tk-num">true</span>,
-  });
-console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].url);</pre>
-              </div>
-              <div class="code-col">
-                <h4>Response</h4>
-                <pre>{
-  <span class="tk-key">"data"</span>: [{
-    <span class="tk-key">"url"</span>: <span class="tk-str">"https://cdn.wagmi.photos/
-            img/pd12m-8f31…"</span>
-  }],
-  <span class="tk-key">"shared_cache"</span>: {
-    <span class="tk-key">"result"</span>: <span class="tk-hit">"hit"</span>,
-    <span class="tk-key">"similarity"</span>: <span class="tk-num">0.9312</span>,
-    <span class="tk-key">"source"</span>: <span class="tk-str">"pd12m"</span>,
-    <span class="tk-key">"model_used"</span>: <span class="tk-str">"flux-schnell"</span>,
-    <span class="tk-key">"cost_saved_usd"</span>: <span class="tk-num">0.055</span>
-  }
+            <svg class="code-scribble" width="48" height="42" viewBox="0 0 48 42" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 24c6-12 12 8 18-2s10 6 16-4"/><path d="M40 4l4 6"/><path d="M45 18l-5 2"/></svg>
+            <div class="cache-callout">
+              <div class="cache-callout-head"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Cache hit · 41 ms · $0.055 saved</div>
+              <pre>{
+  <span class="tk-key">"result"</span>: <span class="tk-hit">"hit"</span>,
+  <span class="tk-key">"similarity"</span>: <span class="tk-num">0.9312</span>,
+  <span class="tk-key">"cost_saved_usd"</span>: <span class="tk-num">0.055</span>
 }</pre>
-              </div>
             </div>
           </div>
         </div>
