@@ -9,7 +9,7 @@ import { numEnv } from "./config";
 import { FLOOR_SIM_MAX, FLOOR_SIM_MIN } from "./floor";
 import { makeEmailSender } from "./email";
 import { resolveApiPrincipal, resolveSession } from "./session";
-import { handleLoginRequest, handleVerify, handleMe, handleLogout, handleListKeys, handleDeleteKey } from "./auth-routes";
+import { handleLoginRequest, handleVerify, handleMe, handleLogout, handleAcceptTos, handleListKeys, handleDeleteKey } from "./auth-routes";
 
 function buildServices(env: Env): Services {
   const { assets, queries, keys, users, sessions, loginTokens } = makeD1Stores(env.DB);
@@ -88,6 +88,8 @@ export default {
         return await handleMe(request, env, services);
       if (url.pathname === "/v1/auth/logout" && request.method === "POST")
         return await handleLogout(request, env, services);
+      if (url.pathname === "/v1/auth/accept-tos" && request.method === "POST")
+        return await handleAcceptTos(request, env, services);
       if (url.pathname === "/v1/keys" && request.method === "GET")
         return await handleListKeys(request, env, services);
       const keyDel = url.pathname.match(/^\/v1\/keys\/([^/]+)$/);
@@ -139,7 +141,7 @@ export default {
         const cfg = {
           floorSimMax: numEnv(env.FLOOR_SIM_MAX, FLOOR_SIM_MAX),
           floorSimMin: numEnv(env.FLOOR_SIM_MIN, FLOOR_SIM_MIN),
-          imagePrice: numEnv(env.IMAGE_PRICE_USD, 0.04),
+          imagePrice: numEnv(env.IMAGE_PRICE_USD, 0.055),
           now: () => Math.floor(Date.now() / 1000),
           assetBaseUrl: env.ASSET_BASE_URL,
         };

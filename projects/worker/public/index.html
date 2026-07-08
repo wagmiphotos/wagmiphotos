@@ -1304,7 +1304,7 @@
       align-items: stretch;
     }
 
-    @media (min-width: 900px) { .pricing-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (min-width: 900px) { .pricing-grid { grid-template-columns: repeat(2, 1fr); max-width: 720px; margin-inline: auto; } }
 
     .pricing-card {
       background: var(--card);
@@ -1454,6 +1454,56 @@
       border-color: rgba(255, 255, 255, 0.3);
     }
     .cta-band .btn-outline:hover { border-color: #fff; }
+
+    /* ============ Manifesto band ============ */
+    .manifesto {
+      margin-top: 72px;
+      background: var(--red);
+      border-radius: 22px;
+      padding: 66px 40px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .manifesto::before,
+    .manifesto::after {
+      content: "";
+      position: absolute;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      border: 2px dashed rgba(255, 255, 255, 0.32);
+      pointer-events: none;
+    }
+    .manifesto::before { left: -96px; top: -104px; }
+    .manifesto::after { right: -96px; bottom: -120px; }
+    .manifesto h2 {
+      position: relative;
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 4.6vw, 3.1rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.04;
+      color: #fff;
+    }
+    .manifesto p {
+      position: relative;
+      max-width: 34em;
+      margin: 18px auto 0;
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 1.0625rem;
+      line-height: 1.6;
+    }
+    .manifesto .wagmi {
+      position: relative;
+      display: block;
+      margin-top: 22px;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: clamp(1.15rem, 2.5vw, 1.65rem);
+      letter-spacing: -0.01em;
+      color: #fff;
+    }
 
     /* ============ Footer ============ */
     .site-footer {
@@ -2251,6 +2301,9 @@
     .modal-sub { font-size: 0.875rem; color: var(--muted); margin-top: 4px; }
     .modal-label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--ink-soft); margin: 18px 0 6px; }
     .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+    .tos-points { list-style: none; margin: 14px 0; padding: 0; display: grid; gap: 8px; }
+    .tos-points li { position: relative; padding-left: 20px; font-size: 0.875rem; color: var(--ink-soft); line-height: 1.5; }
+    .tos-points li::before { content: ""; position: absolute; left: 0; top: 8px; width: 7px; height: 7px; border-radius: 2px; background: var(--red); }
     .btn-ghost { background: transparent; border: 1px solid var(--line); color: var(--ink-soft); }
     .btn-ghost:hover { border-color: var(--muted); }
     .modal-warning {
@@ -2260,6 +2313,7 @@
       font-size: 0.8125rem; font-weight: 500; line-height: 1.4;
     }
     .modal-warning svg { flex: none; margin-top: 1px; }
+    .modal-warning[hidden] { display: none; }  /* the hidden attr must beat display:flex */
     .key-reveal-row { display: flex; gap: 10px; align-items: stretch; }
     .key-reveal-value {
       flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap;
@@ -2317,6 +2371,10 @@
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16h2M13 12h2M17 8h2"/></svg></span>
                   <span><span class="nav-drop-title">Why it wins</span><span class="nav-drop-sub">Price &amp; speed, charted.</span></span>
                 </a>
+                <a href="#safety" class="nav-drop-item">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>
+                  <span><span class="nav-drop-title">Safety</span><span class="nav-drop-sub">Checked before it's built.</span></span>
+                </a>
                 <a href="#the-api" class="nav-drop-item">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg></span>
                   <span><span class="nav-drop-title">The API</span><span class="nav-drop-sub">One endpoint, cache included.</span></span>
@@ -2336,9 +2394,13 @@
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
                   <span><span class="nav-drop-title">Account</span><span class="nav-drop-sub">Keys &amp; usage stats.</span></span>
                 </a>
-                <a href="#/legal" class="nav-drop-item explore">
+                <a href="#/terms" class="nav-drop-item explore">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 7h14"/><path d="m5 7-2 6a4 4 0 0 0 8 0z"/><path d="m19 7-2 6a4 4 0 0 0 8 0z"/><path d="M8 21h8"/></svg></span>
-                  <span><span class="nav-drop-title">Legal</span><span class="nav-drop-sub">Privacy &amp; licensing.</span></span>
+                  <span><span class="nav-drop-title">Terms</span><span class="nav-drop-sub">Use &amp; licensing.</span></span>
+                </a>
+                <a href="#/privacy" class="nav-drop-item explore">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+                  <span><span class="nav-drop-title">Privacy</span><span class="nav-drop-sub">What we store.</span></span>
                 </a>
               </div>
             </div>
@@ -2417,12 +2479,12 @@
             <span class="dot"></span>
             Open license &middot; Grows with use &middot; OpenAI-compatible
           </div>
-          <h1 class="hero-title rise rise-2">Free, open images.<br><em>Shared by everyone.</em></h1>
+          <h1 class="hero-title rise rise-2">Free, open images.<br><em>Shaped by everyone.</em></h1>
           <p class="hero-subtitle rise rise-3">
-            A free, openly licensed image library that gets better the more it's used. Every prompt
-            returns the closest match in milliseconds; the phrases the library can't answer well yet
-            get generated in the background and added — so the pool keeps expanding and the matches
-            keep sharpening for everyone.
+            A free, openly licensed image library shaped by what people search for. Every prompt returns
+            the closest match in milliseconds; the ones the library can't answer yet are generated in the
+            background and added for everyone. It only grows because people use it — no searches, no new
+            images. The more we all search, the better it gets for all of us.
           </p>
           <div class="hero-cta rise rise-4">
             <a href="#/playground" class="btn-solid">Launch playground →</a>
@@ -2546,8 +2608,8 @@
       <section class="section" id="how-it-works">
         <div class="section-head">
           <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>How it works</div>
-          <h2 class="section-title">An image library that grows as more people use it</h2>
-          <p class="section-sub">Your request flows down, your image comes straight back up — and every new image joins the shared library, so the next person's prompt is more likely to be a hit.</p>
+          <h2 class="section-title">An image library <em>shaped by</em> the people who use it</h2>
+          <p class="section-sub">Your request flows down, your image comes straight back up — and every prompt you send shapes what gets built next. The library is a record of what people actually want; with no one searching, nothing new is ever made.</p>
         </div>
 
         <div class="flow">
@@ -2571,7 +2633,7 @@
                   The response
                 </div>
                 <div class="flow-bubble mono">https://cdn.wagmi.photos/img/pd12m-8f31…</div>
-                <div class="flow-meta">"result": "hit" · 41 ms · $0.04 saved</div>
+                <div class="flow-meta">"result": "hit" · 41 ms · $0.055 saved</div>
               </div>
               <div class="flow-arrow" style="color: var(--success);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></div>
             </div>
@@ -2633,6 +2695,13 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <!-- Manifesto: the library is shaped by demand -->
+      <section class="manifesto">
+        <h2>No users, no library.</h2>
+        <p>Every search is a vote for what gets made next. The library isn't ours — it's the shape of what everyone's looking for. Use it and you grow it.</p>
+        <span class="wagmi">We're all gonna make it.</span>
       </section>
 
       <!-- Features -->
@@ -2705,6 +2774,39 @@
           <p class="price-foot">Generation times vary with load and settings. A cache hit skips generation entirely — one vector search at the edge, and the image is on its way.</p>
           <p class="price-sources">Source: <a href="https://artificialanalysis.ai/image" target="_blank" rel="noopener">Artificial Analysis generation-time benchmarks</a> · retrieved July 2026. Cache-hit latency is the wagmi.photos edge target.</p>
         </div>
+        </div>
+      </section>
+
+      <!-- Safety -->
+      <section class="section" id="safety">
+        <div class="section-head">
+          <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>Safety</div>
+          <h2 class="section-title">Every prompt is checked before it's built</h2>
+          <p class="section-sub">Two filters run before we ever spend a GPU. If a prompt trips either one, we don't generate it — and you still get the closest image already in the library.</p>
+        </div>
+
+        <div class="flow-trio">
+          <div class="flow-card">
+            <div class="flow-card-head">
+              <span class="flow-head-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg></span>
+              Trademark &amp; brand filter
+            </div>
+            <p>Prompts that name brands, logos, or protected characters are stopped before generation — so we never mint images that infringe someone else's marks.</p>
+          </div>
+          <div class="flow-card">
+            <div class="flow-card-head">
+              <span class="flow-head-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>
+              Content moderation
+            </div>
+            <p>Every prompt runs an automated safety check — hate, violence, sexual, and self-harm — and anything flagged is turned away.</p>
+          </div>
+          <div class="flow-card">
+            <div class="flow-card-head">
+              <span class="flow-head-icon green"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></span>
+              Closest match, always
+            </div>
+            <p>A stopped prompt still returns the nearest image already in the library. You get a result — we just never generate the risky one.</p>
+          </div>
         </div>
       </section>
 
@@ -2789,7 +2891,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
     <span class="tk-key">"similarity"</span>: <span class="tk-num">0.9312</span>,
     <span class="tk-key">"source"</span>: <span class="tk-str">"pd12m"</span>,
     <span class="tk-key">"model_used"</span>: <span class="tk-str">"flux-schnell"</span>,
-    <span class="tk-key">"cost_saved_usd"</span>: <span class="tk-num">0.04</span>
+    <span class="tk-key">"cost_saved_usd"</span>: <span class="tk-num">0.055</span>
   }
 }</pre>
               </div>
@@ -2802,53 +2904,41 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
       <section class="section">
         <div class="section-head">
           <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>Pricing</div>
-          <h2 class="section-title">Simple, predictable pricing</h2>
-          <p class="section-sub">Scale your image generation without the scaling costs. No egress fees, no surprises.</p>
+          <h2 class="section-title">One plan. Every image.</h2>
+          <p class="section-sub">A free, openly licensed image library that gets better the more it's used — full-resolution and open to everyone, plus a single upgrade that adds a commercial license and unlimited access. Two dollars a month, cheaper than every stock site.</p>
         </div>
 
         <!-- Authoritative pricing cards — the #/pricing view clones this grid at startup -->
         <div class="pricing-grid" id="pricing-grid-src">
           <div class="pricing-card">
             <h3 class="price-title">Free</h3>
-            <p class="price-desc">Perfect for sandboxing, prototyping, and integrating the cache.</p>
-            <div class="price-value">$0<span class="price-period">/mo</span></div>
+            <p class="price-desc">Search the whole library and pull the closest match, instantly. It grows the more it's used — and so does what you get back.</p>
+            <div class="price-value">$0<span class="price-period">/forever</span></div>
             <ul class="price-features">
-              <li>Restricted cache lookup rate</li>
-              <li>Standard CDN asset delivery</li>
-              <li>Access to public domain index</li>
-              <li class="cross">Immediate GPU fallbacks</li>
-              <li class="cross">SLA uptime guarantees</li>
+              <li>Unlimited search &amp; instant closest-match</li>
+              <li>Full-resolution image URL in every response</li>
+              <li>Full open-license public library</li>
+              <li>Missing prompts generated in the background</li>
+              <li class="cross">Commercial-use license &amp; indemnity</li>
+              <li class="cross">Unlimited rate + API access</li>
             </ul>
-            <a href="#/playground" class="btn-outline">Launch demo</a>
+            <a href="#/playground" class="btn-outline">Start browsing</a>
           </div>
 
           <div class="pricing-card popular">
-            <div class="pricing-badge">Most popular</div>
-            <h3 class="price-title">Pro</h3>
-            <p class="price-desc">Unlimited semantic cache delivery and managed automatic fallbacks for production apps.</p>
-            <div class="price-value">$15<span class="price-period">/mo</span></div>
+            <div class="pricing-badge">Best value</div>
+            <h3 class="price-title">Unlimited</h3>
+            <p class="price-desc">Everything in Free, plus a clear commercial license and unlimited access — for a fraction of what every stock site charges.</p>
+            <div class="price-value">$2<span class="price-period">/mo</span></div>
+            <p class="price-fine" style="margin:-6px 0 0;font-size:13px;opacity:.62;">Billed annually at $24 · cancel anytime</p>
             <ul class="price-features">
-              <li>Unlimited semantic cache lookups</li>
-              <li>Managed automatic queue fallback</li>
-              <li>Z-Image-Turbo background compute</li>
-              <li>High-priority cache warming</li>
-              <li>SLA uptime guarantees</li>
+              <li>Everything in Free</li>
+              <li>Commercial-use license, no attribution</li>
+              <li>Unlimited downloads, no rate limits</li>
+              <li>Priority generation of your exact prompt</li>
+              <li>OpenAI-compatible API access</li>
             </ul>
-            <a href="#/playground" class="btn-solid red">Get started</a>
-          </div>
-
-          <div class="pricing-card">
-            <h3 class="price-title">BYOK</h3>
-            <p class="price-desc">Bring your own GMI Cloud keys. Private GPU generations, straight into the cache.</p>
-            <div class="price-value">$5<span class="price-period">/mo</span></div>
-            <ul class="price-features">
-              <li>Unlimited semantic cache lookups</li>
-              <li>Custom GMI Cloud GPU compute</li>
-              <li>Private object storage syncing</li>
-              <li>Dedicated key generation access</li>
-              <li>Zero markup on model generations</li>
-            </ul>
-            <a href="#/account" class="btn-outline">Bind your keys</a>
+            <a href="#/account" class="btn-solid red">Go Unlimited — $24/yr</a>
           </div>
         </div>
       </section>
@@ -2897,10 +2987,6 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
             <summary>Is it really free? What's the license?</summary>
             <div class="faq-answer">Images are shared under a permissive open license and free to use. You pay for <b>access</b> to the library through a plan (from $0/mo), never per image — and every cache hit is $0 to serve.</div>
           </details>
-          <details class="faq-item">
-            <summary>What is BYOK?</summary>
-            <div class="faq-answer">Bring Your Own Key. Plug in your own GMI Cloud GPU keys to run generations privately on your own compute, straight into the cache — for when you want your exact prompts built on demand rather than waiting on shared, demand-ranked backfill.</div>
-          </details>
         </div>
       </section>
     </div>
@@ -2910,7 +2996,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
       <div class="page-head">
         <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>Pricing</div>
         <h1 class="section-title">Simple, predictable pricing</h1>
-        <p class="section-sub">Scale your image-generation applications without the scaling costs. Choose the plan that fits your workload.</p>
+        <p class="section-sub">A free, open, full-resolution image library plus one simple upgrade — a commercial license and unlimited access for $2 a month.</p>
       </div>
 
       <!-- Populated at startup by cloning #pricing-grid-src (home section) — single source of truth -->
@@ -3250,7 +3336,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
   <span class="tk-key">"shared_cache"</span>: {
     <span class="tk-key">"result"</span>: <span class="tk-hit">"hit"</span>,
     <span class="tk-key">"similarity"</span>: <span class="tk-num">0.93</span>,
-    <span class="tk-key">"cost_saved_usd"</span>: <span class="tk-num">0.04</span>,
+    <span class="tk-key">"cost_saved_usd"</span>: <span class="tk-num">0.055</span>,
     <span class="tk-key">"model_used"</span>: <span class="tk-str">"flux-schnell"</span>,
     <span class="tk-key">"source"</span>: <span class="tk-str">"pd12m"</span>,
     <span class="tk-key">"sizes"</span>: { <span class="tk-key">"thumb"</span>: <span class="tk-str">"…"</span>, <span class="tk-key">"medium"</span>: <span class="tk-str">"…"</span>, <span class="tk-key">"large"</span>: <span class="tk-str">"…"</span> },
@@ -3615,37 +3701,125 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       </div>
     </div>
 
-    <div id="view-legal" class="spa-view">
+    <div id="view-terms" class="spa-view">
       <div class="view-pad">
       <div class="glass-card">
         <div class="legal-content">
-          <h1 style="font-family: var(--font-display); font-size: 2.25rem; font-weight: 800; color: var(--ink); margin-bottom: 24px;">Legal &amp; Usage Policy</h1>
+          <h1 style="font-family: var(--font-display); font-size: 2.25rem; font-weight: 800; color: var(--ink); margin-bottom: 24px;">Terms of Use</h1>
 
           <p style="font-size: 1.125rem; color: var(--muted); margin-bottom: 24px;">
-            Effective Date: July 1, 2026
+            Effective Date: July 8, 2026 · Version 2026-07-08
           </p>
 
-          <h2>1. Privacy Policy</h2>
-          <p>
-            What we store, and why:
-          </p>
+          <p>These terms are an agreement between you and <a href="https://suppers.ai/" target="_blank" rel="noopener" style="color: var(--red); text-decoration: none; font-weight: 600;">Suppers Software Limited</a> ("we", "us"), a company based in Hamilton, New Zealand, which operates wagmi.photos ("the service"). By creating an account or using the service, you accept them. If you don't agree, please don't use the service.</p>
+
+          <h2>1. Who can use it</h2>
+          <p>You must be at least 18, or the age of majority where you live, and able to enter a binding agreement. If you use the service for an organization, you confirm you're authorized to accept these terms on its behalf.</p>
+
+          <h2>2. The service</h2>
+          <p>wagmi.photos is a shared, semantic image cache. Your prompt is matched against an openly licensed library and the closest image is returned instantly; genuinely new prompts are generated in the background by a shared worker and added to the library. A free tier and a paid upgrade are offered — current prices are on the pricing page and may change.</p>
+
+          <h2>3. Your account</h2>
+          <p>Sign-in is by magic link sent to your email. You're responsible for your account, your email inbox, and any API keys you create — keys are shown once, so keep them safe. Don't share your access or let others use your account, and tell us promptly if you suspect unauthorized use.</p>
+
+          <h2>4. Acceptable use</h2>
+          <p>You agree that:</p>
           <ul>
-            <li><strong>Your email address:</strong> Logging in works by magic link — you give us your email, we send you a sign-in link. We store that email server-side to operate your account. It is not sold or shared.</li>
-            <li><strong>Session cookie:</strong> After you open the login link, a session cookie keeps you logged in. It is HttpOnly and used only to authenticate you to your own account.</li>
-            <li><strong>API keys as hashes:</strong> API keys are shown to you exactly once, at creation. Server-side we store only a SHA-256 hash of each key — we cannot recover or display the key itself, so keep your copy safe.</li>
-            <li><strong>Prompts and images:</strong> This is a shared cache. Prompts you send are stored (with demand counts) to match requests and rank background generation, and generated images join the shared, openly licensed library. Do not put private or personal information in prompts.</li>
-            <li><strong>Local browser state:</strong> The playground's telemetry counters and session history live only in your browser and can be cleared any time from the Account page.</li>
-            <li><strong>Encrypted transit:</strong> All communication with wagmi.photos is encrypted via HTTPS.</li>
+            <li><strong>Your prompts and their outputs are your responsibility.</strong> You will not request, generate, download, or redistribute images that infringe any third party's copyright, trademark, publicity, or other rights, or that are illegal, harmful, or that violate our content rules.</li>
+            <li><strong>You will not attempt</strong> to produce sexual content involving minors, realistic depictions of identifiable real people without consent, or other prohibited or unlawful content.</li>
+            <li><strong>You will not abuse the service</strong> — no denial-of-service, scraping, cache pollution, reverse engineering, bulk extraction of the library, or circumventing our filters, rate limits, or security.</li>
           </ul>
 
-          <h2>2. Terms of Use &amp; Data Licensing</h2>
-          <p>
-            By using wagmi.photos, you agree to comply with the terms of our backend caching logic and the licenses of our creative catalogs:
-          </p>
+          <h2>5. Filtering and moderation</h2>
+          <p>Before generation we screen prompts with a trademark/brand denylist and automated content moderation, and we may refuse a prompt, remove content, or suspend an account. Screening is a safeguard, not a guarantee — you remain responsible for your use and outputs.</p>
+
+          <h2>6. Content and the shared library</h2>
+          <p>This is a shared cache: prompts you submit and the images generated for them join the openly licensed library so future requests can reuse them. By submitting a prompt you grant us a worldwide, royalty-free license to store, process, display, and redistribute the prompt and its resulting image as part of that library. You confirm you have the right to submit each prompt, and you agree not to include private or personal information in prompts.</p>
+
+          <h2>7. Ownership and licensing</h2>
           <ul>
-            <li><strong>Public Domain Data:</strong> wagmi.photos leverages the <strong>PD12M</strong> dataset from Spawning. This dataset is licensed under the <a href="https://spdx.org/licenses/CDLA-Permissive-2.0" target="_blank" style="color: var(--red); text-decoration: none; font-weight: 600;">CDLA-Permissive-2.0</a> agreement. You are permitted to copy, distribute, modify, and utilize all pre-seeded images for commercial or personal purposes without attribution.</li>
-            <li><strong>Fair Use:</strong> You agree not to abuse the cache endpoints through coordinated denial-of-service, scraping, or cache pollution. Misses are queued and generated in the background by the shared backend, ranked by demand; requests are rate-limited to keep that fair.</li>
+            <li><strong>Seeded catalog:</strong> the pre-seeded images come from the <strong>PD12M</strong> dataset (Spawning), licensed <a href="https://spdx.org/licenses/CDLA-Permissive-2.0" target="_blank" style="color: var(--red); text-decoration: none; font-weight: 600;">CDLA-Permissive-2.0</a> — you may copy, distribute, modify, and use them for commercial or personal purposes without attribution.</li>
+            <li><strong>Generated images:</strong> outputs are produced by third-party AI models. As between you and us, you may use the outputs returned to you, subject to those providers' terms. Note that purely AI-generated images may not qualify for copyright protection, and we make no warranty that any output is free of protected or trademarked content.</li>
           </ul>
+
+          <h2>8. Disclaimers</h2>
+          <p>The service and all outputs are provided "as is" and "as available", without warranties of any kind — including non-infringement, merchantability, fitness for a particular purpose, accuracy, or uninterrupted availability.</p>
+
+          <h2>9. Limitation of liability</h2>
+          <p>To the fullest extent permitted by law, we are not liable for indirect, incidental, special, or consequential damages, or for lost profits or data. Our total liability for any claim is limited to the greater of what you paid us in the three months before the claim, or US$50.</p>
+
+          <h2>10. Indemnification</h2>
+          <p>You will indemnify and hold wagmi.photos harmless from claims, damages, liabilities, and reasonable costs (including legal fees) arising from your prompts, your use of the service, your outputs, or your breach of these terms.</p>
+
+          <h2>11. Suspension and termination</h2>
+          <p>You may stop using the service and delete your account at any time. We may suspend or end access if you breach these terms or to protect the service or others. Content already contributed to the shared library may remain after your account is closed.</p>
+
+          <h2>12. Changes</h2>
+          <p>We may update the service and these terms. When we make a material change to these terms we bump the version and ask you to accept the new version before continuing; continued use after minor changes means you accept them.</p>
+
+          <h2>13. Governing law</h2>
+          <p>These terms are governed by the laws of New Zealand, without regard to conflict-of-law rules, and you agree to the exclusive jurisdiction of the New Zealand courts.</p>
+
+          <h2>14. Contact</h2>
+          <p>Questions about these terms: <a href="mailto:support@suppers.ai" style="color: var(--red); text-decoration: none; font-weight: 600;">support@suppers.ai</a>. wagmi.photos is a service of <a href="https://suppers.ai/" target="_blank" rel="noopener" style="color: var(--red); text-decoration: none; font-weight: 600;">Suppers Software Limited</a>, Hamilton, New Zealand.</p>
+
+          <p style="margin-top: 24px;">See also our <a href="#/privacy" style="color: var(--red); text-decoration: none; font-weight: 600;">Privacy Policy</a>.</p>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <div id="view-privacy" class="spa-view">
+      <div class="view-pad">
+      <div class="glass-card">
+        <div class="legal-content">
+          <h1 style="font-family: var(--font-display); font-size: 2.25rem; font-weight: 800; color: var(--ink); margin-bottom: 24px;">Privacy Policy</h1>
+
+          <p style="font-size: 1.125rem; color: var(--muted); margin-bottom: 24px;">
+            Effective Date: July 8, 2026
+          </p>
+
+          <p>wagmi.photos is operated by <a href="https://suppers.ai/" target="_blank" rel="noopener" style="color: var(--red); text-decoration: none; font-weight: 600;">Suppers Software Limited</a> (Hamilton, New Zealand), the data controller. This explains what we collect, why, and who processes it.</p>
+
+          <h2>1. What we collect</h2>
+          <ul>
+            <li><strong>Email address</strong> — for magic-link sign-in and to operate your account. Not sold, and not shared except with the providers below to run the service.</li>
+            <li><strong>Session cookie</strong> — one HttpOnly, essential cookie that keeps you signed in. No advertising or tracking cookies.</li>
+            <li><strong>API keys, as hashes</strong> — stored only as a SHA-256 hash; we cannot recover or display the key itself, so keep your copy safe.</li>
+            <li><strong>Prompts and images</strong> — stored (with demand counts) to run the shared cache and rank background generation; generated images join the shared, openly licensed library. Please don't put private or personal information in prompts.</li>
+            <li><strong>Terms-acceptance record</strong> — when you accept our Terms of Use we record the version, the time, your IP address, and your browser's user-agent, as proof of consent.</li>
+            <li><strong>Local browser state</strong> — the playground's counters and history live only in your browser and can be cleared any time from the Account page.</li>
+          </ul>
+
+          <h2>2. How we use it</h2>
+          <p>To operate your account, run and rank the shared cache, keep the service safe (prompt filtering and moderation), prove consent, and prevent abuse. We don't sell your data.</p>
+
+          <h2>3. Who processes your data</h2>
+          <p>We rely on these providers to run the service; your prompts and/or account data pass through them:</p>
+          <ul>
+            <li><strong>Cloudflare</strong> — hosting, the edge worker, prompt embeddings, vector search, and the account database.</li>
+            <li><strong>OpenAI</strong> — automated safety moderation of prompt text before generation.</li>
+            <li><strong>GMI Cloud</strong> — image generation for cache misses (receives the prompt).</li>
+            <li><strong>Backblaze B2</strong> — durable storage of the images.</li>
+            <li><strong>Resend</strong> — sends your magic-link sign-in emails.</li>
+          </ul>
+
+          <h2>4. Retention</h2>
+          <p>Account data is kept while your account exists. Prompts and images contributed to the shared cache persist as part of the library. Acceptance and security records are kept as long as needed for legal and safety purposes.</p>
+
+          <h2>5. Your choices</h2>
+          <p>You can delete your API keys any time, and request deletion of your account by contacting us. Images already contributed to the shared library may remain.</p>
+
+          <h2>6. Security</h2>
+          <p>All communication with wagmi.photos is encrypted with HTTPS, API keys are stored only as hashes, and the session cookie is HttpOnly.</p>
+
+          <h2>7. Children</h2>
+          <p>The service isn't intended for anyone under 18 (or the age of majority where you live).</p>
+
+          <h2>8. Changes &amp; contact</h2>
+          <p>We may update this policy; the effective date shows the latest version. Privacy questions: <a href="mailto:support@suppers.ai" style="color: var(--red); text-decoration: none; font-weight: 600;">support@suppers.ai</a>.</p>
+
+          <p style="margin-top: 24px;">See also our <a href="#/terms" style="color: var(--red); text-decoration: none; font-weight: 600;">Terms of Use</a>.</p>
         </div>
       </div>
       </div>
@@ -3660,7 +3834,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         <img src="/assets/logo.webp" alt="" width="22" height="22">
         <span><b>wagmi<span class="logo-tld">.photos</span></b> — semantic image cache</span>
       </div>
-      <span>Seeded with PD12M · CDLA-Permissive-2.0</span>
+      <span>A <a href="https://suppers.ai/" target="_blank" rel="noopener" style="color: var(--ink-soft); text-decoration: none; font-weight: 600;">Suppers Software Limited</a> project · Hamilton, NZ · Seeded with PD12M (CDLA-Permissive-2.0)</span>
       <div class="footer-links">
         <a href="#/playground">Playground</a>
         <a href="#/library">Library</a>
@@ -3669,7 +3843,8 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         <a href="#/matching">Matching</a>
         <a href="#/agents">Agents</a>
         <a href="#/pricing">Pricing</a>
-        <a href="#/legal">Legal</a>
+        <a href="#/terms">Terms</a>
+        <a href="#/privacy">Privacy</a>
       </div>
     </div>
   </footer>
@@ -3703,6 +3878,25 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         <div class="modal-actions">
           <button class="btn btn-primary" onclick="closeCreateKey()">Done</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Acceptable Use gate: shown when a signed-in user hasn't accepted the current AUP -->
+  <div id="tos-gate" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <h3 class="modal-title">One thing before you start</h3>
+      <p class="modal-sub">Please accept our Acceptable Use Policy to use wagmi.photos.</p>
+      <ul class="tos-points">
+        <li>You're responsible for your prompts and the images they produce.</li>
+        <li>You won't request content that infringes a trademark, copyright, or other right, or that is otherwise illegal.</li>
+        <li>You indemnify wagmi.photos for claims arising from your use of the service.</li>
+      </ul>
+      <p class="modal-sub">Full text: <a href="#/terms" target="_blank" rel="noopener">Terms of Use&nbsp;↗</a></p>
+      <p id="tos-error" class="modal-warning" hidden>Couldn't save that — please try again.</p>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="tos-decline">Log out</button>
+        <button class="btn-solid red" id="tos-agree">I agree</button>
       </div>
     </div>
   </div>
@@ -3753,7 +3947,9 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         updateStats();
         loadKeys();
       } },
-      '#/legal':      { view: 'view-legal' },
+      '#/terms':      { view: 'view-terms' },
+      '#/privacy':    { view: 'view-privacy' },
+      '#/legal':      { view: 'view-terms' },   // legacy alias -> Terms
       '#/docs':       { view: 'view-docs', link: 'nav-docs' },
       '#/openai':     { view: 'view-openai', link: 'nav-openai' },
       '#/matching':   { view: 'view-matching', link: 'nav-matching' },
@@ -3769,7 +3965,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     };
     const PATH_TO_HASH = {
       '/playground': '#/playground', '/docs': '#/docs', '/pricing': '#/pricing',
-      '/account': '#/account', '/legal': '#/legal', '/openai': '#/openai',
+      '/account': '#/account', '/terms': '#/terms', '/privacy': '#/privacy', '/legal': '#/terms', '/openai': '#/openai',
       '/matching': '#/matching', '/clip': '#/matching', '/agents': '#/agents',
       '/library': '#/library',
     };
@@ -3846,10 +4042,30 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     async function fetchMe() {
       try {
         const r = await fetch('/v1/me', { credentials: 'same-origin' });
-        currentUser = r.ok ? (await r.json()).user : null;
+        if (r.ok) { const me = await r.json(); currentUser = me.user; showTosGate(me.tos); }
+        else { currentUser = null; }
       } catch { currentUser = null; }
       renderAuthNav();
     }
+    // Acceptable-Use gate: block the signed-in experience until the current AUP is accepted.
+    function showTosGate(tos) {
+      const gate = document.getElementById('tos-gate');
+      if (gate) gate.hidden = !(currentUser && tos && tos.accepted === false);
+    }
+    document.getElementById('tos-agree')?.addEventListener('click', async () => {
+      const err = document.getElementById('tos-error');
+      const btn = document.getElementById('tos-agree');
+      err.hidden = true; btn.disabled = true;
+      try {
+        const r = await fetch('/v1/auth/accept-tos', { method: 'POST', credentials: 'same-origin' });
+        if (!r.ok) throw new Error('accept failed');
+        document.getElementById('tos-gate').hidden = true;
+      } catch { err.hidden = false; } finally { btn.disabled = false; }
+    });
+    document.getElementById('tos-decline')?.addEventListener('click', async () => {
+      try { await fetch('/v1/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch {}
+      location.hash = '#/'; location.reload();
+    });
     function renderAuthNav() {
       // Logged in: avatar button with an Account/Log out dropdown. Logged out: a Log in link.
       const login = document.getElementById('auth-login');

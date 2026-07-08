@@ -5,7 +5,7 @@ import { sha256Hex } from "../src/auth";
 import type { AssetRow } from "../src/types";
 
 const BASE = "https://cdn.example.com";
-const cfg = { floorSimMax: 0.35, floorSimMin: 0.18, imagePrice: 0.04, now: () => 1000, assetBaseUrl: BASE };
+const cfg = { floorSimMax: 0.35, floorSimMin: 0.18, imagePrice: 0.055, now: () => 1000, assetBaseUrl: BASE };
 
 function asset(over: Partial<AssetRow> = {}): AssetRow {
   return { id: "a1", prompt: "p", source: "pd12m", source_id: "7",
@@ -61,7 +61,7 @@ it("hit: score >= floor, cached -> result hit + cost saved", async () => {
   expect(res.status).toBe(200);
   expect(j.data[0].url).toBe(`${BASE}/assets/a1/image.webp`);
   expect(j.shared_cache.result).toBe("hit");
-  expect(j.shared_cache.cost_saved_usd).toBe(0.04);
+  expect(j.shared_cache.cost_saved_usd).toBe(0.055);
   expect(j.shared_cache.sizes).toEqual({
     thumb: `${BASE}/assets/a1/thumb.webp`, medium: `${BASE}/assets/a1/medium.webp`, large: `${BASE}/assets/a1/image.webp`,
   });
