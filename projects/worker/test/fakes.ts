@@ -26,10 +26,23 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
       deleteKey: async (u, id) => { if (keyOwners.get(id) === u) keyOwners.delete(id); },
     },
     rateLimiter: { limit: async () => true },
-    users: { upsertByEmail: async (id, email) => ({ id, email }), getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null, tos_version: null, tos_accepted_at: null }), acceptTos: async () => {} },
+    rateLimiterPaid: { limit: async () => true },
+    users: {
+      upsertByEmail: async (id, email) => ({ id, email }),
+      getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null, tos_version: null, tos_accepted_at: null, stripe_customer_id: null, stripe_subscription_id: null, plan_status: null, plan_current_period_end: null }),
+      acceptTos: async () => {},
+      getByStripeCustomerId: async () => null,
+      setStripeCustomer: async () => {},
+      setSubscriptionByCustomer: async () => {},
+    },
     sessions: { create: async () => {}, resolve: async () => null, touch: async () => {}, delete: async () => {}, purgeExpired: async () => {} },
     loginTokens: { create: async (_hash: string, _email: string, _nonceHash: string) => {}, consume: async (_hash: string, _nonceHash: string) => null, purgeExpired: async () => {} },
     email: { sendMagicLink: async () => {} },
+    stripe: {
+      createCustomer: async () => ({ id: "cus_fake" }),
+      createCheckoutSession: async () => ({ url: "https://checkout.stripe/fake" }),
+      createPortalSession: async () => ({ url: "https://portal.stripe/fake" }),
+    },
   };
   // expose internals for assertions
   (base as any)._assets = assets;
