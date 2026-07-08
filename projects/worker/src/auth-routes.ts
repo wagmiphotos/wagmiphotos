@@ -6,6 +6,7 @@ import {
   serializeLoginNonceCookie, clearLoginNonceCookie, LOGIN_NONCE_COOKIE,
 } from "./session";
 import { emailIsDevMode } from "./email";
+import { planView } from "./entitlement";
 
 export interface AuthCfg { token?: () => string; nonce?: () => string; verifyBase: string; now?: () => number; }
 
@@ -75,6 +76,7 @@ export async function handleMe(request: Request, env: Env, s: Services): Promise
   if (!user) return Response.json({ error: "not authenticated" }, { status: 401 });
   return Response.json({
     user: { id: user.id, email: user.email },
+    plan: planView(user),
     tos: {
       current_version: TOS_VERSION,
       accepted: user.tos_version === TOS_VERSION,

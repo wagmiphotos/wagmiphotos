@@ -197,3 +197,11 @@ it("logout: clears cookie + deletes session", async () => {
   expect(res.headers.get("Set-Cookie")).toContain("Max-Age=0");
   expect(deleted).toBe(await sha256Hex("tok"));
 });
+
+it("me includes the plan projection", async () => {
+  const paid = svc({ users: { upsertByEmail: async (id: string, email: string) => ({ id, email }), getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null, tos_version: null, tos_accepted_at: null, stripe_customer_id: "cus_1", stripe_subscription_id: "sub_1", plan_status: "active", plan_current_period_end: "2027-07-08T00:00:00.000Z" }), acceptTos: async () => {} } });
+  const req = new Request("https://x/v1/me", { headers: { Cookie: `${SESSION_COOKIE}=s` } });
+  const res = await handleMe(req, {} as any, paid);
+  const j: any = await res.json();
+  expect(j.plan).toEqual({ active: true, status: "active", current_period_end: "2027-07-08T00:00:00.000Z" });
+});
