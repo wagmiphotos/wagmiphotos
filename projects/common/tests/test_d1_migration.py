@@ -86,9 +86,18 @@ def test_pending_queries_sql_selects_and_filters(conn):
                 claimed_at="2000-01-01 00:00:00")                 # reclaimable
     _seed_query(conn, "fresh claim", status="building",
                 claimed_at=conn.execute("SELECT datetime('now')").fetchone()[0])
-    rows = conn.execute(d1_client.PENDING_QUERIES_SQL, [10]).fetchall()
+    rows = conn.execute(d1_client.PENDING_QUERIES_SQL, [1, 10]).fetchall()
     got = {r[0] for r in rows}
     assert got == {"a fox", "stale claim"}
+
+
+def test_pending_queries_sql_min_count_threshold(conn):
+    _seed_query(conn, "hot", count=12)
+    _seed_query(conn, "warm", count=10)
+    _seed_query(conn, "cold", count=3)
+    # min_count=10 keeps prompts requested >= 10 times, drops the one-off/low-demand
+    rows = conn.execute(d1_client.PENDING_QUERIES_SQL, [10, 50]).fetchall()
+    assert {r[0] for r in rows} == {"hot", "warm"}
 
 
 def test_claim_sql_claims_once_and_reclaims_stale(conn):

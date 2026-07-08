@@ -13,10 +13,11 @@ def _client(monkeypatch, rows=None):
 def test_pending_queries_orders_and_maps(monkeypatch):
     rows = [[{"normalized_prompt": "a fox", "original_prompt": "A Fox", "count": 5}]]
     c, calls = _client(monkeypatch, rows)
-    out = c.pending_queries(10)
+    out = c.pending_queries(10, min_count=3)
     assert out == [QueryRow("a fox", "A Fox", 5)]
     sql, params = calls[0]
-    assert "status='pending'" in sql and "ORDER BY count DESC" in sql and params == [10]
+    assert "status='pending'" in sql and "ORDER BY count DESC" in sql and params == [3, 10]
+    assert "count >= ?" in sql  # demand threshold: skip one-off prompts
     assert "generate=1" in sql  # opted-out prompts are never picked up by the backfill
     assert "attempts < 5" in sql  # poisoned prompts fall out of the queue
     assert "building" in sql and "-15 minutes" in sql  # stale claims are reclaimable

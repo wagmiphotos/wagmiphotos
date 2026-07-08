@@ -15,10 +15,12 @@ class Settings(BaseSettings):
     b2_region: str = "us-west-004"
     b2_public_url_base: str | None = None
     embedding_dims: int = 768
-    default_image_model: str = "Z-Image-Turbo"
+    default_image_model: str = "gpt-image-2-generate"
+    generation_size: str = "1024x1024"   # model-dependent (Seedream needs 2048x2048)
     hf_token: str | None = None
     default_provider: str = "gmicloud"
-    image_price_usd: float = 0.01
+    image_price_usd: float = 0.055   # gpt-image-2-generate @ 1024x1024 medium; quality-dependent
+    generation_min_requests: int = 10   # backfill only builds prompts requested >= this many times
     worker_interval_seconds: int = 300
     worker_batch_size: int = 5
     worker_max_spend_usd: float = 5.0

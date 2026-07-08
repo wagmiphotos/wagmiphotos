@@ -21,11 +21,13 @@ class FakeD1:
         self.dead: dict[str, str] = {}
 
     # -- queries ----------------------------------------------------------
-    def pending_queries(self, limit):
+    def pending_queries(self, limit, min_count=1):
         # Claim filtering is deliberately NOT applied here: the SQL does it,
         # but the select->claim race is exactly what claim_query() guards, so
-        # tests can hand a claimed row to the worker.
-        out = [q for q in self.pending if self.attempts.get(q.normalized_prompt, 0) < 5]
+        # tests can hand a claimed row to the worker. The demand threshold IS
+        # applied (the SQL filters count >= min_count).
+        out = [q for q in self.pending
+               if self.attempts.get(q.normalized_prompt, 0) < 5 and q.count >= min_count]
         return out[:limit]
 
     def claim_query(self, normalized_prompt):

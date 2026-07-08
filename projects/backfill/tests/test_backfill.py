@@ -72,6 +72,39 @@ async def test_generate_pass_builds_pending_and_upserts(monkeypatch):
     assert all(a.provider == "gmicloud" for a in d1.inserted)
 
 @pytest.mark.asyncio
+async def test_generate_pass_uses_configured_generation_size():
+    # Generation size is model-dependent (Seedream rejects 1024x1024, needs
+    # 2048x2048), so the worker must pass its configured size to the generator.
+    class SizeRecordingStub(StubGenerator):
+        def __init__(self, storage):
+            super().__init__(storage); self.sizes = []
+        async def generate(self, prompt, *, model, size="1024x1024", provider_api_key=None):
+            self.sizes.append(size)
+            return await super().generate(prompt, model=model, size=size)
+    d1, vec = FakeD1(), FakeVectorize()
+    d1.pending = [QueryRow("p", "p", 1)]
+    storage = InMemoryStorage()
+    gen = SizeRecordingStub(storage)
+    w = BackfillWorker(d1, vec, FakeEmbedder(), gen, storage, model=TEST_MODEL,
+                       floor_sim_max=0.35, floor_sim_min=0.18, generation_size="2048x2048")
+    await w.generate_pass()
+    assert gen.sizes == ["2048x2048"]
+
+
+@pytest.mark.asyncio
+async def test_generate_pass_skips_below_min_requests():
+    # Demand gate: don't spend on one-off prompts — only build ones requested
+    # at least generation_min_requests times.
+    d1, vec = FakeD1(), FakeVectorize()
+    d1.pending = [QueryRow("hot", "hot", 12), QueryRow("cold", "cold", 3)]
+    w = _worker(d1, vec, batch_size=5, max_spend_usd=100.0, price_usd=0.04,
+                generation_min_requests=10)
+    built = await w.generate_pass()
+    assert built == 1                        # only 'hot' (12 >= 10) generates
+    assert [b[0] for b in d1.built] == ["hot"]   # 'cold' (3) is below the threshold
+
+
+@pytest.mark.asyncio
 async def test_generate_pass_rechecks_and_skips(monkeypatch):
     d1, vec = FakeD1(), FakeVectorize()
     d1.assets["existing"] = {"id": "existing"}     # the matched id really exists in D1

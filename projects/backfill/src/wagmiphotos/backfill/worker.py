@@ -36,7 +36,9 @@ class BackfillWorker:
                  floor_sim_max: float = 0.87, floor_sim_min: float = 0.75, batch_size: int = 5,
                  max_spend_usd: float = 5.0, price_usd: float = 0.04,
                  max_lifetime_spend_usd: float | None = None,
-                 max_rehost_bytes: int = DEFAULT_MAX_REHOST_BYTES):
+                 max_rehost_bytes: int = DEFAULT_MAX_REHOST_BYTES,
+                 generation_size: str = "1024x1024",
+                 generation_min_requests: int = 1):
         self._d1 = d1
         self._vec = vectorize
         self._embedder = embedder
@@ -51,6 +53,8 @@ class BackfillWorker:
         self._max_rehost_bytes = max_rehost_bytes
         self._price = price_usd
         self._model = model
+        self._gen_size = generation_size
+        self._min_requests = generation_min_requests
 
     # -- spend accounting ---------------------------------------------------
 
@@ -76,7 +80,7 @@ class BackfillWorker:
     async def generate_pass(self) -> int:
         built = 0
         self._pass_spent = 0.0
-        for q in self._d1.pending_queries(self._batch):
+        for q in self._d1.pending_queries(self._batch, self._min_requests):
             # Claim before doing any work so two workers (or one worker racing
             # Vectorize's eventual consistency) can't double-generate a prompt.
             if not self._d1.claim_query(q.normalized_prompt):
@@ -104,7 +108,7 @@ class BackfillWorker:
         return built
 
     async def _generate_one(self, q: QueryRow, prompt_vec: list[float]) -> None:
-        gen = await self._gen.generate(q.original_prompt, model=self._model, size="1024x1024")
+        gen = await self._gen.generate(q.original_prompt, model=self._model, size=self._gen_size)
         # The provider was paid the moment generate() returned — record the
         # spend durably before any downstream step can fail.
         self._record_spend(self._price)
@@ -243,4 +247,5 @@ def build_worker_from_settings(s) -> "BackfillWorker":
                           floor_sim_max=s.floor_sim_max, floor_sim_min=s.floor_sim_min,
                           batch_size=s.worker_batch_size, max_spend_usd=s.worker_max_spend_usd,
                           max_lifetime_spend_usd=s.worker_max_lifetime_spend_usd,
-                          price_usd=s.image_price_usd)
+                          price_usd=s.image_price_usd, generation_size=s.generation_size,
+                          generation_min_requests=s.generation_min_requests)

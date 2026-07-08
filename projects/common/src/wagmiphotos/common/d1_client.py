@@ -29,7 +29,7 @@ _CLAIMABLE = ("(status='pending' OR (status='building' AND "
 PENDING_QUERIES_SQL = (
     "SELECT normalized_prompt, original_prompt, count FROM queries "
     f"WHERE {_CLAIMABLE} AND generate=1 AND attempts < {MAX_QUERY_ATTEMPTS} "
-    "ORDER BY count DESC LIMIT ?")
+    "AND count >= ? ORDER BY count DESC LIMIT ?")
 
 CLAIM_QUERY_SQL = (
     "UPDATE queries SET status='building', claimed_at=datetime('now') "
@@ -123,8 +123,8 @@ class D1Client:
         """Run one statement; return the affected-row count."""
         return int(self._exec(sql, params).get("meta", {}).get("changes", 0))
 
-    def pending_queries(self, limit: int) -> list[QueryRow]:
-        rows = self._query(PENDING_QUERIES_SQL, [limit])
+    def pending_queries(self, limit: int, min_count: int = 1) -> list[QueryRow]:
+        rows = self._query(PENDING_QUERIES_SQL, [min_count, limit])
         return [QueryRow(r["normalized_prompt"], r["original_prompt"], int(r["count"])) for r in rows]
 
     def claim_query(self, normalized_prompt: str) -> bool:
