@@ -23,7 +23,7 @@ export interface User { id: string; email: string; created_at: string; last_logi
 export interface UserStore {
   upsertByEmail(id: string, email: string): Promise<{ id: string; email: string }>;
   getById(id: string): Promise<User | null>;
-  acceptTos(userId: string, version: string): Promise<void>;
+  acceptTos(userId: string, version: string, ip: string | null, userAgent: string | null): Promise<void>;
 }
 export interface SessionStore {
   create(userId: string, tokenHash: string): Promise<void>;

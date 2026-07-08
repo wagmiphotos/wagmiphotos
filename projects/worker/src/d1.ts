@@ -96,9 +96,14 @@ export function makeD1Stores(db: D1Database): {
       const row = await db.prepare("SELECT id, email, created_at, last_login, tos_version, tos_accepted_at FROM users WHERE id = ?").bind(id).first<User>();
       return row ?? null;
     },
-    async acceptTos(userId, version) {
-      await db.prepare("UPDATE users SET tos_version = ?, tos_accepted_at = datetime('now') WHERE id = ?")
-        .bind(version, userId).run();
+    async acceptTos(userId, version, ip, userAgent) {
+      // Append the immutable audit row and refresh the current-status columns together.
+      await db.batch([
+        db.prepare("INSERT INTO tos_acceptances (user_id, tos_version, ip, user_agent) VALUES (?, ?, ?, ?)")
+          .bind(userId, version, ip, userAgent),
+        db.prepare("UPDATE users SET tos_version = ?, tos_accepted_at = datetime('now') WHERE id = ?")
+          .bind(version, userId),
+      ]);
     },
   };
 

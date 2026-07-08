@@ -176,12 +176,13 @@ it("me: reports ToS acceptance status against the current version", async () => 
   expect(b2.tos.accepted).toBe(true);
 });
 
-it("accept-tos: records acceptance of the current version for the session user; 401 anon", async () => {
+it("accept-tos: records version + IP + user-agent for the session user; 401 anon", async () => {
   let recorded: any = null;
-  const s = svc({ users: { getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null, tos_version: null, tos_accepted_at: null }), acceptTos: async (uid: string, v: string) => { recorded = { uid, v }; } } });
-  const ok = await handleAcceptTos(new Request("https://x/v1/auth/accept-tos", { method: "POST", headers: { Cookie: `${SESSION_COOKIE}=tok` } }), {} as any, s);
+  const s = svc({ users: { getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null, tos_version: null, tos_accepted_at: null }), acceptTos: async (uid: string, v: string, ip: string | null, ua: string | null) => { recorded = { uid, v, ip, ua }; } } });
+  const req = new Request("https://x/v1/auth/accept-tos", { method: "POST", headers: { Cookie: `${SESSION_COOKIE}=tok`, "CF-Connecting-IP": "203.0.113.7", "User-Agent": "TestBrowser/1.0" } });
+  const ok = await handleAcceptTos(req, {} as any, s);
   expect(ok.status).toBe(200);
-  expect(recorded).toEqual({ uid: "usr_1", v: TOS_VERSION });
+  expect(recorded).toEqual({ uid: "usr_1", v: TOS_VERSION, ip: "203.0.113.7", ua: "TestBrowser/1.0" });
 
   const anon = svc({ sessions: { resolve: async () => null, touch: async () => {}, create: async () => {}, delete: async () => {}, purgeExpired: async () => {} } });
   const res = await handleAcceptTos(new Request("https://x/v1/auth/accept-tos", { method: "POST" }), {} as any, anon);

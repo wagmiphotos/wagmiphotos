@@ -86,7 +86,10 @@ export async function handleMe(request: Request, env: Env, s: Services): Promise
 export async function handleAcceptTos(request: Request, env: Env, s: Services): Promise<Response> {
   const principal = await resolveSession(request, env, s.sessions);
   if (!principal) return Response.json({ error: "not authenticated" }, { status: 401 });
-  await s.users.acceptTos(principal.userId, TOS_VERSION);
+  // Cloudflare sets CF-Connecting-IP to the real client IP at the edge.
+  const ip = request.headers.get("CF-Connecting-IP");
+  const userAgent = request.headers.get("User-Agent");
+  await s.users.acceptTos(principal.userId, TOS_VERSION, ip, userAgent);
   return Response.json({ status: "ok", tos_version: TOS_VERSION });
 }
 
