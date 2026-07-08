@@ -1,5 +1,9 @@
 # wagmi.photos — Handoff / Resume Here
 
+> **2026-07-08:** Stripe billing (annual $24/yr subscription + paid-API gating) is merged to
+> `main` and verified end-to-end locally, but **not yet configured on production**. Resume
+> that work from [`docs/HANDOFF-2026-07-08-stripe-billing.md`](docs/HANDOFF-2026-07-08-stripe-billing.md).
+
 _Last updated: 2026-07-07 (evening session, after launch). **The product is
 LIVE at [wagmi.photos](https://wagmi.photos)**. This session shipped two
 reviewed features, both deployed: (1) the rehosted `large` variant is capped at
