@@ -317,3 +317,10 @@ intentionally unused**. Deploy steps:
 5. **Verify:** add a real OpenAI key on `#/account`, set the cap to 2, run a playground prompt obscure
    enough to be below the floor → expect the ✨ generated badge, the meter at 1/2, the image in the
    library, and a second+third run to flip to `cap_reached`. Then delete the key.
+
+## Collections (namespaced vector index)
+
+1. **Vectorize index:** `npx wrangler vectorize create wagmiphotos-coll --dimensions=768 --metric=cosine`
+   (the `VECTORIZE_COLL` binding in wrangler.toml expects this exact name; same dims/metric as the BGE shards).
+2. **Migration:** `npx wrangler d1 migrations apply wagmiphotos --remote` (0015: collections table + assets.collection_id/serve_count + live_assets recreation).
+3. No backfill/GMI changes — the backfill never generates for collections (scoped requests write no demand rows).

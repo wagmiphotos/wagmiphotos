@@ -26,6 +26,14 @@ export interface VectorizeStore {
   query(vector: number[], topK: number): Promise<Match[]>;
   /** Shard-routed write (fnv1a32(id) % shards) — BYOK in-request ingest. */
   upsert(id: string, vector: number[]): Promise<void>;
+  /** Collection-scoped query against the namespaced collections index only.
+   *  Returns [] when the index is not bound (local dev). */
+  queryNamespace(vector: number[], namespace: string, topK: number): Promise<Match[]>;
+  /** Best-effort second write for collection assets (namespace = collection id). */
+  upsertNamespace(id: string, vector: number[], namespace: string): Promise<void>;
+  /** Best-effort removal from the owning shard AND the collections index.
+   *  D1 tombstones are the source of truth; orphans are tolerated. */
+  deleteByIds(ids: string[]): Promise<void>;
 }
 export interface AssetStore {
   getAsset(id: string): Promise<AssetRow | null>;
@@ -116,7 +124,10 @@ export interface Services {
   email: EmailSender; stripe: StripeClient; byok: ByokStore; collections: CollectionStore;
 }
 export interface Env {
-  DB: D1Database; VECTORIZE_0: VectorizeIndex; VECTORIZE_1: VectorizeIndex; VECTORIZE_2: VectorizeIndex; AI: Ai; RATE_LIMITER?: RateLimitBinding;
+  DB: D1Database; VECTORIZE_0: VectorizeIndex; VECTORIZE_1: VectorizeIndex; VECTORIZE_2: VectorizeIndex;
+  /** Namespaced collections index (namespace = collection id); optional so local dev degrades. */
+  VECTORIZE_COLL?: VectorizeIndex;
+  AI: Ai; RATE_LIMITER?: RateLimitBinding;
   RATE_LIMITER_PAID?: RateLimitBinding;
   ASSETS: { fetch(request: Request): Promise<Response> };
   MASTER_API_KEY?: string;

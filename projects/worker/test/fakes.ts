@@ -8,6 +8,9 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   const keyOwners = new Map<string, string>();
   const matches: Match[] = [];
   const upserted: { id: string; vector: number[] }[] = [];
+  const nsMatches: { id: string; score: number; ns: string }[] = [];
+  const nsUpserted: { id: string; vector: number[]; namespace: string }[] = [];
+  const vectorDeletes: string[] = [];
   const generatedInserts: any[] = [];
   const byokRows = new Map<string, ByokRow>();
   const byokUsage = new Map<string, { count: number; est_spend_usd: number }>();
@@ -19,6 +22,9 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
     vectorize: {
       query: async () => matches,
       upsert: async (id: string, vector: number[]) => { upserted.push({ id, vector }); },
+      queryNamespace: async (_v: number[], namespace: string) => nsMatches.filter((m) => m.ns === namespace).map((m) => ({ id: m.id, score: m.score })),
+      upsertNamespace: async (id: string, vector: number[], namespace: string) => { nsUpserted.push({ id, vector, namespace }); },
+      deleteByIds: async (ids: string[]) => { vectorDeletes.push(...ids); },
     },
     assets: {
       getAsset: async (id) => assets.get(id) ?? null,
@@ -107,6 +113,9 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   (base as any)._recorded = recorded;
   (base as any)._matches = matches;
   (base as any)._upserted = upserted;
+  (base as any)._nsMatches = nsMatches;
+  (base as any)._nsUpserted = nsUpserted;
+  (base as any)._vectorDeletes = vectorDeletes;
   (base as any)._generatedInserts = generatedInserts;
   (base as any)._keyOwners = keyOwners;
   (base as any)._byokRows = byokRows;

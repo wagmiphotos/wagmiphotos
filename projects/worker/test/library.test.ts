@@ -135,7 +135,7 @@ it("falls back to LIKE search when the embedder throws", async () => {
 });
 
 it("falls back to LIKE search when vectorize.query throws", async () => {
-  const s = fakeServices({ vectorize: { query: async () => { throw new Error("index unavailable"); }, upsert: async () => {} } });
+  const s = fakeServices({ vectorize: { query: async () => { throw new Error("index unavailable"); }, upsert: async () => {}, queryNamespace: async () => [], upsertNamespace: async () => {}, deleteByIds: async () => {} } });
   (s as any)._libraryRows.push(libRow({ id: "like-hit" }));
   const res = await handleLibrarySearch(new URL("https://x/v1/library?q=cat"), s, { floorSimMin: 0.72 });
   expect(res.status).toBe(200);
@@ -160,7 +160,7 @@ it("empty q keeps the recency browse (vectorize and embedder never called)", asy
   let vectorizeCalled = false;
   let embedderCalled = false;
   const s = fakeServices({
-    vectorize: { query: async () => { vectorizeCalled = true; return []; }, upsert: async () => {} },
+    vectorize: { query: async () => { vectorizeCalled = true; return []; }, upsert: async () => {}, queryNamespace: async () => [], upsertNamespace: async () => {}, deleteByIds: async () => {} },
     embedder: { textEmbed: async () => { embedderCalled = true; return [0, 0, 0]; } },
   });
   (s as any)._libraryRows.push(libRow());

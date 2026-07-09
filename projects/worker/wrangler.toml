@@ -28,6 +28,14 @@ index_name = "wagmiphotos-bge-1"
 binding = "VECTORIZE_2"
 index_name = "wagmiphotos-bge-2"
 
+# Vectorize — namespaced collections index (namespace = collection id). Dual-
+# written alongside the shards for collection assets; scoped queries hit only
+# this index. Create with:
+#   npx wrangler vectorize create wagmiphotos-coll --dimensions=768 --metric=cosine
+[[vectorize]]
+binding = "VECTORIZE_COLL"
+index_name = "wagmiphotos-coll"
+
 # R2 — originals for BYOK in-request generation. Serve the bucket publicly
 # (custom domain or r2.dev) and point BYOK_PUBLIC_URL_BASE at it. The
 # demand-first rehost derives thumb/medium/large into B2 later (0008).

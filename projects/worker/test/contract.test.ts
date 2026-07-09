@@ -46,19 +46,22 @@ it("denylist_terms is a non-empty lowercase list", () => {
   for (const t of contract.denylist_terms) expect(t).toBe(t.toLowerCase().trim());
 });
 
-it("wrangler.toml [[vectorize]] bindings match contract.json (shard count + index names)", () => {
+it("wrangler.toml [[vectorize]] shard bindings match contract.json (shard count + index names)", () => {
   const toml = readFileSync(join(__dirname, "../wrangler.toml"), "utf8");
   const blocks = toml.split("[[vectorize]]").slice(1);
+  // Only the numbered VECTORIZE_<n> blocks are shards; VECTORIZE_COLL is a
+  // separate namespaced index (checked below) and isn't part of the shard count.
+  const shardBlocks = blocks.filter((b) => /binding\s*=\s*"VECTORIZE_\d+"/.test(b));
   expect(
-    blocks.length,
-    `wrangler.toml has ${blocks.length} [[vectorize]] block(s), contract.json vectorize_shards is ${contract.vectorize_shards}`,
+    shardBlocks.length,
+    `wrangler.toml has ${shardBlocks.length} shard [[vectorize]] block(s), contract.json vectorize_shards is ${contract.vectorize_shards}`,
   ).toBe(contract.vectorize_shards);
 
-  const parsed = blocks.map((block, i) => {
+  const parsed = shardBlocks.map((block, i) => {
     const bindingMatch = block.match(/binding\s*=\s*"VECTORIZE_(\d+)"/);
     const indexMatch = block.match(/index_name\s*=\s*"([^"]+)"/);
-    expect(bindingMatch, `[[vectorize]] block ${i} in wrangler.toml is missing a binding = "VECTORIZE_<n>" line`).not.toBeNull();
-    expect(indexMatch, `[[vectorize]] block ${i} in wrangler.toml is missing an index_name = "..." line`).not.toBeNull();
+    expect(bindingMatch, `[[vectorize]] shard block ${i} in wrangler.toml is missing a binding = "VECTORIZE_<n>" line`).not.toBeNull();
+    expect(indexMatch, `[[vectorize]] shard block ${i} in wrangler.toml is missing an index_name = "..." line`).not.toBeNull();
     return { shard: Number(bindingMatch![1]), indexName: indexMatch![1] };
   });
 
@@ -75,4 +78,12 @@ it("wrangler.toml [[vectorize]] bindings match contract.json (shard count + inde
       `wrangler.toml binding "${expectedBinding}" has index_name = "${entry!.indexName}", expected "${expectedIndexName}"`,
     ).toBe(expectedIndexName);
   }
+});
+
+it("wrangler.toml has a VECTORIZE_COLL [[vectorize]] block for the namespaced collections index", () => {
+  const toml = readFileSync(join(__dirname, "../wrangler.toml"), "utf8");
+  const blocks = toml.split("[[vectorize]]").slice(1);
+  const collBlock = blocks.find((b) => /binding\s*=\s*"VECTORIZE_COLL"/.test(b));
+  expect(collBlock, 'wrangler.toml has no [[vectorize]] block with binding = "VECTORIZE_COLL"').toBeDefined();
+  expect(collBlock).toMatch(/index_name\s*=\s*"wagmiphotos-coll"/);
 });

@@ -34,7 +34,7 @@ function buildServices(env: Env): Services {
   };
   return {
     embedder: { textEmbed: (p) => bgeTextEmbed(p, env) },
-    vectorize: makeVectorize([env.VECTORIZE_0, env.VECTORIZE_1, env.VECTORIZE_2]),
+    vectorize: makeVectorize([env.VECTORIZE_0, env.VECTORIZE_1, env.VECTORIZE_2], env.VECTORIZE_COLL),
     assets, queries, keys, rateLimiter, rateLimiterPaid,
     users, sessions, loginTokens, email: makeEmailSender(env), stripe: makeStripe(env), byok, collections,
   };
