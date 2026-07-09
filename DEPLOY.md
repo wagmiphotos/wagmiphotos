@@ -301,3 +301,18 @@ intentionally unused**. Deploy steps:
    `price_...` into `STRIPE_PRICE_ID` (step 3).
 7. **Enable the live Customer Portal** (Stripe dashboard → Settings → Billing →
    Customer portal) so `#/account` → "Manage billing" works for real subscribers.
+
+## BYOK (bring-your-own-key generation)
+
+1. **Migration:** `npx wrangler d1 migrations apply wagmiphotos --remote` (adds `byok_keys` / `byok_usage`, 0013).
+2. **R2 bucket:** `npx wrangler r2 bucket create wagmiphotos-byok-originals`, enable public access
+   (custom domain preferred), and set `BYOK_PUBLIC_URL_BASE` in `wrangler.toml` `[vars]` to that origin.
+3. **Secrets:**
+   - `npx wrangler secret put BYOK_KEK` → `openssl rand -base64 32` output. Rotating it orphans all
+     stored keys (decrypt fails → requests fall back, users re-enter keys); rotate only deliberately.
+   - `npx wrangler secret put OPENAI_API_KEY` → operator key; moderates prompts for GMI-key users
+     (same key the backfill box uses).
+4. **Deploy:** `cd projects/worker && npm run deploy`.
+5. **Verify:** add a real OpenAI key on `#/account`, set the cap to 2, run a playground prompt obscure
+   enough to be below the floor → expect the ✨ generated badge, the meter at 1/2, the image in the
+   library, and a second+third run to flip to `cap_reached`. Then delete the key.
