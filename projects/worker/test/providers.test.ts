@@ -4,18 +4,35 @@ import { providerFor, ProviderAuthError } from "../src/providers";
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]).buffer;
 const okJson = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
 
-it("openai: posts the contract-pinned model and decodes b64_json", async () => {
+// SSE body shaped like the real stream (captured live 2026-07-09): partial
+// first, completed last; only completed carries the final image.
+const sseBody = (events: { type: string; b64?: string }[]) => events.map((e) =>
+  `event: ${e.type}\ndata: ${JSON.stringify({ type: e.type, b64_json: e.b64, output_format: "webp" })}\n`
+).join("\n") + "\n";
+
+it("openai: posts the contract-pinned model with streaming and decodes the completed event", async () => {
   const calls: any[] = [];
   const fetchFn = (async (url: any, init: any) => {
     calls.push({ url: String(url), body: JSON.parse(init.body), init });
-    return okJson({ data: [{ b64_json: btoa("\x89PNG") }] });
+    return new Response(sseBody([
+      { type: "image_generation.partial_image", b64: btoa("PARTIAL") },
+      { type: "image_generation.completed", b64: btoa("\x89PNG") },
+    ]), { status: 200 });
   }) as unknown as typeof fetch;
   const img = await providerFor("openai", fetchFn).generate("a red fox", "sk-user");
   expect(calls[0].url).toBe("https://api.openai.com/v1/images/generations");
-  expect(calls[0].body).toEqual({ model: "gpt-image-2", prompt: "a red fox", n: 1, size: "1024x1024", quality: "medium", output_format: "webp", output_compression: 85 });
+  expect(calls[0].body).toEqual({ model: "gpt-image-2", prompt: "a red fox", n: 1, size: "1024x1024", quality: "medium", output_format: "webp", output_compression: 85, stream: true, partial_images: 1 });
   expect(calls[0].init.signal).toBeInstanceOf(AbortSignal);
-  expect(img.mime).toBe("image/webp"); // output_format webp: ~10x smaller than png, survives flaky delivery
-  expect(new Uint8Array(img.bytes)).toEqual(new Uint8Array(PNG));
+  expect(img.mime).toBe("image/webp");
+  expect(new Uint8Array(img.bytes)).toEqual(new Uint8Array(PNG)); // completed frame, not the partial
+});
+
+it("openai: stream ending without a completed event throws", async () => {
+  const fetchFn = (async () => new Response(sseBody([
+    { type: "image_generation.partial_image", b64: btoa("PARTIAL") },
+  ]), { status: 200 })) as unknown as typeof fetch;
+  await expect(providerFor("openai", fetchFn).generate("x", "sk-user"))
+    .rejects.toThrow(/without a completed image/);
 });
 
 it("openai: 401 throws ProviderAuthError", async () => {

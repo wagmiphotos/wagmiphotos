@@ -31,6 +31,37 @@ const GMI_MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 
 const OPENAI_API = "https://api.openai.com/v1";
 
+/** Reads an SSE body and returns the parsed `data:` payload of the first
+ *  event whose `type` matches; null when the stream ends without one. Events
+ *  are blank-line separated; a partial image (~2MB base64) is the largest
+ *  single block, so peak buffering stays bounded per event. */
+async function readSseEvent(res: Response, wantType: string): Promise<any | null> {
+  if (!res.body) return null;
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (value) buf += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf("\n\n")) >= 0) {
+      const block = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      for (const line of block.split("\n")) {
+        if (!line.startsWith("data: ")) continue;
+        try {
+          const d = JSON.parse(line.slice(6));
+          if (d?.type === wantType) {
+            reader.cancel().catch(() => { /* stream already finished */ });
+            return d;
+          }
+        } catch { /* non-JSON data line: ignore */ }
+      }
+    }
+    if (done) return null;
+  }
+}
+
 function makeOpenAiProvider(fetchFn: typeof fetch): ImageProvider {
   return {
     async generate(prompt, apiKey) {
@@ -39,18 +70,21 @@ function makeOpenAiProvider(fetchFn: typeof fetch): ImageProvider {
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         // quality pinned to medium: matches the contract price estimate ($0.055/img)
         // and avoids auto resolving to high (~4x cost, slower generations).
-        // webp@85: ~10x smaller response than png — OpenAI bills per generation
-        // (format-independent) and intermittently kills large-body delivery
-        // (observed 520s, 2026-07-09), so smaller bodies survive more often.
-        body: JSON.stringify({ model: PINNED.openai.model, prompt, n: 1, size: "1024x1024", quality: "medium", output_format: "webp", output_compression: 85 }),
+        // webp@85: ~10x smaller payload. stream + partial_images=1: OpenAI's
+        // gateway intermittently kills SILENT image connections after ~20s
+        // (billed but undelivered — diagnosed live 2026-07-09; gpt-image-2
+        // medium runs 44-80s). SSE events keep the connection non-idle; only
+        // the completed event carries the final image (~$0.003 partial cost).
+        body: JSON.stringify({ model: PINNED.openai.model, prompt, n: 1, size: "1024x1024", quality: "medium", output_format: "webp", output_compression: 85, stream: true, partial_images: 1 }),
         signal: AbortSignal.timeout(OPENAI_GENERATE_TIMEOUT_MS),
       });
       if (res.status === 401 || res.status === 403) throw new ProviderAuthError(`openai ${res.status}`);
       if (!res.ok) throw new Error(`openai images ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
-      const data: any = await res.json();
-      const b64 = data?.data?.[0]?.b64_json;
-      if (typeof b64 !== "string") throw new Error("openai images: no b64_json in response");
-      return { bytes: Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer, mime: "image/webp" };
+      const completed: any = await readSseEvent(res, "image_generation.completed");
+      const b64 = completed?.b64_json;
+      if (typeof b64 !== "string") throw new Error("openai images: stream ended without a completed image");
+      const fmt = typeof completed.output_format === "string" ? completed.output_format : "webp";
+      return { bytes: Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer, mime: `image/${fmt}` };
     },
     async validateKey(apiKey) {
       const res = await fetchFn(`${OPENAI_API}/models`, {
