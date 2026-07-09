@@ -231,3 +231,32 @@ it("assetFilename: slugs, truncates to 60 chars, falls back to id, maps mime to 
   expect(assetFilename({ id: "x", prompt: long, mime: "image/gif" }, null)).toBe("a".repeat(60) + ".gif");
   expect(assetFilename({ id: "x", prompt: "p", mime: "image/webp; charset=binary" }, null)).toBe("p.webp");
 });
+
+it("library scoped: 404 unknown collection", async () => {
+  const s: any = fakeServices();
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?collection=col_nope"), s, { floorSimMin: 0.75 });
+  expect(res.status).toBe(404);
+});
+
+it("library scoped semantic: embeds query+theme and hits only the namespace", async () => {
+  const s: any = fakeServices();
+  s._collectionRows.set("col_abc", { id: "col_abc", owner_user_id: "u", name: "n", theme_prompt: "watercolor style", created_at: "x", updated_at: "x" });
+  const embeds: string[] = [];
+  s.embedder.textEmbed = async (p: string) => { embeds.push(p); return [0.1]; };
+  s._assets.set("a1", { id: "a1", prompt: "a cat, watercolor style", source: "byok", source_id: null, model_used: "m", width: 1, height: 1, mime: "image/png", source_url: "https://x/a1.png", locally_cached: 0, created_at: "x" });
+  s._nsMatches.push({ id: "a1", score: 0.9, ns: "col_abc" });
+  s.vectorize.query = async () => { throw new Error("global shards must not serve scoped library searches"); };
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?q=cat&collection=col_abc"), s, { floorSimMin: 0.75 });
+  const { images }: any = await res.json();
+  expect(embeds).toEqual(["cat, watercolor style"]);
+  expect(images.map((i: any) => i.id)).toEqual(["a1"]);
+  expect(images[0].serve_count).toBeUndefined(); // public shape: no owner stats
+});
+
+it("library scoped browse/fallback: LIKE path filters by collection_id", async () => {
+  const s: any = fakeServices();
+  s._collectionRows.set("col_abc", { id: "col_abc", owner_user_id: "u", name: "n", theme_prompt: "", created_at: "x", updated_at: "x" });
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?collection=col_abc"), s, { floorSimMin: 0.75 });
+  expect(res.status).toBe(200);
+  expect(s._searchCalls[0].collectionId).toBe("col_abc");
+});

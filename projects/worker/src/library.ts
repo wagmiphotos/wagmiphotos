@@ -1,5 +1,6 @@
-import type { Services, LibraryAssetRow } from "./types";
+import type { Services, LibraryAssetRow, CollectionRow } from "./types";
 import { assetUrls } from "./asset-urls";
+import { combinedPrompt } from "./collections";
 
 export interface LibraryCfg { assetBaseUrl?: string; }
 export interface LibrarySearchCfg extends LibraryCfg { floorSimMin: number; }
@@ -45,10 +46,19 @@ export async function handleLibrarySearch(url: URL, s: Services, cfg: LibrarySea
     offset = n;
   }
 
+  let coll: CollectionRow | null = null;
+  const collectionId = url.searchParams.get("collection");
+  if (collectionId) {
+    coll = await s.collections.get(collectionId);
+    if (!coll) return Response.json({ error: "unknown collection" }, { status: 404 });
+  }
+
   if (q) {
     try {
-      const vec = await s.embedder.textEmbed(q);
-      const matches = await s.vectorize.query(vec, SEARCH_TOP_K);
+      const vec = await s.embedder.textEmbed(coll ? combinedPrompt(q, coll.theme_prompt) : q);
+      const matches = coll
+        ? await s.vectorize.queryNamespace(vec, coll.id, SEARCH_TOP_K)
+        : await s.vectorize.query(vec, SEARCH_TOP_K);
       const relevant = matches.filter((m) => m.score >= cfg.floorSimMin);
       const page = relevant.slice(offset, offset + limit);
       const rows = await s.assets.getAssetsByIds(page.map((m) => m.id));
@@ -66,7 +76,7 @@ export async function handleLibrarySearch(url: URL, s: Services, cfg: LibrarySea
   }
 
   // browse (empty q) and fallback path: existing searchAssets LIKE + recency code
-  const rows = await s.assets.searchAssets({ q, limit: limit + 1, offset });
+  const rows = await s.assets.searchAssets({ q, limit: limit + 1, offset, ...(coll ? { collectionId: coll.id } : {}) });
   const has_more = rows.length > limit;
   return Response.json({ images: rows.slice(0, limit).map((r) => publicAsset(r, cfg.assetBaseUrl)), has_more });
 }
