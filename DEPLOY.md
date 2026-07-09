@@ -4,7 +4,8 @@ Ordered runbook for the production deploy. **Status 2026-07-07: steps 0–3 and
 5–6 are DONE and live** (wagmi.photos + api.wagmi.photos serve the Worker; D1
 migrated 0001–0007; three shards seeded with 1k PD12M rows; drift check passed
 at cosine 1.0000; floors tuned 0.87/0.75; assets route via CF-proxied
-`images.wagmi.photos`). **Step 4 (the GMI backfill box) is NOT up yet** — queued
+`cdn.wagmi.photos` — a Transform Rule rewrites `/assets/…` to
+`/file/wagmi-photos-library/assets/…` before B2). **Step 4 (the GMI backfill box) is NOT up yet** — queued
 generations and rehosting wait on it. Kept in full as the rebuild-from-scratch
 reference; run steps **in order** — several have hard dependencies.
 

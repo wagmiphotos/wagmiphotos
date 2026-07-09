@@ -61,7 +61,7 @@ IMAGE_PRICE_USD = "0.055"        # advertised cost_saved_usd per hit — keep in
 PUBLIC_SITE_URL = "https://wagmi.photos"           # canonical site origin (override per environment / .dev.vars)
 PUBLIC_API_BASE_URL = "https://api.wagmi.photos/v1"  # documented API base rendered into docs/examples
 GITHUB_REPO = "wagmiphotos/wagmiphotos"            # repo for the header star-count badge
-ASSET_BASE_URL = "https://images.wagmi.photos/file/wagmi-photos-library"  # CF-proxied B2 (free egress + cache rule); MUST equal backfill B2_PUBLIC_URL_BASE
+ASSET_BASE_URL = "https://cdn.wagmi.photos"  # CF-proxied B2 via a Transform Rule that prepends /file/wagmi-photos-library (free egress + cache rule); MUST equal backfill B2_PUBLIC_URL_BASE
 STRIPE_PRICE_ID = "price_REPLACE_ME"   # recurring annual $24 Price id (sandbox now, live at launch)
 BYOK_PUBLIC_URL_BASE = "https://byok.wagmi.photos"  # public origin of the BYOK_ORIGINALS R2 bucket
 # Secrets (set with `wrangler secret put`): MASTER_API_KEY, RESEND_API_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, BYOK_KEK, OPENAI_API_KEY

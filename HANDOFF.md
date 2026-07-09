@@ -46,9 +46,11 @@ to `main` and pushed._
   shows "View original ↗" links.
 - **Vectorize**: 3 shards `wagmiphotos-bge-0/1/2` holding 333/343/324 vectors —
   fnv1a32 write-routing balance confirmed live.
-- **Assets CDN path**: `https://images.wagmi.photos/file/wagmi-photos-library`
-  (Cloudflare-proxied B2 `wagmi-photos-library`, public bucket, free egress via
-  the Backblaze/Cloudflare partnership, 1-year cache rule; keys are immutable).
+- **Assets CDN path**: `https://cdn.wagmi.photos/assets/{id}/<size>.webp`
+  (Cloudflare-proxied B2 `wagmi-photos-library`; a Transform Rule prepends
+  `/file/wagmi-photos-library` so public URLs hide the vendor/bucket; free
+  egress via the Backblaze/Cloudflare partnership, 1-year cache rule; keys are
+  immutable). Renamed from the never-created `images.wagmi.photos` 2026-07-09.
   Worker `ASSET_BASE_URL` == backfill `B2_PUBLIC_URL_BASE` — the seam check is
   `curl -I` a rehosted `thumb_url` (see `DEPLOY.md` Verify).
 - **BGE drift check PASSED at cosine 1.0000** — after discovering live that
