@@ -75,7 +75,7 @@ it("patch updates only the provided fields", async () => {
   expect(calls[0].sql).not.toContain("enabled = ?");
 });
 
-it("insertGenerated writes a byok asset row satisfying legacy NOT NULLs", async () => {
+it("insertGenerated writes a byok asset row matching the post-0007 schema (no url column)", async () => {
   const { db, calls } = fakeDb();
   const { assets } = makeD1Stores(db);
   await assets.insertGenerated({
@@ -86,9 +86,12 @@ it("insertGenerated writes a byok asset row satisfying legacy NOT NULLs", async 
   expect(calls[0].sql).toContain("INSERT INTO assets");
   expect(calls[0].sql).toContain("'byok'");
   expect(calls[0].sql).toContain("created_by");
-  // legacy url column mirrors source_url until the rehost pipeline derives sizes
+  // Migration 0007 DROPPED url/thumb_url/medium_url/manifest_url — URLs are
+  // derived (asset-urls.ts). Inserting into url breaks against the real
+  // schema (diagnosed live 2026-07-09: "table assets has no column named url").
+  expect(calls[0].sql).not.toContain(" url");
   expect(calls[0].args).toEqual(["gen-1", "a red fox", "gpt-image-1", 1024, 1024, "image/png",
-    "https://byok.example/byok/gen-1/original.png", "https://byok.example/byok/gen-1/original.png", 0.04, "openai",
+    "https://byok.example/byok/gen-1/original.png", 0.04, "openai",
     "usr_abc", null]);
 });
 
