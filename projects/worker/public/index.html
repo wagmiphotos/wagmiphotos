@@ -4549,7 +4549,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       const el = document.getElementById('collections-body');
       if (!el) return;
       const canCreate = !!(currentByok && currentByok.enabled);
-      const slotLocked = !!(mySlots && mySlots.generated < mySlots.next_required);
+      const slotLocked = !!(mySlots && mySlots.used < 20 && mySlots.generated < mySlots.next_required);
       const createForm = !canCreate
         ? `<div style="font-size:0.8125rem;margin-top:10px;">Add an enabled provider key above to create collections.</div>`
         : slotLocked
@@ -4595,7 +4595,12 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         if (r.status === 401) { location.hash = '#/login'; return; }
         const data = await r.json();
         if (r.status === 403) { showToast('An enabled provider key is required', 'error'); return; }
-        if (r.status === 409) { showToast('Collection limit reached (20)', 'error'); return; }
+        if (r.status === 409) {
+          showToast(data.error === 'collection slot locked'
+            ? `Generate ${data.required - data.generated} more lifetime images to unlock this collection slot`
+            : 'Collection limit reached (20)', 'error');
+          return;
+        }
         if (!r.ok) { showToast(data.error || 'Could not create the collection', 'error'); return; }
         showToast('Collection created', 'success');
         await loadCollections();
