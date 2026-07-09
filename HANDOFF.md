@@ -2,8 +2,10 @@
 
 > **2026-07-09:** **BYOK (bring-your-own-key generation) is LIVE in production** — users can
 > store an OpenAI/GMI key and fresh-generate below-tolerance prompts into the shared library.
-> The same deploy shipped the Stripe billing code, but the **live Stripe config is still
-> pending** (Upgrade button errors until it's done). Resume from
+> Also live: the asset origin is now **`cdn.wagmi.photos/assets/…`** (via a Cloudflare
+> Transform Rule — see the handoff's ⚠️) and a homepage refresh (compare section moved,
+> tabless API cards, open-license CTA band). The **live Stripe config is still pending**
+> (Upgrade button errors until it's done). Resume from
 > [`docs/HANDOFF-2026-07-09-byok-live-stripe-pending.md`](docs/HANDOFF-2026-07-09-byok-live-stripe-pending.md).
 
 > **2026-07-08:** Stripe billing (annual $24/yr subscription + paid-API gating) merged to

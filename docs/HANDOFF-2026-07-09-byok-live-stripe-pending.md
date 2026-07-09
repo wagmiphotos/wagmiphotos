@@ -29,6 +29,27 @@ recipes remain valid).
 - Docs pages now document `result:"generated"`, the `shared_cache.byok` shapes,
   `400 content_policy`, and the corrected `cache_tolerance` FAQ.
 
+## Also shipped later the same day (homepage + asset origin)
+
+- **`cdn.wagmi.photos` is the public asset origin** — clean URLs
+  `https://cdn.wagmi.photos/assets/{id}/<size>.webp`. ⚠️ **These only work
+  through a Cloudflare Transform Rule** (host `cdn.wagmi.photos`, path
+  `/assets/*` → prepend `/file/wagmi-photos-library`) plus the proxied DNS
+  record and cache rule, all dashboard-side. Delete that rule and every
+  derived asset URL breaks. `ASSET_BASE_URL` (wrangler.toml) ==
+  `B2_PUBLIC_URL_BASE` (deploy/gmi/.env) == `https://cdn.wagmi.photos`.
+  Discovery: the previously documented `images.wagmi.photos` never existed in
+  DNS (unnoticed because the backfill box has never rehosted anything), so
+  nothing was migrated. No real object serves yet — the wiring proof is B2's
+  `not_found` JSON at the clean path; the first rehost makes it real.
+- **Homepage pass** (specs `2026-07-09-homepage-compare-move-api-cards` +
+  `2026-07-09-cdn-hostname-open-license-band`): "Faster. Cheaper. Better."
+  moved below "What you get back"; the OpenAI-compatible section is two
+  static stacked code cards (tabs + red scribble removed, no height jump)
+  with the floating callout showing the full real response JSON; example
+  URLs use the real cdn shape; the CTA band is now the open-license
+  positioning ("Openly licensed. Close enough, on purpose.").
+
 ## 1. Stripe go-live (dashboard work — blocks all revenue)
 
 Status vs `HANDOFF-2026-07-08-stripe-billing.md` §2: step 1 (migration 0012)
@@ -93,7 +114,8 @@ per-task list):
 
 ## Ground truth
 
-- `main` pushed at `6e976f0`; deployed worker version `06ddf6ce` matches it.
+- `main` pushed through `14c30ec` (+ this handoff commit); deployed worker
+  version `77f274d0` matches it.
 - Suites: worker 255/255 + `tsc --noEmit` clean; Python 105/105.
 - Wrangler secrets now: `BYOK_KEK`, `MASTER_API_KEY`, `OPENAI_API_KEY`,
   `RESEND_API_KEY` (Stripe pair still missing — see §1).
