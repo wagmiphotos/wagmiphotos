@@ -6,6 +6,20 @@ export interface AssetRow {
   mime: string | null; source_url: string | null; locally_cached: number;
 }
 export interface LibraryAssetRow extends AssetRow { created_at: string; }
+export interface CollectionRow {
+  id: string; owner_user_id: string; name: string; theme_prompt: string;
+  created_at: string; updated_at: string;
+}
+export interface CollectionSummary extends CollectionRow { image_count: number; total_serves: number; }
+export interface CollectionImageRow extends LibraryAssetRow { serve_count: number; }
+export interface CollectionStore {
+  create(c: { id: string; ownerUserId: string; name: string; themePrompt: string }): Promise<void>;
+  get(id: string): Promise<CollectionRow | null>;
+  listByOwner(userId: string): Promise<CollectionSummary[]>;
+  countByOwner(userId: string): Promise<number>;
+  patch(id: string, f: { name?: string; themePrompt?: string }): Promise<void>;
+  delete(id: string): Promise<void>;
+}
 export interface Match { id: string; score: number; }
 export interface Embedder { textEmbed(prompt: string): Promise<number[]>; }
 export interface VectorizeStore {
@@ -15,12 +29,21 @@ export interface VectorizeStore {
 }
 export interface AssetStore {
   getAsset(id: string): Promise<AssetRow | null>;
-  searchAssets(i: { q: string; limit: number; offset: number }): Promise<LibraryAssetRow[]>;
+  searchAssets(i: { q: string; limit: number; offset: number; collectionId?: string }): Promise<LibraryAssetRow[]>;
   /** Batch lookup for the semantic-search hydration path; missing ids are simply absent (no error). */
   getAssetsByIds(ids: string[]): Promise<LibraryAssetRow[]>;
   /** Insert a BYOK-generated asset. source='byok'; the row serves from
    *  source_url until the demand-first rehost derives B2 sizes (0008). */
-  insertGenerated(a: { id: string; prompt: string; sourceUrl: string; mime: string; width: number | null; height: number | null; modelUsed: string; provider: string; priceUsd: number; createdBy: string }): Promise<void>;
+  insertGenerated(a: { id: string; prompt: string; sourceUrl: string; mime: string; width: number | null; height: number | null; modelUsed: string; provider: string; priceUsd: number; createdBy: string; collectionId: string | null }): Promise<void>;
+  /** Owner-facing management list: public shape + serve_count. */
+  listByCollection(i: { collectionId: string; limit: number; offset: number }): Promise<CollectionImageRow[]>;
+  /** Live membership check for owner image deletion. */
+  getCollectionMember(assetId: string, collectionId: string): Promise<AssetRow | null>;
+  tombstoneAsset(id: string): Promise<void>;
+  /** Tombstones all live members; returns their ids for vector cleanup. */
+  tombstoneByCollection(collectionId: string): Promise<string[]>;
+  /** Fire-and-forget serve counter (hit/approximate generation returns only). */
+  bumpServeCount(id: string): Promise<void>;
 }
 export interface QueryStore {
   /** Upserts the query row and returns the row's effective generate state after merging. */
@@ -90,7 +113,7 @@ export interface Services {
   embedder: Embedder; vectorize: VectorizeStore; assets: AssetStore; queries: QueryStore;
   keys: KeyStore; rateLimiter: RateLimiter; rateLimiterPaid: RateLimiter;
   users: UserStore; sessions: SessionStore; loginTokens: LoginTokenStore;
-  email: EmailSender; stripe: StripeClient; byok: ByokStore;
+  email: EmailSender; stripe: StripeClient; byok: ByokStore; collections: CollectionStore;
 }
 export interface Env {
   DB: D1Database; VECTORIZE_0: VectorizeIndex; VECTORIZE_1: VectorizeIndex; VECTORIZE_2: VectorizeIndex; AI: Ai; RATE_LIMITER?: RateLimitBinding;

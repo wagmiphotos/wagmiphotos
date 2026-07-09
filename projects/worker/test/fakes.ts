@@ -1,4 +1,4 @@
-import type { Services, AssetRow, LibraryAssetRow, Match, ByokRow } from "../src/types";
+import type { Services, AssetRow, LibraryAssetRow, Match, ByokRow, CollectionRow } from "../src/types";
 
 export function fakeServices(overrides: Partial<Services> = {}): Services {
   const assets = new Map<string, AssetRow>();
@@ -11,6 +11,9 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   const generatedInserts: any[] = [];
   const byokRows = new Map<string, ByokRow>();
   const byokUsage = new Map<string, { count: number; est_spend_usd: number }>();
+  const collectionRows = new Map<string, CollectionRow>();
+  const serveCounts = new Map<string, number>();
+  const tombstoned: string[] = [];
   const base: Services = {
     embedder: { textEmbed: async () => [0.1, 0.2, 0.3] },
     vectorize: {
@@ -31,6 +34,19 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
           width: a.width, height: a.height, mime: a.mime, source_url: a.sourceUrl, locally_cached: 0,
         });
       },
+      listByCollection: async ({ collectionId, limit, offset }) =>
+        libraryRows.filter((r: any) => r.collection_id === collectionId).slice(offset, offset + limit).map((r: any) => ({ ...r, serve_count: serveCounts.get(r.id) ?? 0 })),
+      getCollectionMember: async (assetId, collectionId) => {
+        const r: any = assets.get(assetId);
+        return r && r.collection_id === collectionId && !tombstoned.includes(assetId) ? r : null;
+      },
+      tombstoneAsset: async (id) => { tombstoned.push(id); assets.delete(id); },
+      tombstoneByCollection: async (collectionId) => {
+        const ids = [...assets.values()].filter((r: any) => r.collection_id === collectionId).map((r) => r.id);
+        for (const id of ids) { tombstoned.push(id); assets.delete(id); }
+        return ids;
+      },
+      bumpServeCount: async (id) => { serveCounts.set(id, (serveCounts.get(id) ?? 0) + 1); },
     },
     queries: { recordQuery: async (i) => { recorded.push(i); return i.generate; } },
     keys: {
@@ -68,6 +84,16 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
       refund: async (u, m) => { const cur = byokUsage.get(`${u}:${m}`); if (cur) cur.count = Math.max(0, cur.count - 1); },
       addSpend: async (u, m, usd) => { const k = `${u}:${m}`; const cur = byokUsage.get(k) ?? { count: 0, est_spend_usd: 0 }; cur.est_spend_usd += usd; byokUsage.set(k, cur); },
     },
+    collections: {
+      create: async ({ id, ownerUserId, name, themePrompt }) => {
+        collectionRows.set(id, { id, owner_user_id: ownerUserId, name, theme_prompt: themePrompt, created_at: "x", updated_at: "x" });
+      },
+      get: async (id) => collectionRows.get(id) ?? null,
+      listByOwner: async (userId) => [...collectionRows.values()].filter((c) => c.owner_user_id === userId).map((c) => ({ ...c, image_count: 0, total_serves: 0 })),
+      countByOwner: async (userId) => [...collectionRows.values()].filter((c) => c.owner_user_id === userId).length,
+      patch: async (id, f) => { const c = collectionRows.get(id); if (!c) return; if (f.name != null) c.name = f.name; if (f.themePrompt != null) c.theme_prompt = f.themePrompt; },
+      delete: async (id) => { collectionRows.delete(id); },
+    },
   };
   // expose internals for assertions
   (base as any)._assets = assets;
@@ -80,5 +106,8 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   (base as any)._keyOwners = keyOwners;
   (base as any)._byokRows = byokRows;
   (base as any)._byokUsage = byokUsage;
+  (base as any)._collectionRows = collectionRows;
+  (base as any)._serveCounts = serveCounts;
+  (base as any)._tombstoned = tombstoned;
   return { ...base, ...overrides };
 }

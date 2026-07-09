@@ -268,3 +268,117 @@ it("setSubscriptionByCustomer writes status keyed by customer id", async () => {
   expect(calls[0].sql).toContain("WHERE stripe_customer_id = ?");
   expect(calls[0].args).toEqual(["sub_2", "active", "2027-01-01T00:00:00.000Z", "cus_1"]);
 });
+
+// ---- collections (migration 0015) ----
+
+it("collections.create inserts id/owner/name/theme", async () => {
+  const { db, calls } = fakeDb();
+  const { collections } = makeD1Stores(db);
+  await collections.create({ id: "col_abc", ownerUserId: "usr_1", name: "Retro posters", themePrompt: "retro poster style" });
+  expect(calls[0].sql).toContain("INSERT INTO collections");
+  expect(calls[0].args).toEqual(["col_abc", "usr_1", "Retro posters", "retro poster style"]);
+});
+
+it("collections.get selects by id, returns null when missing", async () => {
+  const row = { id: "col_abc", owner_user_id: "usr_1", name: "n", theme_prompt: "t", created_at: "x", updated_at: "x" };
+  const { db, calls } = fakeDb(row);
+  const { collections } = makeD1Stores(db);
+  expect((await collections.get("col_abc"))?.owner_user_id).toBe("usr_1");
+  expect(calls[0].sql).toContain("FROM collections WHERE id = ?");
+  const { db: db2 } = fakeDb(null);
+  expect(await makeD1Stores(db2).collections.get("nope")).toBeNull();
+});
+
+it("collections.listByOwner aggregates image_count and total_serves over live_assets", async () => {
+  const { db, calls } = fakeDb(null, [{ id: "col_abc", owner_user_id: "usr_1", name: "n", theme_prompt: "", created_at: "x", updated_at: "x", image_count: 2, total_serves: 7 }]);
+  const { collections } = makeD1Stores(db);
+  const rows = await collections.listByOwner("usr_1");
+  expect(rows[0].total_serves).toBe(7);
+  expect(calls[0].sql).toContain("LEFT JOIN live_assets");
+  expect(calls[0].sql).toContain("SUM(a.serve_count)");
+  expect(calls[0].args).toEqual(["usr_1"]);
+});
+
+it("collections.countByOwner counts rows", async () => {
+  const { db, calls } = fakeDb({ n: 3 });
+  const { collections } = makeD1Stores(db);
+  expect(await collections.countByOwner("usr_1")).toBe(3);
+  expect(calls[0].sql).toContain("COUNT(*)");
+});
+
+it("collections.patch updates only provided fields plus updated_at", async () => {
+  const { db, calls } = fakeDb();
+  const { collections } = makeD1Stores(db);
+  await collections.patch("col_abc", { themePrompt: "new theme" });
+  expect(calls[0].sql).toContain("theme_prompt = ?");
+  expect(calls[0].sql).not.toContain("name = ?");
+  expect(calls[0].sql).toContain("updated_at = datetime('now')");
+  expect(calls[0].args).toEqual(["new theme", "col_abc"]);
+});
+
+it("collections.delete deletes by id", async () => {
+  const { db, calls } = fakeDb();
+  const { collections } = makeD1Stores(db);
+  await collections.delete("col_abc");
+  expect(calls[0].sql).toContain("DELETE FROM collections WHERE id = ?");
+});
+
+// ---- asset-store collection extensions ----
+
+it("listByCollection selects live rows with serve_count, newest first", async () => {
+  const { db, calls } = fakeDb(null, []);
+  const { assets } = makeD1Stores(db);
+  await assets.listByCollection({ collectionId: "col_abc", limit: 24, offset: 0 });
+  expect(calls[0].sql).toContain("serve_count");
+  expect(calls[0].sql).toContain("FROM live_assets WHERE collection_id = ?");
+  expect(calls[0].args).toEqual(["col_abc", 24, 0]);
+});
+
+it("getCollectionMember requires both id and collection_id", async () => {
+  const { db, calls } = fakeDb(null);
+  const { assets } = makeD1Stores(db);
+  expect(await assets.getCollectionMember("a1", "col_abc")).toBeNull();
+  expect(calls[0].sql).toContain("WHERE id = ? AND collection_id = ?");
+});
+
+it("tombstoneAsset sets dead_at on the base table", async () => {
+  const { db, calls } = fakeDb();
+  const { assets } = makeD1Stores(db);
+  await assets.tombstoneAsset("a1");
+  expect(calls[0].sql).toContain("UPDATE assets SET dead_at = datetime('now') WHERE id = ? AND dead_at IS NULL");
+});
+
+it("tombstoneByCollection tombstones live members and returns their ids", async () => {
+  const { db, calls } = fakeDb(null, [{ id: "a1" }, { id: "a2" }]);
+  const { assets } = makeD1Stores(db);
+  const ids = await assets.tombstoneByCollection("col_abc");
+  expect(ids).toEqual(["a1", "a2"]);
+  expect(calls[0].sql).toContain("UPDATE assets SET dead_at = datetime('now') WHERE collection_id = ? AND dead_at IS NULL");
+  expect(calls[0].sql).toContain("RETURNING id");
+});
+
+it("bumpServeCount increments on the base table", async () => {
+  const { db, calls } = fakeDb();
+  const { assets } = makeD1Stores(db);
+  await assets.bumpServeCount("a1");
+  expect(calls[0].sql).toContain("serve_count = serve_count + 1");
+  expect(calls[0].args).toEqual(["a1"]);
+});
+
+it("searchAssets adds a collection_id clause in browse and query modes when scoped", async () => {
+  const { db, calls } = fakeDb(null, []);
+  const { assets } = makeD1Stores(db);
+  await assets.searchAssets({ q: "", limit: 5, offset: 0, collectionId: "col_abc" });
+  expect(calls[0].sql).toContain("collection_id = ?");
+  await assets.searchAssets({ q: "fox", limit: 5, offset: 0, collectionId: "col_abc" });
+  expect(calls[1].sql).toContain("prompt LIKE ?");
+  expect(calls[1].sql).toContain("collection_id = ?");
+});
+
+it("insertGenerated binds collection_id (null for global byok)", async () => {
+  const { db, calls } = fakeDb();
+  const { assets } = makeD1Stores(db);
+  await assets.insertGenerated({ id: "g1", prompt: "p", sourceUrl: "https://x/g1.png", mime: "image/png", width: 1024, height: 1024, modelUsed: "gpt-image-1", provider: "openai", priceUsd: 0.04, createdBy: "usr_1", collectionId: "col_abc" });
+  expect(calls[0].sql).toContain("collection_id");
+  expect(calls[0].args).toContain("col_abc");
+});

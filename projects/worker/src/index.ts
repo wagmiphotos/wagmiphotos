@@ -17,7 +17,7 @@ import { handlePutByok, handlePatchByok, handleDeleteByok } from "./byok-routes"
 import type { ByokCfg } from "./byok";
 
 function buildServices(env: Env): Services {
-  const { assets, queries, keys, users, sessions, loginTokens, byok } = makeD1Stores(env.DB);
+  const { assets, queries, keys, users, sessions, loginTokens, byok, collections } = makeD1Stores(env.DB);
   const rateLimiter: RateLimiter = {
     async limit(key) {
       if (!env.RATE_LIMITER) return true; // no binding in dev
@@ -36,7 +36,7 @@ function buildServices(env: Env): Services {
     embedder: { textEmbed: (p) => bgeTextEmbed(p, env) },
     vectorize: makeVectorize([env.VECTORIZE_0, env.VECTORIZE_1, env.VECTORIZE_2]),
     assets, queries, keys, rateLimiter, rateLimiterPaid,
-    users, sessions, loginTokens, email: makeEmailSender(env), stripe: makeStripe(env), byok,
+    users, sessions, loginTokens, email: makeEmailSender(env), stripe: makeStripe(env), byok, collections,
   };
 }
 

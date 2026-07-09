@@ -84,6 +84,7 @@ export async function tryByokGenerate(
       width: 1024, height: 1024, // requested size; providers may letterbox but 1024x1024 is what we ask for
       modelUsed: pinned.model, provider: row.provider, priceUsd: pinned.price_per_image_usd,
       createdBy: i.userId, // audit trail (AUP/takedown); never selected on public reads
+      collectionId: null,
     });
   } catch (e) {
     console.error("byok generation failed", e);

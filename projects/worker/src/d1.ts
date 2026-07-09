@@ -2,6 +2,7 @@ import type {
   AssetRow, AssetStore, LibraryAssetRow, QueryStore, KeyStore,
   User, UserStore, SessionStore, LoginTokenStore,
   ByokRow, ByokStore, ByokUsage,
+  CollectionStore, CollectionRow, CollectionSummary, CollectionImageRow,
 } from "./types";
 
 // Reads select FROM live_assets (migration 0008): the view owns the
@@ -16,22 +17,22 @@ function escapeLike(s: string): string {
 export function makeD1Stores(db: D1Database): {
   assets: AssetStore; queries: QueryStore; keys: KeyStore;
   users: UserStore; sessions: SessionStore; loginTokens: LoginTokenStore;
-  byok: ByokStore;
+  byok: ByokStore; collections: CollectionStore;
 } {
   const assets: AssetStore = {
     async getAsset(id) {
       const row = await db.prepare(`SELECT ${ASSET_COLS} FROM live_assets WHERE id = ?`).bind(id).first<AssetRow>();
       return row ?? null;
     },
-    async searchAssets({ q, limit, offset }) {
+    async searchAssets({ q, limit, offset, collectionId }) {
       const tokens = q.split(/\s+/).filter(Boolean);
-      const tail = "ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?";
-      const stmt = tokens.length
-        ? db.prepare(
-            `SELECT ${ASSET_COLS}, created_at FROM live_assets WHERE ${tokens.map(() => "prompt LIKE ? ESCAPE '\\'").join(" AND ")} ${tail}`
-          ).bind(...tokens.map((t) => `%${escapeLike(t)}%`), limit, offset)
-        : db.prepare(`SELECT ${ASSET_COLS}, created_at FROM live_assets ${tail}`).bind(limit, offset);
-      const { results } = await stmt.all<LibraryAssetRow>();
+      const where: string[] = tokens.map(() => "prompt LIKE ? ESCAPE '\\'");
+      const args: unknown[] = tokens.map((t) => `%${escapeLike(t)}%`);
+      if (collectionId) { where.push("collection_id = ?"); args.push(collectionId); }
+      const cond = where.length ? `WHERE ${where.join(" AND ")} ` : "";
+      const { results } = await db.prepare(
+        `SELECT ${ASSET_COLS}, created_at FROM live_assets ${cond}ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`
+      ).bind(...args, limit, offset).all<LibraryAssetRow>();
       return results ?? [];
     },
     async getAssetsByIds(ids) {
@@ -46,9 +47,35 @@ export function makeD1Stores(db: D1Database): {
       // url (legacy NOT NULL) mirrors source_url; assetUrls() ignores it for
       // non-locally_cached rows and serves source_url directly.
       await db.prepare(
-        `INSERT INTO assets (id, prompt, source, model_used, width, height, mime, source_url, url, locally_cached, price_usd, provider, created_by)
-         VALUES (?, ?, 'byok', ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`
-      ).bind(a.id, a.prompt, a.modelUsed, a.width, a.height, a.mime, a.sourceUrl, a.sourceUrl, a.priceUsd, a.provider, a.createdBy).run();
+        `INSERT INTO assets (id, prompt, source, model_used, width, height, mime, source_url, url, locally_cached, price_usd, provider, created_by, collection_id)
+         VALUES (?, ?, 'byok', ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`
+      ).bind(a.id, a.prompt, a.modelUsed, a.width, a.height, a.mime, a.sourceUrl, a.sourceUrl, a.priceUsd, a.provider, a.createdBy, a.collectionId).run();
+    },
+    async listByCollection({ collectionId, limit, offset }) {
+      const { results } = await db.prepare(
+        `SELECT ${ASSET_COLS}, created_at, serve_count FROM live_assets WHERE collection_id = ? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`
+      ).bind(collectionId, limit, offset).all<CollectionImageRow>();
+      return results ?? [];
+    },
+    async getCollectionMember(assetId, collectionId) {
+      const row = await db.prepare(
+        `SELECT ${ASSET_COLS} FROM live_assets WHERE id = ? AND collection_id = ?`
+      ).bind(assetId, collectionId).first<AssetRow>();
+      return row ?? null;
+    },
+    // Tombstones write to the base table: live_assets is a view and the
+    // dead_at IS NULL guard makes both calls idempotent.
+    async tombstoneAsset(id) {
+      await db.prepare("UPDATE assets SET dead_at = datetime('now') WHERE id = ? AND dead_at IS NULL").bind(id).run();
+    },
+    async tombstoneByCollection(collectionId) {
+      const { results } = await db.prepare(
+        "UPDATE assets SET dead_at = datetime('now') WHERE collection_id = ? AND dead_at IS NULL RETURNING id"
+      ).bind(collectionId).all<{ id: string }>();
+      return (results ?? []).map((r) => r.id);
+    },
+    async bumpServeCount(id) {
+      await db.prepare("UPDATE assets SET serve_count = serve_count + 1 WHERE id = ?").bind(id).run();
     },
   };
   const queries: QueryStore = {
@@ -240,5 +267,44 @@ export function makeD1Stores(db: D1Database): {
     },
   };
 
-  return { assets, queries, keys, users, sessions, loginTokens, byok };
+  const collections: CollectionStore = {
+    async create({ id, ownerUserId, name, themePrompt }) {
+      await db.prepare(
+        "INSERT INTO collections (id, owner_user_id, name, theme_prompt) VALUES (?, ?, ?, ?)"
+      ).bind(id, ownerUserId, name, themePrompt).run();
+    },
+    async get(id) {
+      const row = await db.prepare(
+        "SELECT id, owner_user_id, name, theme_prompt, created_at, updated_at FROM collections WHERE id = ?"
+      ).bind(id).first<CollectionRow>();
+      return row ?? null;
+    },
+    async listByOwner(userId) {
+      // Aggregates come from live_assets so tombstoned images drop out of both counts.
+      const { results } = await db.prepare(
+        `SELECT c.id, c.owner_user_id, c.name, c.theme_prompt, c.created_at, c.updated_at,
+                COUNT(a.id) AS image_count, COALESCE(SUM(a.serve_count), 0) AS total_serves
+         FROM collections c LEFT JOIN live_assets a ON a.collection_id = c.id
+         WHERE c.owner_user_id = ?
+         GROUP BY c.id ORDER BY c.created_at DESC, c.id DESC`
+      ).bind(userId).all<CollectionSummary>();
+      return results ?? [];
+    },
+    async countByOwner(userId) {
+      const row = await db.prepare("SELECT COUNT(*) AS n FROM collections WHERE owner_user_id = ?").bind(userId).first<{ n: number }>();
+      return row?.n ?? 0;
+    },
+    async patch(id, f) {
+      const sets: string[] = ["updated_at = datetime('now')"];
+      const args: unknown[] = [];
+      if (f.name != null) { sets.push("name = ?"); args.push(f.name); }
+      if (f.themePrompt != null) { sets.push("theme_prompt = ?"); args.push(f.themePrompt); }
+      await db.prepare(`UPDATE collections SET ${sets.join(", ")} WHERE id = ?`).bind(...args, id).run();
+    },
+    async delete(id) {
+      await db.prepare("DELETE FROM collections WHERE id = ?").bind(id).run();
+    },
+  };
+
+  return { assets, queries, keys, users, sessions, loginTokens, byok, collections };
 }
