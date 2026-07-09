@@ -3262,7 +3262,7 @@
                   </tr>
                   <tr>
                     <td>collection</td><td>string</td><td>—</td>
-                    <td>Scope matching to a collection by ID (<code>col_…</code>). The collection's theme prompt is appended before matching, and on a miss only the collection owner's BYOK key generates — misses never queue background generation. Official SDKs pass it via <code>extra_body</code>.</td>
+                    <td>Scope matching to a collection by ID (<code>col_…</code>). The collection's theme prompt is appended before matching, and on a miss only the collection owner's BYOK key generates — misses never queue background generation. Official SDKs pass it via <code>extra_body</code>. Additional collections unlock with lifetime generated images (10 for the 2nd, 100 for the 3rd, 1000 for the 4th, …).</td>
                   </tr>
                   <tr>
                     <td>n</td><td>integer</td><td>1</td>
@@ -4525,6 +4525,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     }
 
     let myCollections = [];
+    let mySlots = null;
     const expandedCollections = new Set();
 
     async function loadCollections() {
@@ -4535,7 +4536,9 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         const r = await fetch('/v1/collections', { credentials: 'same-origin' });
         if (r.status === 401) { el.textContent = 'Log in to manage collections.'; return; }
         if (!r.ok) throw new Error('HTTP ' + r.status);
-        myCollections = (await r.json()).collections;
+        const data = await r.json();
+        myCollections = data.collections;
+        mySlots = data.slots || null;
         renderCollections();
       } catch {
         el.textContent = 'Could not load collections.';
@@ -4546,15 +4549,19 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       const el = document.getElementById('collections-body');
       if (!el) return;
       const canCreate = !!(currentByok && currentByok.enabled);
-      const createForm = canCreate ? `
+      const slotLocked = !!(mySlots && mySlots.generated < mySlots.next_required);
+      const createForm = !canCreate
+        ? `<div style="font-size:0.8125rem;margin-top:10px;">Add an enabled provider key above to create collections.</div>`
+        : slotLocked
+        ? `<div style="font-size:0.8125rem;margin-top:10px;">Generate ${mySlots.next_required - mySlots.generated} more image${mySlots.next_required - mySlots.generated === 1 ? '' : 's'} to unlock collection #${mySlots.used + 1} (${mySlots.generated}/${mySlots.next_required} lifetime images).</div>`
+        : `
         <div class="form-group" style="margin-top:14px;">
           <label>New collection</label>
           <input id="coll-name" placeholder="Name (e.g. Retro posters)" maxlength="80" style="height:40px;">
           <label style="margin-top:10px;">Theme prompt (appended to every generation)</label>
           <textarea id="coll-theme" maxlength="500" placeholder="e.g. retro travel poster style, muted palette" style="min-height:60px;"></textarea>
           <button class="btn btn-primary" style="height:40px;width:auto;padding:0 18px;margin-top:12px;" onclick="createCollection(this)">Create collection</button>
-        </div>`
-        : `<div style="font-size:0.8125rem;margin-top:10px;">Add an enabled provider key above to create collections.</div>`;
+        </div>`;
       const rows = myCollections.map((c) => `
         <div style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
