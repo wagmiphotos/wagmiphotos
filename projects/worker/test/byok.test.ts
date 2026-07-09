@@ -53,6 +53,9 @@ it("happy path: moderates, reserves, generates, persists, indexes, accounts", as
   expect(out.cap).toBe(50);
   expect(out.estSpendUsd).toBeCloseTo(0.04);
   expect((s as any)._upserted).toEqual([{ id: "gen-1", vector: [0.1] }]);
+  // audit trail: the D1 row records who generated it (never exposed on reads)
+  expect((s as any)._generatedInserts[0].createdBy).toBe("u1");
+  expect(out.asset).not.toHaveProperty("created_by");
 });
 
 it("skipped when no key row / disabled / cfg incomplete", async () => {

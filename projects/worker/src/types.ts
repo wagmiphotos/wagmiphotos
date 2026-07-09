@@ -20,7 +20,7 @@ export interface AssetStore {
   getAssetsByIds(ids: string[]): Promise<LibraryAssetRow[]>;
   /** Insert a BYOK-generated asset. source='byok'; the row serves from
    *  source_url until the demand-first rehost derives B2 sizes (0008). */
-  insertGenerated(a: { id: string; prompt: string; sourceUrl: string; mime: string; width: number | null; height: number | null; modelUsed: string; provider: string; priceUsd: number }): Promise<void>;
+  insertGenerated(a: { id: string; prompt: string; sourceUrl: string; mime: string; width: number | null; height: number | null; modelUsed: string; provider: string; priceUsd: number; createdBy: string }): Promise<void>;
 }
 export interface QueryStore {
   /** Upserts the query row and returns the row's effective generate state after merging. */

@@ -8,6 +8,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   const keyOwners = new Map<string, string>();
   const matches: Match[] = [];
   const upserted: { id: string; vector: number[] }[] = [];
+  const generatedInserts: any[] = [];
   const byokRows = new Map<string, ByokRow>();
   const byokUsage = new Map<string, { count: number; est_spend_usd: number }>();
   const base: Services = {
@@ -24,6 +25,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
         return r ? [r as LibraryAssetRow] : [];
       }),
       insertGenerated: async (a) => {
+        generatedInserts.push(a);
         assets.set(a.id, {
           id: a.id, prompt: a.prompt, source: "byok", source_id: null, model_used: a.modelUsed,
           width: a.width, height: a.height, mime: a.mime, source_url: a.sourceUrl, locally_cached: 0,
@@ -74,6 +76,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   (base as any)._recorded = recorded;
   (base as any)._matches = matches;
   (base as any)._upserted = upserted;
+  (base as any)._generatedInserts = generatedInserts;
   (base as any)._keyOwners = keyOwners;
   (base as any)._byokRows = byokRows;
   (base as any)._byokUsage = byokUsage;

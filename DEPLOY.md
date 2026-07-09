@@ -304,7 +304,7 @@ intentionally unused**. Deploy steps:
 
 ## BYOK (bring-your-own-key generation)
 
-1. **Migration:** `npx wrangler d1 migrations apply wagmiphotos --remote` (adds `byok_keys` / `byok_usage`, 0013).
+1. **Migration:** `npx wrangler d1 migrations apply wagmiphotos --remote` (adds `byok_keys` / `byok_usage` (0013) + `assets.created_by` audit column (0014)).
 2. **R2 bucket:** `npx wrangler r2 bucket create wagmiphotos-byok-originals`, enable public access
    (custom domain preferred), and set `BYOK_PUBLIC_URL_BASE` in `wrangler.toml` `[vars]` to that origin.
 3. **Secrets:**
