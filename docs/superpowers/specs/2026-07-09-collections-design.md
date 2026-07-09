@@ -135,8 +135,9 @@ non-owner on scoped misses).
 5. Below floor and no generation possible (non-owner, BYOK
    disabled/cap/error, or `generate_on_miss: false`): closest collection match
    as `approximate` (serve_count++ on it, or `202 pending` when the collection
-   is empty), `generation_queued: false` always, existing `byok.status` field
-   explains why when the caller is the owner.
+   is empty), `generation_queued: false` wherever that field appears
+   (approximate/pending; hits omit it, matching the global API convention),
+   existing `byok.status` field explains why when the caller is the owner.
 6. **`queries` is never written for scoped requests.** No demand rows = the
    backfill can never generate for a collection, and themed prompts don't
    distort global demand ranking. This is the whole backfill-exclusion
