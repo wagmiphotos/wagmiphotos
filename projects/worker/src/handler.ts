@@ -3,6 +3,7 @@ import { similarityFloor } from "./floor";
 import { normalizePrompt } from "./normalize";
 import { sha256Hex } from "./auth";
 import { assetUrls } from "./asset-urls";
+import { tryByokGenerate, type ByokCfg, type ByokOutcome } from "./byok";
 
 export interface GenBody { prompt: string; n?: number; size?: string; cache_tolerance?: number; generate_on_miss?: boolean; }
 export interface GenCfg { floorSimMax: number; floorSimMin: number; imagePrice: number; now: () => number; assetBaseUrl?: string; }
@@ -15,7 +16,43 @@ export const MAX_PROMPT_LEN = 2000;
 // Vectorize upsert; fetching a few candidates lets one orphan not hide the cache.
 const QUERY_TOP_K = 3;
 
-export async function handleGenerate(body: GenBody, s: Services, cfg: GenCfg): Promise<Response> {
+// BYOK fires exactly where the response would be approximate/pending and the
+// request did not opt out of generation. Returns null when BYOK didn't take
+// over (skipped / fallback) so the caller continues with today's behavior;
+// fallbackStatus carries cap_reached/provider_error into the fallback body.
+async function runByok(
+  byok: { userId: string; cfg: ByokCfg } | null | undefined,
+  generateOnMiss: boolean, prompt: string, vec: number[], s: Services
+): Promise<{ outcome: ByokOutcome | null; fallbackStatus: string | null }> {
+  if (!byok || !generateOnMiss) return { outcome: null, fallbackStatus: null };
+  const outcome = await tryByokGenerate({ userId: byok.userId, prompt, vec }, s, byok.cfg);
+  if (outcome.kind === "generated" || outcome.kind === "content_policy") return { outcome, fallbackStatus: null };
+  if (outcome.kind === "cap_reached" || outcome.kind === "provider_error") return { outcome: null, fallbackStatus: outcome.kind };
+  return { outcome: null, fallbackStatus: null }; // skipped
+}
+
+function generatedResponse(outcome: Extract<ByokOutcome, { kind: "generated" }>, cfg: GenCfg): Response {
+  const u = assetUrls(outcome.asset, cfg.assetBaseUrl);
+  return Response.json({
+    created: cfg.now(),
+    data: [{ url: u.url }],
+    shared_cache: {
+      result: "generated",
+      similarity: 1,
+      cost_saved_usd: 0,
+      model_used: outcome.asset.model_used,
+      source: outcome.asset.source,
+      sizes: { thumb: u.thumb_url, medium: u.medium_url, large: u.url },
+      original_url: u.original_url,
+      byok: { used: outcome.used, cap: outcome.cap, est_spend_usd: outcome.estSpendUsd },
+    },
+  });
+}
+
+export async function handleGenerate(
+  body: GenBody, s: Services, cfg: GenCfg,
+  byok?: { userId: string; cfg: ByokCfg } | null
+): Promise<Response> {
   if (body.n != null && body.n !== 1) {
     return Response.json({ error: "only n=1 is supported" }, { status: 422 });
   }
@@ -51,6 +88,16 @@ export async function handleGenerate(body: GenBody, s: Services, cfg: GenCfg): P
 
   // empty pool: nothing to serve
   if (!best || !asset) {
+    const b = await runByok(byok, generateOnMiss, prompt, vec, s);
+    if (b.outcome?.kind === "content_policy") {
+      return Response.json({ error: "content_policy", category: b.outcome.category }, { status: 400 });
+    }
+    if (b.outcome?.kind === "generated") {
+      try {
+        await s.queries.recordQuery({ normalized, original: prompt, assetId: b.outcome.asset.id, similarity: 1, built: true, generate: false });
+      } catch (e) { console.error("recordQuery failed", e); }
+      return generatedResponse(b.outcome, cfg);
+    }
     let generationQueued = false;
     try {
       generationQueued = await s.queries.recordQuery({
@@ -58,13 +105,33 @@ export async function handleGenerate(body: GenBody, s: Services, cfg: GenCfg): P
       });
     } catch (e) { console.error("recordQuery failed", e); } // demand write failed: nothing queued
     return Response.json(
-      { created: cfg.now(), data: [], shared_cache: { result: "pending", similarity: 0, cost_saved_usd: 0, generation_queued: generationQueued } },
+      {
+        created: cfg.now(), data: [],
+        shared_cache: {
+          result: "pending", similarity: 0, cost_saved_usd: 0, generation_queued: generationQueued,
+          ...(b.fallbackStatus ? { byok: { status: b.fallbackStatus } } : {}),
+        },
+      },
       { status: 202 }
     );
   }
 
   const isHit = best.score >= floor;
   const result = isHit ? "hit" : "approximate";
+  let byokFallbackStatus: string | null = null;
+  if (!isHit) {
+    const b = await runByok(byok, generateOnMiss, prompt, vec, s);
+    if (b.outcome?.kind === "content_policy") {
+      return Response.json({ error: "content_policy", category: b.outcome.category }, { status: 400 });
+    }
+    if (b.outcome?.kind === "generated") {
+      try {
+        await s.queries.recordQuery({ normalized, original: prompt, assetId: b.outcome.asset.id, similarity: 1, built: true, generate: false });
+      } catch (e) { console.error("recordQuery failed", e); }
+      return generatedResponse(b.outcome, cfg);
+    }
+    byokFallbackStatus = b.fallbackStatus;
+  }
   let generationQueued = false;
   try {
     generationQueued = await s.queries.recordQuery({
@@ -85,6 +152,7 @@ export async function handleGenerate(body: GenBody, s: Services, cfg: GenCfg): P
       sizes: { thumb: u.thumb_url, medium: u.medium_url, large: u.url },
       original_url: u.original_url,
       ...(isHit ? {} : { generation_queued: generationQueued }),
+      ...(byokFallbackStatus ? { byok: { status: byokFallbackStatus } } : {}),
     },
   });
 }

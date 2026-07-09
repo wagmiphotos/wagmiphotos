@@ -3,6 +3,8 @@ import { handleGenerate, handleKeygen } from "../src/handler";
 import { fakeServices } from "./fakes";
 import { sha256Hex } from "../src/auth";
 import type { AssetRow } from "../src/types";
+import { encryptSecret } from "../src/crypto";
+import type { ByokCfg } from "../src/byok";
 
 const BASE = "https://cdn.example.com";
 const cfg = { floorSimMax: 0.35, floorSimMin: 0.18, imagePrice: 0.055, now: () => 1000, assetBaseUrl: BASE };
@@ -241,4 +243,98 @@ it("keygen 429 when rate limited", async () => {
   const s = fakeServices({ rateLimiter: { limit: async () => false } });
   const res = await handleKeygen(new Request("https://x"), s, () => "sc-fixed", "usr_1");
   expect(res.status).toBe(429);
+});
+
+const KEK = btoa(String.fromCharCode(...Array.from({ length: 32 }, (_, i) => i)));
+const cleanModeration = (async () =>
+  new Response(JSON.stringify({ results: [{ flagged: false, categories: {} }] }), { status: 200 })
+) as unknown as typeof fetch;
+
+async function byokCtx(s: any, over: Partial<ByokCfg> = {}) {
+  await s.byok.put({
+    userId: "u1", provider: "openai",
+    keyCiphertext: await encryptSecret("sk-user", KEK), keyLast4: "user", monthlyCap: 50, enabled: true,
+  });
+  return {
+    userId: "u1",
+    cfg: {
+      kek: KEK, moderationKey: "sk-op", bucket: { put: async () => ({}) },
+      publicUrlBase: "https://byok.example", now: () => 1783468800, // 2026-07-08 UTC
+
+      fetchFn: cleanModeration,
+      providerFor: () => ({ generate: async () => ({ bytes: new Uint8Array([1]).buffer, mime: "image/png" }), validateKey: async () => true }),
+      uuid: () => "gen-1",
+      ...over,
+    } as ByokCfg,
+  };
+}
+
+it("below-floor + BYOK: returns result=generated with usage block and records built", async () => {
+  const s = fakeServices();
+  (s as any)._matches.push({ id: "a1", score: 0.20 }); // below this file's floor (~0.32)
+  (s as any)._assets.set("a1", { id: "a1", prompt: "old", source: "pd12m", source_id: null, model_used: null, width: 1, height: 1, mime: "image/webp", source_url: "https://ext/x.webp", locally_cached: 0 });
+  const res = await handleGenerate({ prompt: "a red fox" }, s, cfg, await byokCtx(s));
+  const body: any = await res.json();
+  expect(res.status).toBe(200);
+  expect(body.shared_cache.result).toBe("generated");
+  expect(body.shared_cache.source).toBe("byok");
+  expect(body.shared_cache.byok).toEqual({ used: 1, cap: 50, est_spend_usd: 0.04 });
+  expect(body.data[0].url).toBe("https://byok.example/byok/gen-1/original.png");
+  const recorded = (s as any)._recorded;
+  expect(recorded[recorded.length - 1]).toMatchObject({ assetId: "gen-1", built: true });
+});
+
+it("empty pool + BYOK: generates instead of 202 pending", async () => {
+  const s = fakeServices();
+  const res = await handleGenerate({ prompt: "a red fox" }, s, cfg, await byokCtx(s));
+  expect(res.status).toBe(200);
+  expect(((await res.json()) as any).shared_cache.result).toBe("generated");
+});
+
+it("hit is untouched by BYOK", async () => {
+  const s = fakeServices();
+  (s as any)._matches.push({ id: "a1", score: 0.99 });
+  (s as any)._assets.set("a1", { id: "a1", prompt: "p", source: "pd12m", source_id: null, model_used: null, width: 1, height: 1, mime: "image/webp", source_url: "https://ext/x.webp", locally_cached: 0 });
+  const res = await handleGenerate({ prompt: "a red fox" }, s, cfg, await byokCtx(s));
+  expect(((await res.json()) as any).shared_cache.result).toBe("hit");
+});
+
+it("generate_on_miss=false is the kill switch: no BYOK, normal approximate", async () => {
+  const s = fakeServices();
+  (s as any)._matches.push({ id: "a1", score: 0.20 }); // below this file's floor (~0.32)
+  (s as any)._assets.set("a1", { id: "a1", prompt: "p", source: "pd12m", source_id: null, model_used: null, width: 1, height: 1, mime: "image/webp", source_url: "https://ext/x.webp", locally_cached: 0 });
+  const res = await handleGenerate({ prompt: "a red fox", generate_on_miss: false }, s, cfg, await byokCtx(s));
+  const body: any = await res.json();
+  expect(body.shared_cache.result).toBe("approximate");
+  expect(body.shared_cache.byok).toBeUndefined();
+});
+
+it("content policy -> 400 with category", async () => {
+  const s = fakeServices();
+  const res = await handleGenerate({ prompt: "pikachu portrait" }, s, cfg, await byokCtx(s));
+  expect(res.status).toBe(400);
+  expect(await res.json()).toEqual({ error: "content_policy", category: "denylist:pikachu" });
+});
+
+it("cap reached -> approximate fallback with byok status", async () => {
+  const s = fakeServices();
+  (s as any)._matches.push({ id: "a1", score: 0.20 }); // below this file's floor (~0.32)
+  (s as any)._assets.set("a1", { id: "a1", prompt: "p", source: "pd12m", source_id: null, model_used: null, width: 1, height: 1, mime: "image/webp", source_url: "https://ext/x.webp", locally_cached: 0 });
+  const ctx = await byokCtx(s);
+  await s.byok.patch("u1", { monthlyCap: 1 });
+  await s.byok.reserve("u1", "2026-07", 1);
+  const res = await handleGenerate({ prompt: "a red fox" }, s, cfg, ctx);
+  const body: any = await res.json();
+  expect(body.shared_cache.result).toBe("approximate");
+  expect(body.shared_cache.byok).toEqual({ status: "cap_reached" });
+});
+
+it("provider failure on empty pool -> 202 pending with byok status", async () => {
+  const s = fakeServices();
+  const ctx = await byokCtx(s, { providerFor: () => ({ generate: async () => { throw new Error("boom"); }, validateKey: async () => true }) });
+  const res = await handleGenerate({ prompt: "a red fox" }, s, cfg, ctx);
+  expect(res.status).toBe(202);
+  const body: any = await res.json();
+  expect(body.shared_cache.result).toBe("pending");
+  expect(body.shared_cache.byok).toEqual({ status: "provider_error" });
 });
