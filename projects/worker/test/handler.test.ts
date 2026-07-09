@@ -278,7 +278,7 @@ it("below-floor + BYOK: returns result=generated with usage block and records bu
   expect(res.status).toBe(200);
   expect(body.shared_cache.result).toBe("generated");
   expect(body.shared_cache.source).toBe("byok");
-  expect(body.shared_cache.byok).toEqual({ used: 1, cap: 50, est_spend_usd: 0.055 });
+  expect(body.shared_cache.byok).toEqual({ used: 1, cap: 50, est_spend_usd: 0.04 });
   expect(body.data[0].url).toBe("https://byok.example/byok/gen-1/original.png");
   const recorded = (s as any)._recorded;
   expect(recorded[recorded.length - 1]).toMatchObject({ assetId: "gen-1", built: true });
@@ -456,7 +456,7 @@ it("scoped owner + working BYOK: generates on miss, echoes collection, no demand
   const body: any = await res.json();
   expect(body.shared_cache.result).toBe("generated");
   expect(body.shared_cache.collection).toBe(id);
-  expect(body.shared_cache.byok).toEqual({ used: 1, cap: 50, est_spend_usd: 0.055 });
+  expect(body.shared_cache.byok).toEqual({ used: 1, cap: 50, est_spend_usd: 0.04 });
   expect(s._generatedInserts[0].collectionId).toBe(id);
   expect(s._nsUpserted).toEqual([{ id: "gen-1", vector: [0.1, 0.2, 0.3], namespace: id }]);
   expect(s._recorded).toEqual([]);     // scoped: no demand row, even for the generated return

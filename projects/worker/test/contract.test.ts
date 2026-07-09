@@ -35,7 +35,7 @@ it("fnv1a32 reference value", () => {
 });
 
 it("byok provider pins: fixed model + price estimate per provider", () => {
-  expect(contract.byok_providers.openai.model).toBe("gpt-image-2");
+  expect(contract.byok_providers.openai.model).toBe("gpt-image-1");
   expect(contract.byok_providers.gmicloud.model).toBe("gpt-image-2-generate");
   expect(contract.byok_providers.openai.price_per_image_usd).toBeGreaterThan(0);
   expect(contract.byok_providers.gmicloud.price_per_image_usd).toBeGreaterThan(0);

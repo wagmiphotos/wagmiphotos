@@ -70,7 +70,7 @@ function makeOpenAiProvider(fetchFn: typeof fetch): ImageProvider {
       const res = await fetchFn(`${OPENAI_API}/images/generations`, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        // quality pinned to medium: matches the contract price estimate ($0.055/img)
+        // quality pinned to medium: matches the contract price estimate ($0.04/img)
         // and avoids auto resolving to high (~4x cost, slower generations).
         // webp@85: ~10x smaller payload. stream + partial_images=1: OpenAI's
         // gateway intermittently kills SILENT image connections after ~20s

@@ -21,7 +21,7 @@ it("openai: posts the contract-pinned model with streaming and decodes the compl
   }) as unknown as typeof fetch;
   const img = await providerFor("openai", fetchFn).generate("a red fox", "sk-user");
   expect(calls[0].url).toBe("https://api.openai.com/v1/images/generations");
-  expect(calls[0].body).toEqual({ model: "gpt-image-2", prompt: "a red fox", n: 1, size: "1024x1024", quality: "medium", output_format: "webp", output_compression: 85, stream: true, partial_images: 1 });
+  expect(calls[0].body).toEqual({ model: "gpt-image-1", prompt: "a red fox", n: 1, size: "1024x1024", quality: "medium", output_format: "webp", output_compression: 85, stream: true, partial_images: 1 });
   expect(calls[0].init.signal).toBeInstanceOf(AbortSignal);
   expect(img.mime).toBe("image/webp");
   expect(new Uint8Array(img.bytes)).toEqual(new Uint8Array(PNG)); // completed frame, not the partial
