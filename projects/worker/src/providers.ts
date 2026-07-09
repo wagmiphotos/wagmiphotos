@@ -42,7 +42,9 @@ async function readSseEvent(res: Response, wantType: string): Promise<any | null
   let buf = "";
   while (true) {
     const { done, value } = await reader.read();
-    if (value) buf += decoder.decode(value, { stream: true });
+    // SSE permits \r\n line endings; JSON payloads escape any literal \r, so
+    // stripping it per-chunk is loss-free and \r can't span a chunk boundary.
+    if (value) buf += decoder.decode(value, { stream: true }).replace(/\r/g, "");
     let idx;
     while ((idx = buf.indexOf("\n\n")) >= 0) {
       const block = buf.slice(0, idx);

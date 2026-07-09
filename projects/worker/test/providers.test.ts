@@ -27,6 +27,16 @@ it("openai: posts the contract-pinned model with streaming and decodes the compl
   expect(new Uint8Array(img.bytes)).toEqual(new Uint8Array(PNG)); // completed frame, not the partial
 });
 
+it("openai: parses CRLF-framed SSE (spec allows \\r\\n line endings)", async () => {
+  const crlf = sseBody([
+    { type: "image_generation.partial_image", b64: btoa("PARTIAL") },
+    { type: "image_generation.completed", b64: btoa("\x89PNG") },
+  ]).replace(/\n/g, "\r\n");
+  const fetchFn = (async () => new Response(crlf, { status: 200 })) as unknown as typeof fetch;
+  const img = await providerFor("openai", fetchFn).generate("a red fox", "sk-user");
+  expect(new Uint8Array(img.bytes)).toEqual(new Uint8Array(PNG));
+});
+
 it("openai: stream ending without a completed event throws", async () => {
   const fetchFn = (async () => new Response(sseBody([
     { type: "image_generation.partial_image", b64: btoa("PARTIAL") },
