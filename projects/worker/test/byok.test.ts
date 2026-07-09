@@ -110,6 +110,9 @@ it("provider failure refunds the reservation", async () => {
     cfg({ providerFor: () => ({ generate: async () => { throw new Error("boom"); }, validateKey: async () => true }) }));
   expect(out.kind).toBe("provider_error");
   expect((await s.byok.getUsage("u1", "2026-07")).count).toBe(0);
+  const row = (s as any)._byokRows.get("u1");
+  expect(row.enabled).toBe(1);
+  expect(row.last_error).toBeNull();
 });
 
 it("provider 401 refunds, disables the key, and records last_error", async () => {
@@ -135,4 +138,15 @@ it("vector upsert failure does NOT fail the request (post-spend)", async () => {
   (s.vectorize as any).upsert = async () => { throw new Error("vectorize offline"); };
   const out = await tryByokGenerate({ userId: "u1", prompt: "a red fox", vec: [0.1] }, s, cfg());
   expect(out.kind).toBe("generated");
+});
+
+it("post-persist bookkeeping failure does NOT refund or fail the request", async () => {
+  const s = await seededServices();
+  (s.byok as any).getUsage = async () => { throw new Error("d1 read hiccup"); };
+  const out = await tryByokGenerate({ userId: "u1", prompt: "a red fox", vec: [0.1] }, s, cfg());
+  expect(out.kind).toBe("generated");
+  if (out.kind !== "generated") return;
+  expect(out.used).toBe(1); // fallback numbers when the read fails
+  expect(out.estSpendUsd).toBeCloseTo(0.04);
+  expect((s as any)._byokUsage.get("u1:2026-07").count).toBe(1); // reservation NOT refunded
 });
