@@ -15,7 +15,10 @@ import { handleCheckout, handlePortal, handleStripeWebhook } from "./stripe-rout
 import { isPaid } from "./entitlement";
 import { handlePutByok, handlePatchByok, handleDeleteByok } from "./byok-routes";
 import type { ByokCfg } from "./byok";
-import { handleCreateCollection, handleListCollections, handlePatchCollection } from "./collections-routes";
+import {
+  handleCreateCollection, handleListCollections, handlePatchCollection,
+  handleListCollectionImages, handleDeleteCollectionImage, handleDeleteCollection,
+} from "./collections-routes";
 
 function buildServices(env: Env): Services {
   const { assets, queries, keys, users, sessions, loginTokens, byok, collections } = makeD1Stores(env.DB);
@@ -125,18 +128,32 @@ export default {
         if (request.method === "DELETE") return await handleDeleteByok(request, env, services);
       }
 
+      const libraryCfg = { floorSimMin: numEnv(env.FLOOR_SIM_MIN, FLOOR_SIM_MIN), assetBaseUrl: env.ASSET_BASE_URL };
+
       if (url.pathname === "/v1/collections") {
         if (request.method === "POST") return await handleCreateCollection(request, env, services);
         if (request.method === "GET") return await handleListCollections(request, env, services);
       }
+      const collImages = url.pathname.match(/^\/v1\/collections\/([^/]+)\/images$/);
+      if (collImages && request.method === "GET") {
+        let id: string;
+        try { id = decodeURIComponent(collImages[1]); } catch { return new Response("Not found", { status: 404 }); }
+        return await handleListCollectionImages(id, url, request, env, services, libraryCfg);
+      }
+      const collImageDel = url.pathname.match(/^\/v1\/collections\/([^/]+)\/images\/([^/]+)$/);
+      if (collImageDel && request.method === "DELETE") {
+        let cid: string, aid: string;
+        try { cid = decodeURIComponent(collImageDel[1]); aid = decodeURIComponent(collImageDel[2]); }
+        catch { return new Response("Not found", { status: 404 }); }
+        return await handleDeleteCollectionImage(cid, aid, request, env, services);
+      }
       const collOne = url.pathname.match(/^\/v1\/collections\/([^/]+)$/);
-      if (collOne && request.method === "PATCH") {
+      if (collOne && (request.method === "PATCH" || request.method === "DELETE")) {
         let id: string;
         try { id = decodeURIComponent(collOne[1]); } catch { return new Response("Not found", { status: 404 }); }
-        return await handlePatchCollection(id, request, env, services);
+        if (request.method === "PATCH") return await handlePatchCollection(id, request, env, services);
+        return await handleDeleteCollection(id, request, env, services);
       }
-
-      const libraryCfg = { floorSimMin: numEnv(env.FLOOR_SIM_MIN, FLOOR_SIM_MIN), assetBaseUrl: env.ASSET_BASE_URL };
 
       if (url.pathname === "/v1/library" && request.method === "GET") {
         if (!(await resolveApiPrincipal(request, env, services))) return Response.json({ error: "login required" }, { status: 401 });

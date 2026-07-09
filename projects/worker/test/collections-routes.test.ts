@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import { handleCreateCollection, handleListCollections, handlePatchCollection } from "../src/collections-routes";
+import { handleListCollectionImages, handleDeleteCollectionImage, handleDeleteCollection } from "../src/collections-routes";
 import { fakeServices } from "./fakes";
 import { sha256Hex } from "../src/auth";
 
@@ -102,4 +103,69 @@ it("bearer key auth works for create (paid keys manage collections too)", async 
     body: JSON.stringify({ name: "via key" }),
   });
   expect((await handleCreateCollection(req, env, s)).status).toBe(200);
+});
+
+function seedCollectionAsset(s: any, id: string, collectionId: string) {
+  const row = {
+    id, prompt: `p-${id}`, source: "byok", source_id: null, model_used: "gpt-image-1",
+    width: 1024, height: 1024, mime: "image/png", source_url: `https://x/${id}.png`,
+    locally_cached: 0, created_at: "2026-07-09", collection_id: collectionId,
+  };
+  (s as any)._assets.set(id, row);
+  (s as any)._libraryRows.push(row);
+}
+
+it("images list: owner sees serve_count; non-owner 404", async () => {
+  const { req, s } = sessionReq("usr_1");
+  const id = "col_i".padEnd(24, "i");
+  await s.collections.create({ id, ownerUserId: "usr_1", name: "n", themePrompt: "" });
+  seedCollectionAsset(s, "a1", id);
+  await s.assets.bumpServeCount("a1");
+  const res = await handleListCollectionImages(id, new URL("https://x/v1/collections/x/images"), req, env, s, {});
+  expect(res.status).toBe(200);
+  const { images }: any = await res.json();
+  expect(images[0].id).toBe("a1");
+  expect(images[0].serve_count).toBe(1);
+
+  const { req: req2, s: s2 } = sessionReq("usr_2");
+  await s2.collections.create({ id, ownerUserId: "usr_1", name: "n", themePrompt: "" });
+  expect((await handleListCollectionImages(id, new URL("https://x/v1/collections/x/images"), req2, env, s2, {})).status).toBe(404);
+});
+
+it("image delete: tombstones + deletes vectors; 404 for non-member", async () => {
+  const { req, s } = sessionReq("usr_1", "DELETE");
+  const id = "col_d".padEnd(24, "d");
+  await s.collections.create({ id, ownerUserId: "usr_1", name: "n", themePrompt: "" });
+  seedCollectionAsset(s, "a1", id);
+  const res = await handleDeleteCollectionImage(id, "a1", req, env, s);
+  expect(res.status).toBe(200);
+  expect((s as any)._tombstoned).toContain("a1");
+  expect((s as any)._vectorDeletes).toContain("a1");
+  // not a member anymore -> 404 on repeat
+  expect((await handleDeleteCollectionImage(id, "a1", req, env, s)).status).toBe(404);
+});
+
+it("collection delete: tombstones all live members, deletes vectors, removes the row", async () => {
+  const { req, s } = sessionReq("usr_1", "DELETE");
+  const id = "col_z".padEnd(24, "z");
+  await s.collections.create({ id, ownerUserId: "usr_1", name: "n", themePrompt: "" });
+  seedCollectionAsset(s, "a1", id);
+  seedCollectionAsset(s, "a2", id);
+  const res = await handleDeleteCollection(id, req, env, s);
+  expect(res.status).toBe(200);
+  expect(((await res.json()) as any).images_deleted).toBe(2);
+  expect((s as any)._tombstoned.sort()).toEqual(["a1", "a2"]);
+  expect((s as any)._vectorDeletes.sort()).toEqual(["a1", "a2"]);
+  expect((s as any)._collectionRows.has(id)).toBe(false);
+});
+
+it("collection delete: vector-delete failure still deletes the collection (best-effort)", async () => {
+  const { req, s } = sessionReq("usr_1", "DELETE");
+  const id = "col_f".padEnd(24, "f");
+  await s.collections.create({ id, ownerUserId: "usr_1", name: "n", themePrompt: "" });
+  seedCollectionAsset(s, "a1", id);
+  s.vectorize.deleteByIds = async () => { throw new Error("vectorize down"); };
+  const res = await handleDeleteCollection(id, req, env, s);
+  expect(res.status).toBe(200);
+  expect((s as any)._collectionRows.has(id)).toBe(false);
 });
