@@ -106,4 +106,11 @@ export interface Env {
   /** Base URL for locally_cached asset objects (B2/CDN origin); see asset-urls.ts. */
   ASSET_BASE_URL?: string;
   STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; STRIPE_PRICE_ID?: string;
+  /** BYOK: 32-byte base64 KEK for user provider keys (wrangler secret). */
+  BYOK_KEK?: string;
+  /** BYOK: operator OpenAI key for moderating gmicloud-key users (wrangler secret). */
+  OPENAI_API_KEY?: string;
+  /** BYOK: public base URL of the BYOK_ORIGINALS bucket. */
+  BYOK_PUBLIC_URL_BASE?: string;
+  BYOK_ORIGINALS?: R2Bucket;
 }

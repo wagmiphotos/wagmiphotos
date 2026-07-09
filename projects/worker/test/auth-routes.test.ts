@@ -8,6 +8,7 @@ function svc(over: any = {}) {
   const created: any[] = [];
   const consumeCalls: any[] = [];
   const purged: string[] = [];
+  const byokRows = new Map<string, any>();
   const base = {
     users: { upsertByEmail: async (id: string, email: string) => ({ id, email }), getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null }) },
     sessions: { create: async (u: string, h: string) => { created.push({ u, h }); }, resolve: async () => ({ user_id: "usr_1" }), touch: async () => {}, delete: async () => {}, purgeExpired: async () => { purged.push("sessions"); } },
@@ -23,9 +24,21 @@ function svc(over: any = {}) {
     keys: { getKeyOwner: async () => null, addKey: async () => {}, listByUser: async () => [] },
     rateLimiter: { limit: async () => true },
     email: { sendMagicLink: async (e: string, l: string) => { sent.push({ e, l }); } },
+    byok: {
+      get: async (u: string) => byokRows.get(u) ?? null,
+      put: async (i: any) => { byokRows.set(i.userId, { user_id: i.userId, provider: i.provider, key_ciphertext: i.keyCiphertext, key_last4: i.keyLast4, enabled: i.enabled ? 1 : 0, monthly_cap: i.monthlyCap, last_error: null, created_at: "x", updated_at: "x" }); },
+      patch: async (u: string, f: any) => { const r = byokRows.get(u); if (!r) return; if (f.enabled != null) r.enabled = f.enabled ? 1 : 0; if (f.monthlyCap != null) r.monthly_cap = f.monthlyCap; },
+      delete: async (u: string) => { byokRows.delete(u); },
+      disable: async (u: string, err: string) => { const r = byokRows.get(u); if (r) { r.enabled = 0; r.last_error = err; } },
+      getUsage: async () => ({ count: 0, est_spend_usd: 0 }),
+      reserve: async () => true,
+      refund: async () => {},
+      addSpend: async () => {},
+    },
   };
   const s = { ...base, ...over };
   (s as any)._sent = sent; (s as any)._created = created; (s as any)._consumeCalls = consumeCalls; (s as any)._purged = purged;
+  (s as any)._byokRows = byokRows;
   return s as any;
 }
 const cfg = { token: () => "TOK", nonce: () => "NON", verifyBase: "https://wagmi.photos", now: () => 0 };
@@ -204,4 +217,21 @@ it("me includes the plan projection", async () => {
   const res = await handleMe(req, {} as any, paid);
   const j: any = await res.json();
   expect(j.plan).toEqual({ active: true, status: "active", current_period_end: "2027-07-08T00:00:00.000Z" });
+});
+
+it("me: byok is null without a key", async () => {
+  const s = svc();
+  const req = new Request("https://x/v1/me", { headers: { Cookie: `${SESSION_COOKIE}=tok` } });
+  const res = await handleMe(req, {} as any, s);
+  const j: any = await res.json();
+  expect(j.byok).toBeNull();
+});
+
+it("me includes the byok block when a key exists", async () => {
+  const s = svc();
+  await s.byok.put({ userId: "usr_1", provider: "openai", keyCiphertext: "ct", keyLast4: "2345", monthlyCap: 50, enabled: true });
+  const req = new Request("https://x/v1/me", { headers: { Cookie: `${SESSION_COOKIE}=tok` } });
+  const res = await handleMe(req, {} as any, s);
+  const body: any = await res.json();
+  expect(body.byok).toMatchObject({ provider: "openai", key_last4: "2345" });
 });

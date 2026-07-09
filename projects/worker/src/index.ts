@@ -13,6 +13,8 @@ import { resolveApiPrincipal, resolveSession } from "./session";
 import { handleLoginRequest, handleVerify, handleMe, handleLogout, handleAcceptTos, handleListKeys, handleDeleteKey } from "./auth-routes";
 import { handleCheckout, handlePortal, handleStripeWebhook } from "./stripe-routes";
 import { isPaid } from "./entitlement";
+import { handlePutByok, handlePatchByok, handleDeleteByok } from "./byok-routes";
+import type { ByokCfg } from "./byok";
 
 function buildServices(env: Env): Services {
   const { assets, queries, keys, users, sessions, loginTokens, byok } = makeD1Stores(env.DB);
@@ -116,6 +118,12 @@ export default {
       if (url.pathname === "/v1/stripe/webhook" && request.method === "POST")
         return await handleStripeWebhook(request, env, services);
 
+      if (url.pathname === "/v1/byok") {
+        if (request.method === "PUT") return await handlePutByok(request, env, services);
+        if (request.method === "PATCH") return await handlePatchByok(request, env, services);
+        if (request.method === "DELETE") return await handleDeleteByok(request, env, services);
+      }
+
       const libraryCfg = { floorSimMin: numEnv(env.FLOOR_SIM_MIN, FLOOR_SIM_MIN), assetBaseUrl: env.ASSET_BASE_URL };
 
       if (url.pathname === "/v1/library" && request.method === "GET") {
@@ -171,7 +179,19 @@ export default {
           now: () => Math.floor(Date.now() / 1000),
           assetBaseUrl: env.ASSET_BASE_URL,
         };
-        return await handleGenerate(body, services, cfg);
+        // BYOK is active only when fully configured; master/dev principals have
+        // no byok row and fall through to "skipped" inside the orchestrator.
+        const byokCtx = env.BYOK_KEK && env.BYOK_ORIGINALS && env.BYOK_PUBLIC_URL_BASE
+          ? {
+              userId: principal.userId,
+              cfg: {
+                kek: env.BYOK_KEK, moderationKey: env.OPENAI_API_KEY,
+                bucket: env.BYOK_ORIGINALS, publicUrlBase: env.BYOK_PUBLIC_URL_BASE,
+                now: cfg.now,
+              } satisfies ByokCfg,
+            }
+          : null;
+        return await handleGenerate(body, services, cfg, byokCtx);
       }
 
       if (url.pathname.startsWith("/v1/")) {

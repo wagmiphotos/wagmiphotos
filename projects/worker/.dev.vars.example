@@ -6,3 +6,9 @@ PUBLIC_SITE_URL=http://localhost:8787
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_PRICE_ID=price_...
+
+# BYOK (optional locally): base64 of 32 random bytes — openssl rand -base64 32
+BYOK_KEK=
+# Operator OpenAI key: moderates prompts for gmicloud-key users
+OPENAI_API_KEY=
+BYOK_PUBLIC_URL_BASE=http://localhost:8787/byok-dev

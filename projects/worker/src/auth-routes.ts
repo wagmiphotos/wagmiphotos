@@ -7,6 +7,7 @@ import {
 } from "./session";
 import { emailIsDevMode } from "./email";
 import { planView } from "./entitlement";
+import { byokView } from "./byok-routes";
 
 export interface AuthCfg { token?: () => string; nonce?: () => string; verifyBase: string; now?: () => number; }
 
@@ -82,6 +83,7 @@ export async function handleMe(request: Request, env: Env, s: Services): Promise
       accepted: user.tos_version === TOS_VERSION,
       accepted_version: user.tos_version,
     },
+    byok: await byokView(s, principal.userId, Math.floor(Date.now() / 1000)),
   });
 }
 

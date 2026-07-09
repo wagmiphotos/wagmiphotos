@@ -28,6 +28,13 @@ index_name = "wagmiphotos-bge-1"
 binding = "VECTORIZE_2"
 index_name = "wagmiphotos-bge-2"
 
+# R2 — originals for BYOK in-request generation. Serve the bucket publicly
+# (custom domain or r2.dev) and point BYOK_PUBLIC_URL_BASE at it. The
+# demand-first rehost derives thumb/medium/large into B2 later (0008).
+[[r2_buckets]]
+binding = "BYOK_ORIGINALS"
+bucket_name = "wagmiphotos-byok-originals"
+
 # Per-IP rate limit for key generation
 [[unsafe.bindings]]
 name = "RATE_LIMITER"
@@ -56,7 +63,8 @@ PUBLIC_API_BASE_URL = "https://api.wagmi.photos/v1"  # documented API base rende
 GITHUB_REPO = "wagmiphotos/wagmiphotos"            # repo for the header star-count badge
 ASSET_BASE_URL = "https://images.wagmi.photos/file/wagmi-photos-library"  # CF-proxied B2 (free egress + cache rule); MUST equal backfill B2_PUBLIC_URL_BASE
 STRIPE_PRICE_ID = "price_REPLACE_ME"   # recurring annual $24 Price id (sandbox now, live at launch)
-# Secrets (set with `wrangler secret put`): MASTER_API_KEY, RESEND_API_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+BYOK_PUBLIC_URL_BASE = "https://byok.wagmi.photos"  # public origin of the BYOK_ORIGINALS R2 bucket
+# Secrets (set with `wrangler secret put`): MASTER_API_KEY, RESEND_API_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, BYOK_KEK, OPENAI_API_KEY
 
 [assets]
 directory = "./public"
