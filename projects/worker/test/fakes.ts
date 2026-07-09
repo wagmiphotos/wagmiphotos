@@ -29,10 +29,15 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
       }),
       insertGenerated: async (a) => {
         generatedInserts.push(a);
-        assets.set(a.id, {
+        // collection_id + libraryRows keep the row visible to the collection
+        // fakes (getCollectionMember/tombstoneByCollection/listByCollection).
+        const row = {
           id: a.id, prompt: a.prompt, source: "byok", source_id: null, model_used: a.modelUsed,
           width: a.width, height: a.height, mime: a.mime, source_url: a.sourceUrl, locally_cached: 0,
-        });
+          collection_id: a.collectionId ?? null, created_at: "x",
+        };
+        assets.set(a.id, row);
+        libraryRows.push(row);
       },
       listByCollection: async ({ collectionId, limit, offset }) =>
         libraryRows.filter((r: any) => r.collection_id === collectionId).slice(offset, offset + limit).map((r: any) => ({ ...r, serve_count: serveCounts.get(r.id) ?? 0 })),
