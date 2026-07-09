@@ -4969,7 +4969,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         } else if (sc.byok && sc.byok.status === 'cap_reached') {
           appendResultNote('Your monthly BYOK cap is reached — showing the closest match instead. Raise the cap on the Account page.');
         } else if (sc.byok && sc.byok.status === 'provider_error') {
-          appendResultNote('Your provider key failed — showing the closest match instead. Check the Account page.');
+          appendResultNote('Your provider key failed — showing the closest match instead. If this keeps happening with an OpenAI key, check that your OpenAI organization is verified for image generation, then check the Account page.');
         }
 
         document.getElementById('saved-ticker').textContent = `Saved $${(sc.cost_saved_usd ?? 0).toFixed(2)}`;

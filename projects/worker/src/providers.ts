@@ -35,7 +35,9 @@ function makeOpenAiProvider(fetchFn: typeof fetch): ImageProvider {
       const res = await fetchFn(`${OPENAI_API}/images/generations`, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: PINNED.openai.model, prompt, n: 1, size: "1024x1024" }),
+        // quality pinned to medium: matches the contract price estimate ($0.04/img)
+        // and avoids auto resolving to high (~4x cost, slower generations).
+        body: JSON.stringify({ model: PINNED.openai.model, prompt, n: 1, size: "1024x1024", quality: "medium" }),
         signal: AbortSignal.timeout(OPENAI_GENERATE_TIMEOUT_MS),
       });
       if (res.status === 401 || res.status === 403) throw new ProviderAuthError(`openai ${res.status}`);

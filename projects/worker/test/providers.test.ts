@@ -12,7 +12,7 @@ it("openai: posts gpt-image-1 and decodes b64_json", async () => {
   }) as unknown as typeof fetch;
   const img = await providerFor("openai", fetchFn).generate("a red fox", "sk-user");
   expect(calls[0].url).toBe("https://api.openai.com/v1/images/generations");
-  expect(calls[0].body).toEqual({ model: "gpt-image-1", prompt: "a red fox", n: 1, size: "1024x1024" });
+  expect(calls[0].body).toEqual({ model: "gpt-image-1", prompt: "a red fox", n: 1, size: "1024x1024", quality: "medium" });
   expect(calls[0].init.signal).toBeInstanceOf(AbortSignal);
   expect(img.mime).toBe("image/png");
   expect(new Uint8Array(img.bytes)).toEqual(new Uint8Array(PNG));
