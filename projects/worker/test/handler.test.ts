@@ -447,3 +447,35 @@ it("scoped: 422 on non-string collection", async () => {
   const res = await handleGenerate({ prompt: "p", collection: 7 as any }, s, cfg);
   expect(res.status).toBe(422);
 });
+
+it("scoped owner + working BYOK: generates on miss, echoes collection, no demand row, no serve bump", async () => {
+  const s: any = fakeServices();
+  const id = withCollection(s, "col_abc", "u1"); // owner IS the BYOK caller (byokCtx seeds u1)
+  const res = await handleGenerate({ prompt: "a cat", collection: id }, s, cfg, await byokCtx(s));
+  expect(res.status).toBe(200);
+  const body: any = await res.json();
+  expect(body.shared_cache.result).toBe("generated");
+  expect(body.shared_cache.collection).toBe(id);
+  expect(body.shared_cache.byok).toEqual({ used: 1, cap: 50, est_spend_usd: 0.04 });
+  expect(s._generatedInserts[0].collectionId).toBe(id);
+  expect(s._nsUpserted).toEqual([{ id: "gen-1", vector: [0.1, 0.2, 0.3], namespace: id }]);
+  expect(s._recorded).toEqual([]);     // scoped: no demand row, even for the generated return
+  expect(s._serveCounts.size).toBe(0); // generated must not bump serve_count
+});
+
+it("scoped owner, cap reached: pending fallback carries byok status, collection echo, generation_queued false, no demand row", async () => {
+  const s: any = fakeServices();
+  const id = withCollection(s, "col_abc", "u1");
+  const ctx = await byokCtx(s);
+  await s.byok.patch("u1", { monthlyCap: 1 });
+  await s.byok.reserve("u1", "2026-07", 1); // spend the month (byokCtx now => 2026-07-08)
+  const res = await handleGenerate({ prompt: "a cat", collection: id }, s, cfg, ctx);
+  expect(res.status).toBe(202); // empty namespace pool -> pending
+  const body: any = await res.json();
+  expect(body.shared_cache.result).toBe("pending");
+  expect(body.shared_cache.byok).toEqual({ status: "cap_reached" });
+  expect(body.shared_cache.generation_queued).toBe(false);
+  expect(body.shared_cache.collection).toBe(id);
+  expect(s._generatedInserts).toEqual([]);
+  expect(s._recorded).toEqual([]);
+});
