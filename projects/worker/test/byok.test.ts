@@ -166,3 +166,31 @@ it("post-persist bookkeeping failure does NOT refund or fail the request", async
   expect(out.estSpendUsd).toBeCloseTo(0.04);
   expect((s as any)._byokUsage.get("u1:2026-07").count).toBe(1); // reservation NOT refunded
 });
+
+it("scoped generation: insertGenerated carries collectionId and the namespace gets a best-effort upsert", async () => {
+  const s = await seededServices();
+  const out = await tryByokGenerate(
+    { userId: "u1", prompt: "a cat, watercolor style", vec: [0.1], collectionId: "col_abc" }, s, cfg()
+  );
+  expect(out.kind).toBe("generated");
+  expect((s as any)._generatedInserts[0].collectionId).toBe("col_abc");
+  expect((s as any)._upserted).toEqual([{ id: "gen-1", vector: [0.1] }]);          // main shard write unchanged
+  expect((s as any)._nsUpserted).toEqual([{ id: "gen-1", vector: [0.1], namespace: "col_abc" }]);
+});
+
+it("scoped generation: namespace upsert failure does not fail the request", async () => {
+  const s = await seededServices();
+  s.vectorize.upsertNamespace = async () => { throw new Error("vectorize down"); };
+  const out = await tryByokGenerate(
+    { userId: "u1", prompt: "p", vec: [0.1], collectionId: "col_abc" }, s, cfg()
+  );
+  expect(out.kind).toBe("generated");
+});
+
+it("global generation passes collectionId null and skips the namespace write", async () => {
+  const s = await seededServices();
+  const out = await tryByokGenerate({ userId: "u1", prompt: "p", vec: [0.1] }, s, cfg());
+  expect(out.kind).toBe("generated");
+  expect((s as any)._generatedInserts[0].collectionId).toBeNull();
+  expect((s as any)._nsUpserted).toEqual([]);
+});

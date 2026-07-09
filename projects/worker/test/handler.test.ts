@@ -351,3 +351,99 @@ it("unexpected byok throw (e.g. transient D1 error) never 500s -> degrades to ap
   expect(body.shared_cache.result).toBe("approximate");
   expect(body.shared_cache.byok).toEqual({ status: "provider_error" });
 });
+
+function withCollection(s: any, id = "col_abc", owner = "usr_owner", theme = "watercolor style") {
+  s._collectionRows.set(id, { id, owner_user_id: owner, name: "n", theme_prompt: theme, created_at: "x", updated_at: "x" });
+  return id;
+}
+
+it("scoped: 404 unknown collection", async () => {
+  const s: any = fakeServices();
+  const res = await handleGenerate({ prompt: "a cat", collection: "col_nope" }, s, cfg);
+  expect(res.status).toBe(404);
+});
+
+it("scoped: 422 when combined prompt exceeds MAX_PROMPT_LEN", async () => {
+  const s: any = fakeServices();
+  const id = withCollection(s, "col_abc", "usr_owner", "t".repeat(400));
+  const res = await handleGenerate({ prompt: "p".repeat(1700), collection: id }, s, cfg);
+  expect(res.status).toBe(422);
+});
+
+it("scoped: embeds the combined prompt and queries only the namespace", async () => {
+  const s: any = fakeServices();
+  const embedCalls: string[] = [];
+  s.embedder.textEmbed = async (p: string) => { embedCalls.push(p); return [0.1]; };
+  let namespaceQueried: string | null = null;
+  s.vectorize.queryNamespace = async (_v: any, ns: string) => { namespaceQueried = ns; return []; };
+  s.vectorize.query = async () => { throw new Error("global index must not be queried for scoped requests"); };
+  const id = withCollection(s);
+  await handleGenerate({ prompt: "a cat", collection: id, generate_on_miss: false }, s, cfg);
+  expect(embedCalls).toEqual(["a cat, watercolor style"]);
+  expect(namespaceQueried).toBe(id);
+});
+
+it("scoped hit: serves the collection asset, echoes collection, bumps serve_count, never records demand", async () => {
+  const s: any = fakeServices();
+  const id = withCollection(s);
+  s._assets.set("a1", { id: "a1", prompt: "a cat, watercolor style", source: "byok", source_id: null, model_used: "gpt-image-1", width: 1024, height: 1024, mime: "image/png", source_url: "https://x/a1.png", locally_cached: 0 });
+  s._nsMatches.push({ id: "a1", score: 0.95, ns: id });
+  const res = await handleGenerate({ prompt: "a cat", collection: id }, s, cfg);
+  expect(res.status).toBe(200);
+  const body: any = await res.json();
+  expect(body.shared_cache.result).toBe("hit");
+  expect(body.shared_cache.collection).toBe(id);
+  expect(s._serveCounts.get("a1")).toBe(1);
+  expect(s._recorded).toEqual([]); // backfill exclusion: no queries write, ever
+});
+
+it("scoped approximate (non-owner): closest match served, no generation, no demand row, serve_count bumped", async () => {
+  const s: any = fakeServices();
+  const id = withCollection(s, "col_abc", "usr_owner");
+  s._assets.set("a1", { id: "a1", prompt: "a dog, watercolor style", source: "byok", source_id: null, model_used: "gpt-image-1", width: 1024, height: 1024, mime: "image/png", source_url: "https://x/a1.png", locally_cached: 0 });
+  s._nsMatches.push({ id: "a1", score: 0.2, ns: id }); // below the ≈0.325 floor -> approximate
+  await s.byok.put({ userId: "usr_caller", provider: "openai", keyCiphertext: "ct", keyLast4: "1234", monthlyCap: 50, enabled: true }); // caller has their OWN byok
+  const byokCtx = { userId: "usr_caller", cfg: { kek: "k", bucket: { put: async () => {} }, publicUrlBase: "https://pub", now: () => 123 } };
+  const res = await handleGenerate({ prompt: "a cat", collection: id }, s, cfg, byokCtx as any);
+  const body: any = await res.json();
+  expect(body.shared_cache.result).toBe("approximate");
+  expect(body.shared_cache.generation_queued).toBe(false);
+  expect(body.shared_cache.byok).toBeUndefined(); // non-owner: byok never consulted
+  expect(s._generatedInserts).toEqual([]);        // caller's own key must NOT generate into someone else's collection
+  expect(s._recorded).toEqual([]);
+  expect(s._serveCounts.get("a1")).toBe(1);
+});
+
+it("scoped empty pool (non-owner or no byok): 202 pending, generation_queued false, no demand row", async () => {
+  const s: any = fakeServices();
+  const id = withCollection(s);
+  const res = await handleGenerate({ prompt: "a cat", collection: id }, s, cfg);
+  expect(res.status).toBe(202);
+  const body: any = await res.json();
+  expect(body.shared_cache.result).toBe("pending");
+  expect(body.shared_cache.generation_queued).toBe(false);
+  expect(body.shared_cache.collection).toBe(id);
+  expect(s._recorded).toEqual([]);
+});
+
+it("global path: hit bumps serve_count; generated does not", async () => {
+  const s: any = fakeServices();
+  s._assets.set("g1", { id: "g1", prompt: "p", source: "pd12m", source_id: null, model_used: "m", width: 1, height: 1, mime: "image/jpeg", source_url: "https://x/g1.jpg", locally_cached: 0 });
+  s._matches.push({ id: "g1", score: 0.99 });
+  await handleGenerate({ prompt: "p" }, s, cfg);
+  expect(s._serveCounts.get("g1")).toBe(1);
+});
+
+it("global path unchanged: misses still record demand", async () => {
+  const s: any = fakeServices();
+  const res = await handleGenerate({ prompt: "novel prompt" }, s, cfg);
+  expect(res.status).toBe(202);
+  expect(s._recorded.length).toBe(1);
+  expect(s._recorded[0].generate).toBe(true);
+});
+
+it("scoped: 422 on non-string collection", async () => {
+  const s: any = fakeServices();
+  const res = await handleGenerate({ prompt: "p", collection: 7 as any }, s, cfg);
+  expect(res.status).toBe(422);
+});

@@ -37,7 +37,7 @@ const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/webp": "webp" 
 // has succeeded), everything after is best-effort only — it never refunds
 // and never fails the request.
 export async function tryByokGenerate(
-  i: { userId: string; prompt: string; vec: number[] }, s: Services, cfg: ByokCfg
+  i: { userId: string; prompt: string; vec: number[]; collectionId?: string | null }, s: Services, cfg: ByokCfg
 ): Promise<ByokOutcome> {
   if (!cfg.kek || !cfg.bucket || !cfg.publicUrlBase) return { kind: "skipped" };
   const row = await s.byok.get(i.userId);
@@ -84,7 +84,7 @@ export async function tryByokGenerate(
       width: 1024, height: 1024, // requested size; providers may letterbox but 1024x1024 is what we ask for
       modelUsed: pinned.model, provider: row.provider, priceUsd: pinned.price_per_image_usd,
       createdBy: i.userId, // audit trail (AUP/takedown); never selected on public reads
-      collectionId: null,
+      collectionId: i.collectionId ?? null,
     });
   } catch (e) {
     console.error("byok generation failed", e);
@@ -98,6 +98,11 @@ export async function tryByokGenerate(
   // Durable + paid past this point: best-effort bookkeeping only — never
   // refund, never fail the request.
   try { await s.vectorize.upsert(id, i.vec); } catch (e) { console.error("byok vector upsert failed", e); }
+  if (i.collectionId) {
+    // Second, namespace-scoped write so scoped search can find it. Best-effort:
+    // a failure leaves the image globally findable but scoped-invisible until re-generated demand re-lands it.
+    try { await s.vectorize.upsertNamespace(id, i.vec, i.collectionId); } catch (e) { console.error("byok namespace upsert failed", e); }
+  }
   try { await s.byok.addSpend(i.userId, month, pinned.price_per_image_usd); } catch (e) { console.error("byok addSpend failed", e); }
   let used = 1;
   let estSpendUsd = pinned.price_per_image_usd;
