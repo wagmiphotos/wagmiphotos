@@ -1,7 +1,7 @@
 import type { Env, Services } from "./types";
 import { resolveApiPrincipal } from "./session";
 import {
-  newCollectionId, validateCollectionFields, collectionView, MAX_COLLECTIONS_PER_USER,
+  newCollectionId, validateCollectionFields, collectionView, MAX_COLLECTIONS_PER_USER, requiredGenerationsFor,
 } from "./collections";
 import { assetUrls } from "./asset-urls";
 
@@ -26,8 +26,19 @@ export async function handleCreateCollection(request: Request, env: Env, s: Serv
   const fields = validateCollectionFields(body, false);
   if ("error" in fields) return Response.json({ error: fields.error }, { status: 422 });
 
-  if ((await s.collections.countByOwner(userId)) >= MAX_COLLECTIONS_PER_USER) {
+  const existing = await s.collections.countByOwner(userId);
+  if (existing >= MAX_COLLECTIONS_PER_USER) {
     return Response.json({ error: "collection limit reached", limit: MAX_COLLECTIONS_PER_USER }, { status: 409 });
+  }
+  // Progressive slots (spec 2026-07-09-collection-slots-design.md): the nth
+  // collection needs 10^(n-1) lifetime generations. byok_usage sums are
+  // monotonic — deleting images/collections/keys never re-locks a slot.
+  const required = requiredGenerationsFor(existing + 1);
+  if (required > 0) {
+    const generated = await s.byok.totalGenerated(userId);
+    if (generated < required) {
+      return Response.json({ error: "collection slot locked", required, generated }, { status: 409 });
+    }
   }
   const id = newCollectionId();
   await s.collections.create({ id, ownerUserId: userId, name: fields.name!, themePrompt: fields.themePrompt ?? "" });
@@ -39,7 +50,11 @@ export async function handleListCollections(request: Request, env: Env, s: Servi
   const userId = await auth(request, env, s);
   if (!userId) return Response.json({ error: "login required" }, { status: 401 });
   const rows = await s.collections.listByOwner(userId);
-  return Response.json({ collections: rows.map(collectionView) });
+  const generated = await s.byok.totalGenerated(userId);
+  return Response.json({
+    collections: rows.map(collectionView),
+    slots: { used: rows.length, generated, next_required: requiredGenerationsFor(rows.length + 1) },
+  });
 }
 
 export async function handlePatchCollection(id: string, request: Request, env: Env, s: Services): Promise<Response> {

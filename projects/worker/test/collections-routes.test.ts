@@ -169,3 +169,59 @@ it("collection delete: vector-delete failure still deletes the collection (best-
   expect(res.status).toBe(200);
   expect((s as any)._collectionRows.has(id)).toBe(false);
 });
+
+function seedGenerated(s: any, userId: string, count: number, month = "2026-07") {
+  (s as any)._byokUsage.set(`${userId}:${month}`, { count, est_spend_usd: 0 });
+}
+
+it("slot gate: second collection blocked below 10 lifetime generations", async () => {
+  const { req, s } = sessionReq("usr_1", "POST", { name: "Second" });
+  await giveByok(s, "usr_1");
+  await s.collections.create({ id: "col_first".padEnd(24, "f"), ownerUserId: "usr_1", name: "First", themePrompt: "" });
+  seedGenerated(s, "usr_1", 9);
+  const res = await handleCreateCollection(req, env, s);
+  expect(res.status).toBe(409);
+  const body: any = await res.json();
+  expect(body).toEqual({ error: "collection slot locked", required: 10, generated: 9 });
+});
+
+it("slot gate: second collection allowed at exactly 10; counts sum across months", async () => {
+  const { req, s } = sessionReq("usr_1", "POST", { name: "Second" });
+  await giveByok(s, "usr_1");
+  await s.collections.create({ id: "col_first".padEnd(24, "f"), ownerUserId: "usr_1", name: "First", themePrompt: "" });
+  seedGenerated(s, "usr_1", 5, "2026-06");
+  seedGenerated(s, "usr_1", 5, "2026-07");
+  expect((await handleCreateCollection(req, env, s)).status).toBe(200);
+});
+
+it("slot gate: third collection requires 100", async () => {
+  const { req, s } = sessionReq("usr_1", "POST", { name: "Third" });
+  await giveByok(s, "usr_1");
+  await s.collections.create({ id: "col_a".padEnd(24, "a"), ownerUserId: "usr_1", name: "A", themePrompt: "" });
+  await s.collections.create({ id: "col_b".padEnd(24, "b"), ownerUserId: "usr_1", name: "B", themePrompt: "" });
+  seedGenerated(s, "usr_1", 99);
+  const res = await handleCreateCollection(req, env, s);
+  expect(res.status).toBe(409);
+  expect(((await res.json()) as any).required).toBe(100);
+});
+
+it("slot gate: first collection needs no generations (existing happy path unchanged)", async () => {
+  const { req, s } = sessionReq("usr_1", "POST", { name: "First ever" });
+  await giveByok(s, "usr_1");
+  expect((await handleCreateCollection(req, env, s)).status).toBe(200);
+});
+
+it("list: slots object reports used/generated/next_required", async () => {
+  const { req, s } = sessionReq("usr_1");
+  await s.collections.create({ id: "col_one".padEnd(24, "o"), ownerUserId: "usr_1", name: "One", themePrompt: "" });
+  seedGenerated(s, "usr_1", 7);
+  const res = await handleListCollections(req, env, s);
+  const body: any = await res.json();
+  expect(body.slots).toEqual({ used: 1, generated: 7, next_required: 10 });
+});
+
+it("list: zero collections -> next_required 0 (first is free)", async () => {
+  const { req, s } = sessionReq("usr_1");
+  const body: any = await (await handleListCollections(req, env, s)).json();
+  expect(body.slots).toEqual({ used: 0, generated: 0, next_required: 0 });
+});
