@@ -4727,6 +4727,8 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       const tol = document.getElementById('tol');
       if (tolGroup) tolGroup.style.opacity = on ? '' : '0.45';
       if (tol) tol.disabled = !on;
+      const tolValEl = document.getElementById('tol-val');
+      if (tolValEl && tol) tolValEl.textContent = on ? tol.value : '0.15 (default)';
       const el = document.getElementById('gen-key-status');
       if (!el) return;
       if (!on) { el.innerHTML = ''; return; }
@@ -4927,7 +4929,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
           outImg.removeAttribute('src');
           placeholderMsg.textContent = sc.generation_queued
             ? 'Generating — the backfill is building this image. Check back shortly.'
-            : 'No close match cached. Generation was not requested (generate on demand is off).';
+            : 'No close match cached. Generation was not requested ("Create a fresh image" is off).';
           placeholder.style.display = 'flex';
           loader.style.display = 'none';
           imgWrapper.style.display = 'none';
@@ -4963,6 +4965,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         document.querySelectorAll('.result-details .result-note').forEach(n => n.remove());
         if (sc.result === 'generated' && sc.byok) {
           appendResultNote(`✨ Generated with your key — ${sc.byok.used} / ${sc.byok.cap} this month (est. $${Number(sc.byok.est_spend_usd).toFixed(2)})`);
+          if (currentByok) { currentByok.used_this_month = sc.byok.used; updateGenGating(); }
         } else if (sc.byok && sc.byok.status === 'cap_reached') {
           appendResultNote('Your monthly BYOK cap is reached — showing the closest match instead. Raise the cap on the Account page.');
         } else if (sc.byok && sc.byok.status === 'provider_error') {
@@ -5001,7 +5004,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
         runHistory.unshift({
           prompt: promptVal,
-          tolerance: tolVal,
+          tolerance: genOnMiss ? tolVal : 0.15,
           result: sc.result
         });
         if (runHistory.length > HISTORY_MAX) runHistory.length = HISTORY_MAX;
