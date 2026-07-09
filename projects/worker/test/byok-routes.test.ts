@@ -56,6 +56,16 @@ it("PUT rejects a key the provider refuses", async () => {
   expect((s as any)._byokRows.size).toBe(0);
 });
 
+it("PUT trims pasted whitespace off the api_key before validating and storing", async () => {
+  const s: any = fakeServices();
+  let validatedWith = "";
+  const res = await handlePutByok(put({ provider: "openai", api_key: "  sk-user-12345\n" }), env, s,
+    async (_p, k) => { validatedWith = k; return true; });
+  expect(res.status).toBe(200);
+  expect(validatedWith).toBe("sk-user-12345"); // no clipboard whitespace reaches the provider
+  expect(s._byokRows.get("usr_1").key_last4).toBe("2345");
+});
+
 it("PUT validates provider / api_key / monthly_cap / enabled", async () => {
   const s = sessionServices();
   const v = async () => true;

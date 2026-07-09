@@ -44,7 +44,10 @@ export async function handlePutByok(request: Request, env: Env, s: Services, val
   if (typeof provider !== "string" || !PROVIDERS.has(provider)) {
     return Response.json({ error: "provider must be 'openai' or 'gmicloud'" }, { status: 422 });
   }
-  const apiKey = body?.api_key;
+  // Clipboard pastes carry trailing whitespace/newlines; some provider
+  // endpoints tolerate it in the Bearer header and others fail opaquely
+  // (observed: OpenAI /models accepts, images/generations 520s). Trim first.
+  const apiKey = typeof body?.api_key === "string" ? body.api_key.trim() : body?.api_key;
   if (typeof apiKey !== "string" || apiKey.length < 8 || apiKey.length > 300) {
     return Response.json({ error: "api_key must be a string of 8-300 characters" }, { status: 422 });
   }
