@@ -2960,11 +2960,20 @@
             </div>
 
             <div class="form-group">
-              <label for="tol">Cache match tolerance</label>
+              <span class="field-label">When there's no close match</span>
+              <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 0.8125rem; color: var(--muted); line-height: 1.45; text-transform: none; letter-spacing: normal; font-weight: 400; margin: 0;">
+                <input type="checkbox" id="gen-on-miss" checked onchange="updateGenGating()" style="width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; accent-color: var(--red);">
+                <span><b style="color: var(--ink); font-weight: 600;">Create a fresh image.</b> If the library has nothing close enough, a new image is made for your prompt and added to the library.</span>
+              </label>
+              <div id="gen-key-status" style="font-size: 0.75rem; color: var(--muted); margin-top: 8px;"></div>
+            </div>
+
+            <div class="form-group" id="tol-group">
+              <label for="tol">Match strictness</label>
               <div class="slider-container">
                 <div class="slider-header">
-                  <span>Strict (Exact)</span>
-                  <span>Loose (General concept)</span>
+                  <span>Exact match</span>
+                  <span>Loose match</span>
                 </div>
                 <input type="range" id="tol" min="0" max="1" step="0.01" value="0.15" oninput="updateToleranceValue(this.value)">
                 <div class="slider-info" id="tolerance-info-box">
@@ -2972,14 +2981,6 @@
                   <span id="tolerance-indicator" style="font-weight: 600; color: var(--red);">Normal Match</span>
                 </div>
               </div>
-            </div>
-
-            <div class="form-group">
-              <span class="field-label">On cache miss</span>
-              <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 0.8125rem; color: var(--muted); line-height: 1.45; text-transform: none; letter-spacing: normal; font-weight: 400; margin: 0;">
-                <input type="checkbox" id="gen-on-miss" checked style="width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; accent-color: var(--red);">
-                <span><b style="color: var(--ink); font-weight: 600;">Generate on demand.</b> If nothing close enough is cached, the prompt is queued and generated in the backend with the configured model, then stored in the shared library.</span>
-              </label>
             </div>
 
             <div class="form-group" id="coll-picker-group" hidden>
@@ -3933,7 +3934,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       '#/':           { view: 'view-home' },
       '#/pricing':    { view: 'view-pricing', link: 'nav-pricing' },
       '#/library':    { view: 'view-library', link: 'nav-library', onShow: initLibrary },
-      '#/playground': { view: 'view-playground', link: 'nav-playground', onShow: loadPlaygroundCollections },
+      '#/playground': { view: 'view-playground', link: 'nav-playground', onShow: () => { loadPlaygroundCollections(); updateGenGating(); } },
       '#/account':    { view: 'view-account', onShow: async () => {
         const emailEl = document.getElementById('account-email');
         if (emailEl) emailEl.textContent = currentUser ? currentUser.email : '—';
@@ -4717,6 +4718,29 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       } catch { group.hidden = true; }
     }
 
+    // Tolerance only matters when a miss can create something: greyed +
+    // default when "create a fresh image" is off. Also shows which key a
+    // fresh generation would use (or that the shared queue applies).
+    function updateGenGating() {
+      const on = document.getElementById('gen-on-miss')?.checked ?? true;
+      const tolGroup = document.getElementById('tol-group');
+      const tol = document.getElementById('tol');
+      if (tolGroup) tolGroup.style.opacity = on ? '' : '0.45';
+      if (tol) tol.disabled = !on;
+      const el = document.getElementById('gen-key-status');
+      if (!el) return;
+      if (!on) { el.innerHTML = ''; return; }
+      if (currentByok && currentByok.enabled) {
+        const name = currentByok.provider === 'openai' ? 'OpenAI' : 'GMI Cloud';
+        el.innerHTML = `<span style="color:var(--success);">✓</span> Uses your ${name} key <span style="font-family:var(--font-mono);">••••${escapeHtml(currentByok.key_last4)}</span> — ${currentByok.used_this_month}/${currentByok.monthly_cap} images this month · <a href="#/account" style="color:var(--red);">Manage</a>`;
+      } else if (currentByok) {
+        const name = currentByok.provider === 'openai' ? 'OpenAI' : 'GMI Cloud';
+        el.innerHTML = `⚠ Your ${name} key is disabled — <a href="#/account" style="color:var(--red);">fix it in Account</a>.`;
+      } else {
+        el.innerHTML = `No provider key set — your prompt joins the shared generation queue instead (can take a while). <a href="#/account" style="color:var(--red);">Add your key →</a>`;
+      }
+    }
+
     async function startCheckout(btn) {
       if (btn) { btn.disabled = true; btn.textContent = 'Redirecting…'; }
       try {
@@ -4864,7 +4888,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             prompt: promptVal,
-            cache_tolerance: tolVal,
+            ...(genOnMiss ? { cache_tolerance: tolVal } : {}),
             generate_on_miss: genOnMiss,
             ...(collId ? { collection: collId } : {})
           })
