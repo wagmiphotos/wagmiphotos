@@ -102,3 +102,21 @@ it("asset read paths never select created_by", async () => {
   await assets.getAssetsByIds(["a1"]);
   for (const c of calls) expect(c.sql).not.toContain("created_by");
 });
+
+// collection_id and serve_count are owner/operator-only columns (like
+// created_by): no public read path may select them, or collection membership
+// and per-asset serve counts would leak into library/generation responses.
+// (searchAssets DOES reference collection_id in its WHERE clause when a
+// collectionId filter is passed, but that's not exercised here — these calls
+// are the unfiltered public shape.)
+it("asset read paths never select collection_id or serve_count", async () => {
+  const { db, calls } = fakeDb(null, []);
+  const { assets } = makeD1Stores(db);
+  await assets.getAsset("a1");
+  await assets.searchAssets({ q: "fox", limit: 10, offset: 0 });
+  await assets.getAssetsByIds(["a1"]);
+  for (const c of calls) {
+    expect(c.sql).not.toContain("collection_id");
+    expect(c.sql).not.toContain("serve_count");
+  }
+});

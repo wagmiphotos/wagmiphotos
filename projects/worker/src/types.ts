@@ -31,8 +31,9 @@ export interface VectorizeStore {
   queryNamespace(vector: number[], namespace: string, topK: number): Promise<Match[]>;
   /** Best-effort second write for collection assets (namespace = collection id). */
   upsertNamespace(id: string, vector: number[], namespace: string): Promise<void>;
-  /** Best-effort removal from the owning shard AND the collections index.
-   *  D1 tombstones are the source of truth; orphans are tolerated. */
+  /** Removes ids from the owning shard AND the collections index. Throws on
+   *  failure — callers own the try/catch (D1 tombstones are the source of
+   *  truth; orphans are tolerated by every read path). */
   deleteByIds(ids: string[]): Promise<void>;
 }
 export interface AssetStore {
