@@ -15,7 +15,9 @@ const PINNED: Record<string, { model: string; price_per_image_usd: number }> = (
 
 // Every BYOK outbound fetch is bounded so a hung provider/moderation call
 // never hangs the user's request (and a stranded refund).
-const OPENAI_GENERATE_TIMEOUT_MS = 60_000;
+// 300s: community/vendor guidance for image endpoints (medium ~44-80s,
+// high p95 ~280s); raising only this layer — the others stay tight.
+const OPENAI_GENERATE_TIMEOUT_MS = 300_000;
 const OPENAI_VALIDATE_TIMEOUT_MS = 10_000;
 const GMI_SUBMIT_TIMEOUT_MS = 15_000;
 const GMI_POLL_TIMEOUT_MS = 15_000;
@@ -35,7 +37,7 @@ function makeOpenAiProvider(fetchFn: typeof fetch): ImageProvider {
       const res = await fetchFn(`${OPENAI_API}/images/generations`, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        // quality pinned to medium: matches the contract price estimate ($0.04/img)
+        // quality pinned to medium: matches the contract price estimate ($0.055/img)
         // and avoids auto resolving to high (~4x cost, slower generations).
         // webp@85: ~10x smaller response than png — OpenAI bills per generation
         // (format-independent) and intermittently kills large-body delivery

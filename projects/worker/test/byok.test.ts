@@ -51,7 +51,7 @@ it("happy path: moderates, reserves, generates, persists, indexes, accounts", as
   expect(out.asset.source_url).toBe("https://byok.example/byok/gen-1/original.png");
   expect(out.used).toBe(1);
   expect(out.cap).toBe(50);
-  expect(out.estSpendUsd).toBeCloseTo(0.04);
+  expect(out.estSpendUsd).toBeCloseTo(0.055);
   expect((s as any)._upserted).toEqual([{ id: "gen-1", vector: [0.1] }]);
   // audit trail: the D1 row records who generated it (never exposed on reads)
   expect((s as any)._generatedInserts[0].createdBy).toBe("u1");
@@ -163,7 +163,7 @@ it("post-persist bookkeeping failure does NOT refund or fail the request", async
   expect(out.kind).toBe("generated");
   if (out.kind !== "generated") return;
   expect(out.used).toBe(1); // fallback numbers when the read fails
-  expect(out.estSpendUsd).toBeCloseTo(0.04);
+  expect(out.estSpendUsd).toBeCloseTo(0.055);
   expect((s as any)._byokUsage.get("u1:2026-07").count).toBe(1); // reservation NOT refunded
 });
 

@@ -4,7 +4,7 @@ import { providerFor, ProviderAuthError } from "../src/providers";
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]).buffer;
 const okJson = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
 
-it("openai: posts gpt-image-1 and decodes b64_json", async () => {
+it("openai: posts the contract-pinned model and decodes b64_json", async () => {
   const calls: any[] = [];
   const fetchFn = (async (url: any, init: any) => {
     calls.push({ url: String(url), body: JSON.parse(init.body), init });
@@ -12,7 +12,7 @@ it("openai: posts gpt-image-1 and decodes b64_json", async () => {
   }) as unknown as typeof fetch;
   const img = await providerFor("openai", fetchFn).generate("a red fox", "sk-user");
   expect(calls[0].url).toBe("https://api.openai.com/v1/images/generations");
-  expect(calls[0].body).toEqual({ model: "gpt-image-1", prompt: "a red fox", n: 1, size: "1024x1024", quality: "medium", output_format: "webp", output_compression: 85 });
+  expect(calls[0].body).toEqual({ model: "gpt-image-2", prompt: "a red fox", n: 1, size: "1024x1024", quality: "medium", output_format: "webp", output_compression: 85 });
   expect(calls[0].init.signal).toBeInstanceOf(AbortSignal);
   expect(img.mime).toBe("image/webp"); // output_format webp: ~10x smaller than png, survives flaky delivery
   expect(new Uint8Array(img.bytes)).toEqual(new Uint8Array(PNG));
