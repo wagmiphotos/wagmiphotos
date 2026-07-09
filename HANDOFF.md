@@ -1,5 +1,13 @@
 # wagmi.photos — Handoff / Resume Here
 
+> **2026-07-10:** Big day shipped and verified live: **collections + progressive slots**,
+> **library seeded to 11,005 images**, UI polish batch, and **BYOK generation proven
+> end-to-end in prod** (gpt-image-1 medium, webp, SSE streaming) after a long live debug —
+> two real bugs fixed (post-0007 `url` column in `insertGenerated`; OpenAI's ~20s idle-kill
+> of silent image connections, which also forced reverting a gpt-image-2 attempt).
+> **NEXT TASK: async BYOK generation** to bring gpt-image-2 back — resume from
+> [`docs/HANDOFF-2026-07-10-async-byok-gen.md`](docs/HANDOFF-2026-07-10-async-byok-gen.md).
+
 > **2026-07-09:** **BYOK (bring-your-own-key generation) is LIVE in production** — users can
 > store an OpenAI/GMI key and fresh-generate below-tolerance prompts into the shared library.
 > Also live: the asset origin is now **`cdn.wagmi.photos/assets/…`** (via a Cloudflare
