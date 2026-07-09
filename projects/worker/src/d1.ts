@@ -265,6 +265,12 @@ export function makeD1Stores(db: D1Database): {
         "UPDATE byok_usage SET est_spend_usd = est_spend_usd + ? WHERE user_id = ? AND month = ?"
       ).bind(usd, userId, month).run();
     },
+    async totalGenerated(userId) {
+      const row = await db.prepare(
+        "SELECT COALESCE(SUM(count), 0) AS n FROM byok_usage WHERE user_id = ?"
+      ).bind(userId).first<{ n: number }>();
+      return row?.n ?? 0;
+    },
   };
 
   const collections: CollectionStore = {

@@ -109,6 +109,8 @@ export interface ByokStore {
   reserve(userId: string, month: string, cap: number): Promise<boolean>;
   refund(userId: string, month: string): Promise<void>;
   addSpend(userId: string, month: string, usd: number): Promise<void>;
+  /** Lifetime successful generations (net of refunds) summed across all months. */
+  totalGenerated(userId: string): Promise<number>;
 }
 export interface RateLimiter { limit(key: string): Promise<boolean>; }
 /** Minimal structural type for the unsafe `ratelimit` binding (no exported type in workers-types). */

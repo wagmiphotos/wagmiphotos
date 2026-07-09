@@ -120,3 +120,18 @@ it("asset read paths never select collection_id or serve_count", async () => {
     expect(c.sql).not.toContain("serve_count");
   }
 });
+
+it("totalGenerated sums byok_usage counts across months (COALESCE 0)", async () => {
+  const { db, calls } = fakeDb({ n: 15 });
+  const { byok } = makeD1Stores(db);
+  expect(await byok.totalGenerated("u1")).toBe(15);
+  expect(calls[0].sql).toContain("COALESCE(SUM(count), 0)");
+  expect(calls[0].sql).toContain("FROM byok_usage WHERE user_id = ?");
+  expect(calls[0].args).toEqual(["u1"]);
+});
+
+it("totalGenerated returns 0 when the user has no usage rows", async () => {
+  const { db } = fakeDb(null);
+  const { byok } = makeD1Stores(db);
+  expect(await byok.totalGenerated("nobody")).toBe(0);
+});

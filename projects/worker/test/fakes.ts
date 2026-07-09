@@ -94,6 +94,11 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
       reserve: async (u, m, cap) => { const k = `${u}:${m}`; const cur = byokUsage.get(k) ?? { count: 0, est_spend_usd: 0 }; if (cur.count >= cap) return false; cur.count += 1; byokUsage.set(k, cur); return true; },
       refund: async (u, m) => { const cur = byokUsage.get(`${u}:${m}`); if (cur) cur.count = Math.max(0, cur.count - 1); },
       addSpend: async (u, m, usd) => { const k = `${u}:${m}`; const cur = byokUsage.get(k) ?? { count: 0, est_spend_usd: 0 }; cur.est_spend_usd += usd; byokUsage.set(k, cur); },
+      totalGenerated: async (u) => {
+        let n = 0;
+        for (const [k, v] of byokUsage) if (k.startsWith(`${u}:`)) n += v.count;
+        return n;
+      },
     },
     collections: {
       create: async ({ id, ownerUserId, name, themePrompt }) => {

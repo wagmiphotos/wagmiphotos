@@ -1,6 +1,6 @@
 import { it, expect } from "vitest";
 import {
-  newCollectionId, combinedPrompt, validateCollectionFields, collectionView,
+  newCollectionId, combinedPrompt, validateCollectionFields, collectionView, requiredGenerationsFor,
   MAX_COLLECTIONS_PER_USER, MAX_COLLECTION_NAME_LEN, MAX_THEME_PROMPT_LEN,
 } from "../src/collections";
 
@@ -51,4 +51,13 @@ it("collectionView exposes the public shape (no owner id)", () => {
   });
   // owner id never leaves the server
   expect("owner_user_id" in v).toBe(false);
+});
+
+it("requiredGenerationsFor: first free, then powers of ten", () => {
+  expect(requiredGenerationsFor(0)).toBe(0);
+  expect(requiredGenerationsFor(1)).toBe(0);
+  expect(requiredGenerationsFor(2)).toBe(10);
+  expect(requiredGenerationsFor(3)).toBe(100);
+  expect(requiredGenerationsFor(4)).toBe(1000);
+  expect(requiredGenerationsFor(5)).toBe(10000);
 });

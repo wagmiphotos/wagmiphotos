@@ -51,3 +51,10 @@ export function collectionView(c: CollectionRow | CollectionSummary) {
     ...("image_count" in c ? { image_count: c.image_count, total_serves: c.total_serves } : {}),
   };
 }
+
+/** Lifetime generations required to create your nth collection (1-based):
+ *  the first needs only an enabled BYOK key, the nth needs 10^(n-1)
+ *  (2nd -> 10, 3rd -> 100, ...). Spec: 2026-07-09-collection-slots-design.md */
+export function requiredGenerationsFor(nth: number): number {
+  return nth <= 1 ? 0 : 10 ** (nth - 1);
+}
