@@ -4451,14 +4451,14 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       if (!currentByok) {
         el.innerHTML = `<div class="form-group">
           <label>Provider</label>
-          <select id="byok-provider" style="height:40px;">
+          <select id="byok-provider" class="field-input" style="width:auto;">
             <option value="openai">OpenAI</option>
             <option value="gmicloud">GMI Cloud</option>
           </select>
           <label style="margin-top:10px;">API key</label>
-          <input id="byok-key" type="password" autocomplete="off" placeholder="sk-…" style="height:40px;font-family:var(--font-mono);">
+          <input id="byok-key" type="password" autocomplete="off" placeholder="sk-…" class="api-key-input">
           <label style="margin-top:10px;">Monthly image cap</label>
-          <input id="byok-cap" type="number" min="1" max="10000" value="50" style="height:40px;width:120px;">
+          <input id="byok-cap" type="number" min="1" max="10000" value="50" class="field-input" style="width:120px;">
           <button class="btn btn-primary" style="height:40px;width:auto;padding:0 18px;margin-top:14px;" onclick="saveByok(this)">Save key</button>
         </div>`;
         return;
@@ -4483,7 +4483,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
             <label style="display:flex;gap:6px;align-items:center;font-size:0.8125rem;cursor:pointer;">
               <input type="checkbox" ${b.enabled ? 'checked' : ''} onchange="patchByok({ enabled: this.checked })"> Enabled
             </label>
-            <input type="number" min="1" max="10000" value="${b.monthly_cap}" title="Monthly image cap" style="height:34px;width:90px;" onchange="patchByok({ monthly_cap: parseInt(this.value, 10) || ${b.monthly_cap} })">
+            <input type="number" min="1" max="10000" value="${b.monthly_cap}" title="Monthly image cap" class="field-input" style="width:90px;padding:6px 10px;" onchange="patchByok({ monthly_cap: parseInt(this.value, 10) || ${b.monthly_cap} })">
             <button class="btn" style="height:34px;width:auto;padding:0 12px;" onclick="deleteByok(this)">Delete</button>
           </div>
         </div>`;
@@ -4580,9 +4580,9 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         : `
         <div class="form-group" style="margin-top:14px;">
           <label>New collection</label>
-          <input id="coll-name" placeholder="Name (e.g. Retro posters)" maxlength="80" style="height:40px;">
+          <input id="coll-name" placeholder="Name (e.g. Retro posters)" maxlength="80" class="field-input">
           <label style="margin-top:10px;">Theme prompt (appended to every generation)</label>
-          <textarea id="coll-theme" maxlength="500" placeholder="e.g. retro travel poster style, muted palette" style="min-height:60px;"></textarea>
+          <textarea id="coll-theme" maxlength="500" placeholder="e.g. retro travel poster style, muted palette" class="field-input" style="min-height:60px;"></textarea>
           <button class="btn btn-primary" style="height:40px;width:auto;padding:0 18px;margin-top:12px;" onclick="createCollection(this)">Create collection</button>
         </div>`;
       const rows = myCollections.map((c) => `
