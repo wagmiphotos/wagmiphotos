@@ -88,6 +88,12 @@ account flips to Unlimited. Cancel in the Portal to watch it revoke. Use the
 
 ## 2. Production Stripe setup (not done yet)
 
+> **Status update 2026-07-09:** steps **1** (migration 0012 applied remote), **4**
+> (RATE_LIMITER_PAID deployed) and **7** (worker deployed — it rode the BYOK deploy) are
+> **DONE**. Steps **2, 3, 5, 6** (live Price, secrets + `STRIPE_PRICE_ID`, webhook endpoint,
+> Customer Portal) remain — see `docs/HANDOFF-2026-07-09-byok-live-stripe-pending.md` §1.
+> Until then the deployed Upgrade button errors and nobody can subscribe.
+
 All of this is in `DEPLOY.md` → "Stripe billing"; summarized here in order.
 
 1. **Apply the migration to prod D1:**

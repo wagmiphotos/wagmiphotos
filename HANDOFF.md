@@ -1,8 +1,14 @@
 # wagmi.photos — Handoff / Resume Here
 
-> **2026-07-08:** Stripe billing (annual $24/yr subscription + paid-API gating) is merged to
-> `main` and verified end-to-end locally, but **not yet configured on production**. Resume
-> that work from [`docs/HANDOFF-2026-07-08-stripe-billing.md`](docs/HANDOFF-2026-07-08-stripe-billing.md).
+> **2026-07-09:** **BYOK (bring-your-own-key generation) is LIVE in production** — users can
+> store an OpenAI/GMI key and fresh-generate below-tolerance prompts into the shared library.
+> The same deploy shipped the Stripe billing code, but the **live Stripe config is still
+> pending** (Upgrade button errors until it's done). Resume from
+> [`docs/HANDOFF-2026-07-09-byok-live-stripe-pending.md`](docs/HANDOFF-2026-07-09-byok-live-stripe-pending.md).
+
+> **2026-07-08:** Stripe billing (annual $24/yr subscription + paid-API gating) merged to
+> `main` and verified end-to-end locally — [`docs/HANDOFF-2026-07-08-stripe-billing.md`](docs/HANDOFF-2026-07-08-stripe-billing.md)
+> (its §2 production steps are partially superseded; see the 2026-07-09 handoff).
 
 _Last updated: 2026-07-07 (evening session, after launch). **The product is
 LIVE at [wagmi.photos](https://wagmi.photos)**. This session shipped two
