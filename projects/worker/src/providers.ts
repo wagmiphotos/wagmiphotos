@@ -37,7 +37,10 @@ function makeOpenAiProvider(fetchFn: typeof fetch): ImageProvider {
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         // quality pinned to medium: matches the contract price estimate ($0.04/img)
         // and avoids auto resolving to high (~4x cost, slower generations).
-        body: JSON.stringify({ model: PINNED.openai.model, prompt, n: 1, size: "1024x1024", quality: "medium" }),
+        // webp@85: ~10x smaller response than png — OpenAI bills per generation
+        // (format-independent) and intermittently kills large-body delivery
+        // (observed 520s, 2026-07-09), so smaller bodies survive more often.
+        body: JSON.stringify({ model: PINNED.openai.model, prompt, n: 1, size: "1024x1024", quality: "medium", output_format: "webp", output_compression: 85 }),
         signal: AbortSignal.timeout(OPENAI_GENERATE_TIMEOUT_MS),
       });
       if (res.status === 401 || res.status === 403) throw new ProviderAuthError(`openai ${res.status}`);
@@ -45,7 +48,7 @@ function makeOpenAiProvider(fetchFn: typeof fetch): ImageProvider {
       const data: any = await res.json();
       const b64 = data?.data?.[0]?.b64_json;
       if (typeof b64 !== "string") throw new Error("openai images: no b64_json in response");
-      return { bytes: Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer, mime: "image/png" };
+      return { bytes: Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer, mime: "image/webp" };
     },
     async validateKey(apiKey) {
       const res = await fetchFn(`${OPENAI_API}/models`, {
