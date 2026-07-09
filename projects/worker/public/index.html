@@ -4622,12 +4622,15 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const { images } = await r.json();
         if (!images.length) { el.innerHTML = '<span style="font-size:0.75rem;">No images yet — generate into this collection from the playground or API.</span>'; return; }
-        el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;">' + images.map((img) => `
+        el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;">' + images.map((img) => {
+          const thumb = img.thumb_url || img.medium_url || img.url;
+          return `
           <div style="position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;">
-            <img src="${img.thumb_url}" alt="${escapeHtml(img.prompt)}" title="${escapeHtml(img.prompt)}" style="width:100%;aspect-ratio:1;object-fit:cover;display:block;">
+            <img src="${escapeHtml(thumb)}" alt="${escapeHtml(img.prompt)}" title="${escapeHtml(img.prompt)}" style="width:100%;aspect-ratio:1;object-fit:cover;display:block;">
             <span style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.65);color:#fff;font-size:0.6875rem;padding:1px 6px;border-radius:9px;" title="Times returned by the API">${img.serve_count}×</span>
             <button style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.65);color:#fff;border:0;border-radius:9px;font-size:0.6875rem;padding:1px 7px;cursor:pointer;" title="Delete image" onclick="deleteCollectionImage('${id}', '${img.id}')">✕</button>
-          </div>`).join('') + '</div>';
+          </div>`;
+        }).join('') + '</div>';
       } catch { el.innerHTML = '<span style="font-size:0.75rem;">Could not load images.</span>'; }
     }
 
