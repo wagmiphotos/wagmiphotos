@@ -25,7 +25,15 @@ async function runByok(
   generateOnMiss: boolean, prompt: string, vec: number[], s: Services
 ): Promise<{ outcome: ByokOutcome | null; fallbackStatus: string | null }> {
   if (!byok || !generateOnMiss) return { outcome: null, fallbackStatus: null };
-  const outcome = await tryByokGenerate({ userId: byok.userId, prompt, vec }, s, byok.cfg);
+  let outcome: ByokOutcome;
+  try {
+    outcome = await tryByokGenerate({ userId: byok.userId, prompt, vec }, s, byok.cfg);
+  } catch (e) {
+    // A throw here (e.g. a transient D1 error from s.byok.get/reserve) must
+    // never 500 the request: degrade to the normal approximate/pending path.
+    console.error("byok path failed", e);
+    return { outcome: null, fallbackStatus: "provider_error" };
+  }
   if (outcome.kind === "generated" || outcome.kind === "content_policy") return { outcome, fallbackStatus: null };
   if (outcome.kind === "cap_reached" || outcome.kind === "provider_error") return { outcome: null, fallbackStatus: outcome.kind };
   return { outcome: null, fallbackStatus: null }; // skipped

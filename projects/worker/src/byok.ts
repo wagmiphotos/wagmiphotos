@@ -31,9 +31,11 @@ const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/webp": "webp" 
 
 // The BYOK in-request generation path. Ordering is load-bearing:
 // guardrails (fail-closed) -> atomic quota reserve -> provider -> durable
-// persist (R2 + D1) -> best-effort index -> accounting. Any throw after the
-// reserve refunds it; after provider spend, indexing errors never fail the
-// request (the image is already durable and paid for).
+// persist (R2 + D1) -> best-effort index -> accounting. Failures from the
+// provider call through insertGenerated refund the reservation (and an auth
+// failure also disables the key); once the asset is durable (insertGenerated
+// has succeeded), everything after is best-effort only — it never refunds
+// and never fails the request.
 export async function tryByokGenerate(
   i: { userId: string; prompt: string; vec: number[] }, s: Services, cfg: ByokCfg
 ): Promise<ByokOutcome> {

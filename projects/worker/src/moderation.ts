@@ -3,6 +3,9 @@
 // caller can fail closed: no moderation verdict, no generation.
 export const MODERATIONS_URL = "https://api.openai.com/v1/moderations";
 
+// Parity with the Python mirror's 10s moderation timeout.
+const MODERATION_TIMEOUT_MS = 10_000;
+
 export async function moderationFlagged(
   text: string, apiKey: string, fetchFn: typeof fetch = fetch
 ): Promise<string | null> {
@@ -10,6 +13,7 @@ export async function moderationFlagged(
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ input: text, model: "omni-moderation-latest" }),
+    signal: AbortSignal.timeout(MODERATION_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`moderation ${res.status}`);
   const data: any = await res.json();

@@ -7,12 +7,13 @@ const okJson = (body: unknown) => new Response(JSON.stringify(body), { status: 2
 it("openai: posts gpt-image-1 and decodes b64_json", async () => {
   const calls: any[] = [];
   const fetchFn = (async (url: any, init: any) => {
-    calls.push({ url: String(url), body: JSON.parse(init.body) });
+    calls.push({ url: String(url), body: JSON.parse(init.body), init });
     return okJson({ data: [{ b64_json: btoa("\x89PNG") }] });
   }) as unknown as typeof fetch;
   const img = await providerFor("openai", fetchFn).generate("a red fox", "sk-user");
   expect(calls[0].url).toBe("https://api.openai.com/v1/images/generations");
   expect(calls[0].body).toEqual({ model: "gpt-image-1", prompt: "a red fox", n: 1, size: "1024x1024" });
+  expect(calls[0].init.signal).toBeInstanceOf(AbortSignal);
   expect(img.mime).toBe("image/png");
   expect(new Uint8Array(img.bytes)).toEqual(new Uint8Array(PNG));
 });
@@ -51,6 +52,39 @@ it("gmicloud: submits to the request queue, polls to success, fetches the image"
   const img = await gmi.generate("a red fox", "gmi-key");
   expect(img.mime).toBe("image/png");
   expect(polls).toBe(2);
+});
+
+it("gmicloud: rejects a disallowed content type on the image download", async () => {
+  const fetchFn = (async (url: any, init?: any) => {
+    const u = String(url);
+    if (u.endsWith("/requests") && init?.method === "POST") return okJson({ request_id: "req-1" });
+    if (u.endsWith("/requests/req-1")) {
+      return okJson({ status: "success", outcome: { media_urls: [{ url: "https://cdn.gmi/img.png" }] } });
+    }
+    if (u === "https://cdn.gmi/img.png") return new Response("<html></html>", { status: 200, headers: { "Content-Type": "text/html" } });
+    throw new Error(`unexpected fetch ${u}`);
+  }) as unknown as typeof fetch;
+  const gmi = providerFor("gmicloud", fetchFn, async () => {});
+  await expect(gmi.generate("a red fox", "gmi-key")).rejects.toThrow(/content type/);
+});
+
+it("gmicloud: rejects an image download over the size cap via Content-Length", async () => {
+  const fetchFn = (async (url: any, init?: any) => {
+    const u = String(url);
+    if (u.endsWith("/requests") && init?.method === "POST") return okJson({ request_id: "req-1" });
+    if (u.endsWith("/requests/req-1")) {
+      return okJson({ status: "success", outcome: { media_urls: [{ url: "https://cdn.gmi/img.png" }] } });
+    }
+    if (u === "https://cdn.gmi/img.png") {
+      return new Response(PNG, {
+        status: 200,
+        headers: { "Content-Type": "image/png", "Content-Length": String(26 * 1024 * 1024) },
+      });
+    }
+    throw new Error(`unexpected fetch ${u}`);
+  }) as unknown as typeof fetch;
+  const gmi = providerFor("gmicloud", fetchFn, async () => {});
+  await expect(gmi.generate("a red fox", "gmi-key")).rejects.toThrow(/too large/);
 });
 
 it("gmicloud: failed status throws a plain error (not auth)", async () => {

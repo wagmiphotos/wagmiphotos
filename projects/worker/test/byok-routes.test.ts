@@ -22,6 +22,18 @@ it("PUT requires a session", async () => {
   expect(res.status).toBe(401);
 });
 
+it("PUT rejects a bearer-only request: no cookie session, no key management via sc- keys", async () => {
+  const s = fakeServices(); // sessions.resolve -> null (unset)
+  const req = new Request("https://x/v1/byok", {
+    method: "PUT",
+    headers: { Authorization: "Bearer sc-whatever", "Content-Type": "application/json" },
+    body: JSON.stringify({ provider: "openai", api_key: "sk-user-12345" }),
+  });
+  const res = await handlePutByok(req, env, s, async () => true);
+  expect(res.status).toBe(401);
+  expect((s as any)._byokRows.size).toBe(0);
+});
+
 it("PUT validates and stores the key encrypted with last4 + defaults", async () => {
   const s = sessionServices();
   const res = await handlePutByok(put({ provider: "openai", api_key: "sk-user-12345" }), env, s, async () => true);

@@ -338,3 +338,16 @@ it("provider failure on empty pool -> 202 pending with byok status", async () =>
   expect(body.shared_cache.result).toBe("pending");
   expect(body.shared_cache.byok).toEqual({ status: "provider_error" });
 });
+
+it("unexpected byok throw (e.g. transient D1 error) never 500s -> degrades to approximate", async () => {
+  const s = fakeServices();
+  (s as any)._matches.push({ id: "a1", score: 0.20 }); // below this file's floor (~0.32)
+  (s as any)._assets.set("a1", { id: "a1", prompt: "p", source: "pd12m", source_id: null, model_used: null, width: 1, height: 1, mime: "image/webp", source_url: "https://ext/x.webp", locally_cached: 0 });
+  const ctx = await byokCtx(s);
+  s.byok.get = async () => { throw new Error("d1 down"); };
+  const res = await handleGenerate({ prompt: "a red fox" }, s, cfg, ctx);
+  expect(res.status).toBe(200);
+  const body: any = await res.json();
+  expect(body.shared_cache.result).toBe("approximate");
+  expect(body.shared_cache.byok).toEqual({ status: "provider_error" });
+});

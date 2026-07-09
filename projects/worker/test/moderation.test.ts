@@ -8,6 +8,7 @@ it("returns null when not flagged", async () => {
     expect(String(url)).toBe(MODERATIONS_URL);
     expect(init.headers.Authorization).toBe("Bearer sk-mod");
     expect(JSON.parse(init.body).model).toBe("omni-moderation-latest");
+    expect(init.signal).toBeInstanceOf(AbortSignal);
     return okJson({ results: [{ flagged: false, categories: {} }] });
   }) as unknown as typeof fetch;
   expect(await moderationFlagged("a red fox", "sk-mod", fetchFn)).toBeNull();
