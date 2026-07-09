@@ -2900,7 +2900,7 @@
           </details>
           <details class="faq-item">
             <summary><span>What does <code>cache_tolerance</code> do?</span></summary>
-            <div class="faq-answer">It sets how close a match has to be to count as a <code>hit</code> versus an <code>approximate</code> match. It never changes <b>what</b> you get back — you always receive the closest image — it just controls the label and which prompts get flagged as gaps worth generating.</div>
+            <div class="faq-answer">It sets how close a match has to be to count as a <code>hit</code> versus an <code>approximate</code> match. Without a BYOK key it never changes <b>what</b> you get back — you always receive the closest image — it just controls the label and which prompts get flagged as gaps worth generating. With a <a href="#/account">BYOK key</a> enabled, tolerance also decides when your key fires: anything below the floor generates fresh instead of settling for the closest match.</div>
           </details>
           <details class="faq-item">
             <summary>What happens when my prompt isn't in the library yet?</summary>
@@ -3322,9 +3322,14 @@
                     <td>pending</td><td>202</td>
                     <td>The library has nothing to serve. <code>data</code> is empty and the prompt is queued for generation (unless opted out). Retry the same prompt later — once built, it is a hit for everyone.</td>
                   </tr>
+                  <tr>
+                    <td>generated</td><td>200</td>
+                    <td>You have a <a href="#/account">BYOK provider key</a> enabled and the result would have been approximate or pending, so a fresh image was generated with your key and added to the shared library. <code>shared_cache.byok</code> carries your usage: <code>{"used", "cap", "est_spend_usd"}</code>. When your key can't fire (monthly cap reached, provider error), the normal approximate/pending response is returned with <code>shared_cache.byok.status</code> set to <code>cap_reached</code> or <code>provider_error</code>.</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
+            <p style="font-size:0.875rem;color:var(--muted);">With BYOK enabled, a prompt that fails the content policy (denylist or moderation) returns <code>400</code> with <code>{"error": "content_policy", "category": "…"}</code> and nothing is generated or counted.</p>
 
             <h2 id="docs-matching">How matching works</h2>
             <p>
@@ -3600,6 +3605,14 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 - "pending"      (HTTP 202): nothing close yet, data is empty. Generate with
                   your own model if you need an image now. The prompt was queued
                   (unless you opted out), so retrying later will hit for $0.
+- "generated"    (HTTP 200): the account has a BYOK provider key enabled and a
+                  fresh image was generated with it (below-tolerance requests
+                  only). data[0].url is the new image; shared_cache.byok reports
+                  {used, cap, est_spend_usd}. If byok.status is "cap_reached" or
+                  "provider_error" instead, the response degraded to the normal
+                  approximate/pending shape.
+- HTTP 400 {"error":"content_policy"}: the prompt was blocked by the denylist or
+                  moderation (BYOK path only). Do not retry the same prompt.
 
 ## Rules for the agent
 1. Default to the cache. Send generate_on_miss=false when you only want free,
@@ -3607,6 +3620,8 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 2. Never treat "approximate" as exact — verify it matches the request.
 3. On 202, do not block waiting. Proceed without an image or fall back to a real
    generator, then retry the same prompt later for a cheap hit.
+4. "generated" costs the account owner real provider spend — respect
+   generate_on_miss=false as the way to guarantee a $0 call.
 4. Reuse one wagmi.photos key. It is hashed server-side; keep it secret.</pre>
             </div>
 
@@ -4419,8 +4434,11 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       const b = currentByok;
       const providerName = b.provider === 'openai' ? 'OpenAI' : 'GMI Cloud';
       const price = b.price_per_image != null ? ` · ~$${Number(b.price_per_image).toFixed(3).replace(/0$/, '')}/image` : '';
+      const errText = b.last_error === 'decrypt_failed'
+        ? `Your stored ${providerName} key can no longer be read (our encryption key was rotated) and has been disabled — delete it and enter it again.`
+        : `Your ${providerName} key was rejected by the provider and has been disabled — delete it and enter a new one.`;
       const err = b.last_error
-        ? `<div style="color:var(--danger);font-size:0.8125rem;margin-bottom:10px;">Your ${providerName} key was rejected by the provider and has been disabled — delete it and enter a new one.</div>`
+        ? `<div style="color:var(--danger);font-size:0.8125rem;margin-bottom:10px;">${errText}</div>`
         : '';
       el.innerHTML = `${err}
         <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">

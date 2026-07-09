@@ -50,7 +50,13 @@ export async function tryByokGenerate(
 
   let apiKey: string;
   try { apiKey = await decryptSecret(row.key_ciphertext, cfg.kek); }
-  catch (e) { console.error("byok decrypt failed", e); return { kind: "provider_error" }; }
+  catch (e) {
+    // KEK rotated or ciphertext corrupted: without this disable the account
+    // card looks healthy while every request silently falls back.
+    console.error("byok decrypt failed", e);
+    try { await s.byok.disable(i.userId, "decrypt_failed"); } catch (de) { console.error("byok disable failed", de); }
+    return { kind: "provider_error" };
+  }
 
   // openai users are moderated with their own key (the endpoint is free);
   // gmicloud users need the operator OPENAI_API_KEY. No key => never generate.

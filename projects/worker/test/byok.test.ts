@@ -85,6 +85,19 @@ it("moderation flag -> content_policy, nothing reserved", async () => {
   expect((await s.byok.getUsage("u1", "2026-07")).count).toBe(0);
 });
 
+it("undecryptable key (KEK rotated) disables the key with decrypt_failed", async () => {
+  const OTHER_KEK = btoa(String.fromCharCode(...Array.from({ length: 32 }, (_, i) => 255 - i)));
+  const s = await seededServices();
+  (s as any)._byokRows.get("u1").key_ciphertext = await encryptSecret("sk-user-key", OTHER_KEK);
+  const out = await tryByokGenerate({ userId: "u1", prompt: "a red fox", vec: [0.1] }, s, cfg());
+  expect(out.kind).toBe("provider_error");
+  const row = (s as any)._byokRows.get("u1");
+  expect(row.enabled).toBe(0);
+  expect(row.last_error).toBe("decrypt_failed");
+  // decrypt happens before the quota reserve: nothing to refund
+  expect((await s.byok.getUsage("u1", "2026-07")).count).toBe(0);
+});
+
 it("moderation outage -> provider_error (fail closed), nothing reserved", async () => {
   const s = await seededServices();
   const down = (async () => new Response("x", { status: 500 })) as unknown as typeof fetch;
