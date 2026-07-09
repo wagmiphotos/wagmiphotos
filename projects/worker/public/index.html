@@ -3021,7 +3021,7 @@
 
             <div id="state-loader" class="state-loader">
               <div class="spinner"></div>
-              <p style="font-size: 0.875rem; font-weight: 500; letter-spacing: 0.02em;">Querying index &amp; caches...</p>
+              <p id="loader-msg" style="font-size: 0.875rem; font-weight: 500; letter-spacing: 0.02em;">Searching the library&hellip;</p>
             </div>
 
             <div id="img-wrapper" class="img-wrapper">
@@ -3141,7 +3141,7 @@
       <div class="glass-card">
         <h2 class="card-title">Bring your own key</h2>
         <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
-          Add your own OpenAI or GMI Cloud API key and the playground generates a fresh image whenever the library has no close-enough match. Generated images join the shared library. Spend shown is an estimate (images × list price) — your provider bills you directly.
+          Add your own OpenAI or GMI Cloud API key and the playground generates a fresh image whenever the library has no close-enough match. Generated images join the shared library. Spend shown is an <b>estimate</b> (images &times; list price) &mdash; actual billing can differ per image. Check your provider for real costs: <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" style="color:var(--red);">OpenAI usage</a> &middot; <a href="https://console.gmicloud.ai" target="_blank" rel="noopener" style="color:var(--red);">GMI Cloud console</a>.
         </p>
         <div id="byok-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
       </div>
@@ -4479,6 +4479,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
             <b style="color:var(--ink);">${providerName}</b>
             <span style="font-family:var(--font-mono);"> ••••${escapeHtml(b.key_last4)}</span>
             <span> · ${b.used_this_month} / ${b.monthly_cap} images this month · est. $${Number(b.est_spend_usd).toFixed(2)} spent${price}</span>
+            <a href="${b.provider === 'openai' ? 'https://platform.openai.com/usage' : 'https://console.gmicloud.ai'}" target="_blank" rel="noopener" style="font-size:0.75rem;color:var(--red);">real costs &#8599;</a>
           </div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
             <label style="display:flex;gap:6px;align-items:center;font-size:0.8125rem;cursor:pointer;">
@@ -4879,6 +4880,21 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
       const startTime = performance.now();
 
+      // Staged wait feedback: cache lookups return in ~1-2s; anything longer
+      // means a fresh generation is running (gpt-image-2 medium: usually
+      // 30-90s, no reliable progress signal — show honest elapsed time).
+      const loaderMsg = document.getElementById('loader-msg');
+      if (loaderMsg) loaderMsg.textContent = 'Searching the library\u2026';
+      const genOnMissChecked = document.getElementById('gen-on-miss').checked;
+      const loaderTimer = setInterval(() => {
+        if (!loaderMsg) return;
+        const elapsed = Math.round((performance.now() - startTime) / 1000);
+        if (elapsed >= 3 && genOnMissChecked && currentByok && currentByok.enabled) {
+          const pname = currentByok.provider === 'openai' ? 'OpenAI' : 'GMI Cloud';
+          loaderMsg.textContent = '\u2728 Creating a fresh image with your ' + pname + ' key \u2014 usually 30\u201390 seconds (' + elapsed + 's)';
+        }
+      }, 1000);
+
       try {
         const genOnMiss = document.getElementById('gen-on-miss').checked;
         const collSel = document.getElementById('coll-select');
@@ -5018,6 +5034,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         loader.style.display = 'none';
         placeholder.style.display = 'flex';
       } finally {
+        clearInterval(loaderTimer);
         submitBtn.disabled = false;
         submitBtn.innerHTML = `<span>Generate image</span>`;
       }
