@@ -62,6 +62,15 @@
       border-radius: 4px;
     }
 
+    .skip-link {
+      position: absolute; left: 16px; top: -48px;
+      z-index: 300; padding: 10px 16px;
+      background: var(--ink); color: #fff; text-decoration: none;
+      border-radius: 8px; font-weight: 600; font-size: 0.875rem;
+      transition: top 0.15s ease;
+    }
+    .skip-link:focus { top: 12px; }
+
     .container {
       max-width: 1140px;
       margin: 0 auto;
@@ -408,8 +417,10 @@
     .view-pad { padding: 40px 0 64px; }
 
     /* ============ Library ============ */
-    .page-tabs { display: inline-flex; gap: 4px; margin: 0 0 18px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
-    .page-tab { border: none; background: transparent; padding: 8px 18px; border-radius: 999px; font: inherit; font-weight: 600; font-size: 0.9rem; color: var(--ink-soft); cursor: pointer; }
+    .page-tabs { display: inline-flex; gap: 4px; margin: 0 0 18px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+    .page-tabs::-webkit-scrollbar { display: none; }
+    .page-tab { border: none; background: transparent; padding: 8px 18px; border-radius: 999px; font: inherit; font-weight: 600; font-size: 0.9rem; color: var(--ink-soft); cursor: pointer; white-space: nowrap; }
+    @media (max-width: 480px) { .page-tab { padding: 8px 10px; font-size: 0.8125rem; } }
     .page-tab:hover { color: var(--ink); }
     .page-tab.active { background: var(--ink); color: #fff; }
     .library-bar { max-width: 720px; margin: 0 auto 12px; display: flex; gap: 10px; flex-wrap: wrap; }
@@ -451,6 +462,24 @@
       font-size: 0.8125rem; color: var(--muted);
     }
     .coll-viewer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+    .coll-tile { position: relative; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .coll-tile img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+    .tile-badge {
+      position: absolute; top: 4px; left: 4px;
+      background: rgba(0, 0, 0, 0.65); color: #fff;
+      font-size: 0.6875rem; padding: 3px 8px; border-radius: 9px;
+    }
+    .tile-del {
+      position: absolute; top: 4px; right: 4px;
+      width: 32px; height: 32px; border: 0; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0, 0, 0, 0.65); color: #fff;
+      font-size: 0.9375rem; line-height: 1; cursor: pointer;
+    }
+    .tile-del:hover { background: var(--danger); }
+
+    /* compact page heading for views without a hero-style page-head */
+    .page-h1 { font-family: var(--font-display); font-size: 1.75rem; font-weight: 800; color: var(--ink); margin: 0 0 20px; }
     .library-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
     @media (max-width: 1000px) { .library-grid { grid-template-columns: repeat(3, 1fr); } }
     @media (max-width: 640px) { .library-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -475,17 +504,18 @@
       border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px;
     }
     .library-download {
-      margin-top: auto; height: 34px; font-size: 0.8125rem; text-decoration: none;
+      margin-top: auto; height: 38px; font-size: 0.8125rem; text-decoration: none;
       display: inline-flex; align-items: center; justify-content: center;
       background: var(--ink); color: #fff; border-radius: 8px;
     }
     .library-download:hover { background: var(--red); }
-    .library-original { font-size: 0.8125rem; color: var(--muted); text-decoration: underline; }
+    .library-original { display: inline-block; padding: 8px 0 2px; font-size: 0.8125rem; color: var(--muted); text-decoration: underline; }
     .library-original:hover { color: var(--ink); }
     .library-status { text-align: center; color: var(--muted); padding: 40px 0; font-size: 0.9375rem; }
     .library-status a { color: var(--red); }
     .link-btn {
-      background: none; border: none; padding: 0;
+      background: none; border: none;
+      padding: 8px; margin: -8px; /* grows the hit area without shifting layout */
       font: inherit; color: var(--red); cursor: pointer;
       text-decoration: underline; text-underline-offset: 2px;
     }
@@ -1548,8 +1578,8 @@
       color: var(--ink-soft);
       margin-bottom: 14px;
     }
-    .footer-col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-    .footer-col a { color: var(--muted); text-decoration: none; }
+    .footer-col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+    .footer-col a { display: inline-block; padding: 5px 0; color: var(--muted); text-decoration: none; }
     .footer-col a:hover { color: var(--red); }
 
     .footer-bottom {
@@ -2188,6 +2218,8 @@
 </head>
 <body>
 
+  <a class="skip-link" href="#main">Skip to content</a>
+
   <!-- Navigation Bar -->
   <nav class="navbar" id="navbar">
     <div class="navbar-inner">
@@ -2293,7 +2325,7 @@
     </div>
   </nav>
 
-  <main class="container">
+  <main class="container" id="main">
 
     <!-- VIEW 1: HOME -->
     <div id="view-home" class="spa-view">
@@ -2799,12 +2831,12 @@
           <p class="section-sub" id="lib-page-sub">Every image the cache has ever served, ranked by semantic closeness to your search — the same BGE prompt embeddings that power generation, not keyword matching. Download anything — it's all public-domain PD12M or cache-generated.</p>
         </div>
 
-        <div class="page-tabs" role="tablist">
-          <button class="page-tab active" data-tab="library" onclick="showLibTab('library')">Shared library</button>
-          <button class="page-tab" data-tab="browse" onclick="showLibTab('browse')">Collections</button>
-          <button class="page-tab" data-tab="collections" onclick="showLibTab('collections')">My collections</button>
+        <div class="page-tabs" role="tablist" aria-label="Library sections" onkeydown="onLibTabKeydown(event)">
+          <button class="page-tab active" role="tab" id="ptab-library" aria-selected="true" aria-controls="tab-library" data-tab="library" onclick="showLibTab('library')">Shared library</button>
+          <button class="page-tab" role="tab" id="ptab-browse" aria-selected="false" aria-controls="tab-browse" data-tab="browse" onclick="showLibTab('browse')">Collections</button>
+          <button class="page-tab" role="tab" id="ptab-collections" aria-selected="false" aria-controls="tab-collections" data-tab="collections" onclick="showLibTab('collections')">My collections</button>
         </div>
-        <div id="tab-library">
+        <div id="tab-library" role="tabpanel" aria-labelledby="ptab-library">
           <div class="library-bar">
             <input id="library-search" class="input-field" type="search" placeholder="Search prompts, e.g. flamingo sunset…"
                    aria-label="Search prompts"
@@ -2817,7 +2849,7 @@
         </div>
 
         <!-- Public collections browse -->
-        <div id="tab-browse" hidden>
+        <div id="tab-browse" role="tabpanel" aria-labelledby="ptab-browse" hidden>
           <div id="browse-list">
             <div class="library-bar">
               <input id="browse-search" class="input-field" type="search" placeholder="Find a collection, e.g. retro posters…"
@@ -2844,7 +2876,7 @@
             </div>
           </div>
         </div>
-        <div id="tab-collections" hidden>
+        <div id="tab-collections" role="tabpanel" aria-labelledby="ptab-collections" hidden>
           <div class="coll-split">
             <!-- Left: prompt + key entry + create form -->
             <div>
@@ -2910,6 +2942,8 @@
     <div id="view-account" class="spa-view">
       <div class="view-pad">
 
+      <h1 class="page-h1">Account</h1>
+
       <!-- Telemetry Card -->
       <div class="glass-card">
         <h2 class="card-title">Telemetry &amp; performance</h2>
@@ -2941,6 +2975,9 @@
             $<span id="saved">0.00</span>
           </div>
         </div>
+        <p id="stats-empty-hint" style="font-size: 0.8125rem; color: var(--muted); margin-top: 12px;" hidden>
+          No activity yet — <a href="#/library" style="color: var(--red);">search the library</a> or call the API and your requests, cache hits, and savings will land here.
+        </p>
       </div>
 
       <!-- Plan Card -->
@@ -2991,14 +3028,14 @@
 
         <!-- Login Card -->
         <div class="glass-card" style="max-width: 420px; margin: 0 auto;">
-          <h2 class="card-title">Log in</h2>
+          <h1 class="card-title">Log in</h1>
           <p style="font-size: 0.875rem; color: var(--muted); margin-bottom: 20px;">
             Enter your email and we'll send you a magic link — no password required.
           </p>
 
           <div class="form-group">
             <label for="login-email">Email address</label>
-            <input id="login-email" type="email" class="api-key-input" placeholder="you@example.com">
+            <input id="login-email" type="email" autocomplete="email" class="api-key-input" placeholder="you@example.com">
           </div>
 
           <button class="btn btn-primary" id="login-submit" onclick="requestMagicLink()">Send me a login link</button>
@@ -3696,6 +3733,32 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
   <!-- Toast Container -->
   <div id="toast" class="toast" role="status" aria-live="polite">Could not load image resource.</div>
 
+  <!-- Generic confirm modal (replaces native confirm()) -->
+  <div id="confirm-modal" class="modal-overlay" hidden onclick="if(event.target===this)closeConfirm(false)">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <h3 class="modal-title" id="confirm-title"></h3>
+      <p class="modal-sub" id="confirm-body"></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeConfirm(false)">Cancel</button>
+        <button class="btn btn-primary" id="confirm-ok" onclick="closeConfirm(true)">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Theme prompt editor modal (replaces native prompt()) -->
+  <div id="theme-modal" class="modal-overlay" hidden onclick="if(event.target===this)closeThemeModal()">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="theme-modal-title">
+      <h3 class="modal-title" id="theme-modal-title">Edit theme prompt</h3>
+      <p class="modal-sub">Appended to every future image generated into this collection. Existing images keep the theme they were made with.</p>
+      <label class="modal-label" for="theme-modal-input">Theme prompt</label>
+      <textarea id="theme-modal-input" class="field-input" maxlength="500" style="min-height: 80px;" placeholder="e.g. retro travel poster style, muted palette"></textarea>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeThemeModal()">Cancel</button>
+        <button class="btn btn-primary" id="theme-modal-save" onclick="saveThemeModal(this)">Save theme</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Create API key modal -->
   <div id="key-modal" class="modal-overlay" hidden onclick="if(event.target===this)closeCreateKey()">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="key-modal-title">
@@ -4022,6 +4085,16 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     }
 
     // Copy the code/skill block inside the button's .copy-wrap
+    // Bare docs code blocks get the same Copy affordance /openai and /agents have.
+    document.querySelectorAll('#view-docs .docs-pre').forEach((pre) => {
+      if (pre.closest('.copy-wrap')) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'copy-wrap';
+      pre.parentNode.insertBefore(wrap, pre);
+      wrap.appendChild(pre);
+      wrap.insertAdjacentHTML('afterbegin', '<button class="copy-btn" type="button" onclick="copyCode(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span class="copy-label">Copy</span></button>');
+    });
+
     function copyCode(btn) {
       const wrap = btn.closest('.copy-wrap');
       const pre = wrap && wrap.querySelector('pre');
@@ -4076,6 +4149,8 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
       const rate = total > 0 ? Math.round((hits / total) * 100) : 0;
       document.getElementById('hit-rate').textContent = `${rate}%`;
+      const emptyHint = document.getElementById('stats-empty-hint');
+      if (emptyHint) emptyHint.hidden = total > 0;
 
       // Persist Stats
       localStorage.setItem('wagmiphotos_saved', saved.toString());
@@ -4108,12 +4183,28 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       document.getElementById('tab-library').hidden = tab !== 'library';
       document.getElementById('tab-browse').hidden = tab !== 'browse';
       document.getElementById('tab-collections').hidden = tab !== 'collections';
-      document.querySelectorAll('.page-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+      document.querySelectorAll('.page-tab').forEach((b) => {
+        const active = b.dataset.tab === tab;
+        b.classList.toggle('active', active);
+        b.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
       const head = LIB_TAB_HEADINGS[tab];
       document.getElementById('lib-page-title').textContent = head.title;
       document.getElementById('lib-page-sub').textContent = head.sub;
       if (tab === 'browse') initBrowse();
       if (tab === 'collections') { renderByok(); loadCollections(); }
+    }
+
+    // Roving arrow-key support for the tablist (ARIA tabs pattern).
+    function onLibTabKeydown(e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const tabs = [...e.currentTarget.querySelectorAll('.page-tab')];
+      const i = tabs.indexOf(document.activeElement);
+      if (i === -1) return;
+      e.preventDefault();
+      const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+      next.focus();
+      next.click();
     }
 
     const LIB_PAGE_SIZE = 24;
@@ -4324,6 +4415,47 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     }
 
+    // ---- Styled confirm + theme-edit modals (replace native confirm()/prompt()) ----
+    let _confirmResolve = null;
+    function askConfirm({ title, body, action = 'Delete' }) {
+      return new Promise((resolve) => {
+        _confirmResolve = resolve;
+        document.getElementById('confirm-title').textContent = title;
+        document.getElementById('confirm-body').textContent = body || '';
+        document.getElementById('confirm-ok').textContent = action;
+        document.getElementById('confirm-modal').hidden = false;
+        // focus the safe choice by default
+        document.querySelector('#confirm-modal .btn-ghost').focus();
+      });
+    }
+    function closeConfirm(result) {
+      document.getElementById('confirm-modal').hidden = true;
+      if (_confirmResolve) { _confirmResolve(result); _confirmResolve = null; }
+    }
+
+    let _themeCollId = null;
+    function openThemeModal(id) {
+      const c = myCollections.find((x) => x.id === id);
+      if (!c) return;
+      _themeCollId = id;
+      const input = document.getElementById('theme-modal-input');
+      input.value = c.theme_prompt || '';
+      const btn = document.getElementById('theme-modal-save');
+      btn.disabled = false; btn.textContent = 'Save theme';
+      document.getElementById('theme-modal').hidden = false;
+      input.focus();
+    }
+    function closeThemeModal() {
+      document.getElementById('theme-modal').hidden = true;
+      _themeCollId = null;
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (!document.getElementById('confirm-modal').hidden) closeConfirm(false);
+      if (!document.getElementById('theme-modal').hidden) closeThemeModal();
+    });
+
     // API key creation modal
     let _lastGeneratedKey = '';
     function openCreateKey() {
@@ -4494,7 +4626,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     }
 
     async function deleteByok(btn) {
-      if (!confirm('Delete your provider key? Fresh generation stops immediately; usage history is kept.')) return;
+      if (!(await askConfirm({ title: 'Delete your provider key?', body: 'Fresh generation stops immediately; usage history is kept.', action: 'Delete key' }))) return;
       if (btn) btn.disabled = true;
       try {
         const r = await fetch('/v1/byok', { method: 'DELETE', credentials: 'same-origin' });
@@ -4590,8 +4722,8 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
             <div style="margin-top:4px;">${collStatsLine(c)} · theme: ${c.theme_prompt ? escapeHtml(c.theme_prompt) : '<i>none</i>'}</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn" style="height:32px;width:auto;padding:0 10px;font-size:0.8125rem;" onclick="editCollectionTheme('${c.id}')">Edit theme</button>
-            <button class="btn" style="height:32px;width:auto;padding:0 10px;font-size:0.8125rem;color:var(--danger);" onclick="deleteCollection('${c.id}', this)">Delete</button>
+            <button class="btn" style="height:38px;width:auto;padding:0 14px;font-size:0.8125rem;" onclick="editCollectionTheme('${c.id}')">Edit theme</button>
+            <button class="btn" style="height:38px;width:auto;padding:0 14px;font-size:0.8125rem;color:var(--danger);" onclick="deleteCollection('${c.id}', this)">Delete</button>
           </div>
         </div>`;
     }
@@ -4632,16 +4764,18 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       finally { if (btn) btn.disabled = false; }
     }
 
-    async function editCollectionTheme(id) {
-      const c = myCollections.find((x) => x.id === id);
-      const theme = prompt('Theme prompt (appended to every future generation in this collection):', c ? c.theme_prompt : '');
-      if (theme == null) return;
+    function editCollectionTheme(id) { openThemeModal(id); }
+
+    async function saveThemeModal(btn) {
+      if (!_themeCollId) return;
+      const theme = document.getElementById('theme-modal-input').value.trim();
+      btn.disabled = true; btn.textContent = 'Saving…';
       try {
-        const r = await fetch('/v1/collections/' + encodeURIComponent(id), {
+        const r = await fetch('/v1/collections/' + encodeURIComponent(_themeCollId), {
           method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ theme_prompt: theme }),
         });
-        if (r.status === 401) { location.hash = '#/login'; return; }
+        if (r.status === 401) { closeThemeModal(); location.hash = '#/login'; return; }
         if (r.status === 422) {
           const data = await r.json().catch(() => ({}));
           showToast(data.error === 'content_policy'
@@ -4651,13 +4785,15 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         }
         if (r.status === 503) { showToast('Content check unavailable right now — try again in a minute', 'error'); return; }
         if (!r.ok) throw new Error('HTTP ' + r.status);
+        closeThemeModal();
         showToast('Theme updated — applies to future generations', 'success');
         await loadCollections();
       } catch { showToast('Could not update the theme', 'error'); }
+      finally { btn.disabled = false; btn.textContent = 'Save theme'; }
     }
 
     async function deleteCollection(id, btn) {
-      if (!confirm('Delete this collection AND all its images? This cannot be undone.')) return;
+      if (!(await askConfirm({ title: 'Delete this collection?', body: 'All of its images are deleted with it. This cannot be undone.', action: 'Delete collection' }))) return;
       if (btn) btn.disabled = true;
       try {
         const r = await fetch('/v1/collections/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin' });
@@ -4685,13 +4821,13 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     function collTile(img) {
       const thumb = img.thumb_url || img.medium_url || img.url;
       const serves = img.serve_count != null
-        ? `<span style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.65);color:#fff;font-size:0.6875rem;padding:1px 6px;border-radius:9px;" title="Times returned by the API">${img.serve_count}×</span>`
+        ? `<span class="tile-badge" title="Times returned by the API">${img.serve_count}×</span>`
         : '';
       return `
-        <div style="position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;">
-          <img src="${escapeHtml(thumb)}" alt="${escapeHtml(img.prompt)}" title="${escapeHtml(img.prompt)}" style="width:100%;aspect-ratio:1;object-fit:cover;display:block;">
+        <div class="coll-tile">
+          <img src="${escapeHtml(thumb)}" alt="${escapeHtml(img.prompt)}" title="${escapeHtml(img.prompt)}">
           ${serves}
-          <button style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.65);color:#fff;border:0;border-radius:9px;font-size:0.6875rem;padding:1px 7px;cursor:pointer;" title="Delete image" onclick="deleteCollectionImage('${selectedCollId}', '${img.id}')">✕</button>
+          <button type="button" class="tile-del" aria-label="Delete image" title="Delete image" onclick="deleteCollectionImage('${selectedCollId}', '${img.id}')">✕</button>
         </div>`;
     }
 
@@ -4728,7 +4864,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     }
 
     async function deleteCollectionImage(collId, assetId) {
-      if (!confirm('Delete this image?')) return;
+      if (!(await askConfirm({ title: 'Delete this image?', body: 'It is removed from the collection permanently.', action: 'Delete image' }))) return;
       try {
         const r = await fetch('/v1/collections/' + encodeURIComponent(collId) + '/images/' + encodeURIComponent(assetId), { method: 'DELETE', credentials: 'same-origin' });
         if (r.status === 401) { location.hash = '#/login'; return; }
@@ -4899,7 +5035,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     }
 
     async function deleteApiKey(id) {
-      if (!confirm('Delete this API key? Any integration using it will stop working immediately.')) return;
+      if (!(await askConfirm({ title: 'Delete this API key?', body: 'Any integration using it will stop working immediately.', action: 'Delete key' }))) return;
       try {
         const r = await fetch('/v1/keys/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin' });
         if (r.status === 401) { location.hash = '#/login'; return; }
@@ -4908,8 +5044,8 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       } catch { showToast('Could not delete key', 'error'); }
     }
 
-    function resetSession() {
-      if (confirm("Reset local telemetry stats? Your account and API keys aren't affected.")) {
+    async function resetSession() {
+      if (await askConfirm({ title: 'Reset local telemetry stats?', body: "Your account and API keys aren't affected.", action: 'Reset stats' })) {
         localStorage.clear();
         saved = 0.00;
         hits = 0;
