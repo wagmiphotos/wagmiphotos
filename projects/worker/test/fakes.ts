@@ -17,6 +17,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   const collectionRows = new Map<string, CollectionRow>();
   const generationRows = new Map<string, GenerationRow>();
   const serveCounts = new Map<string, number>();
+  const searchCounts = new Map<string, number>();
   const tombstoned: string[] = [];
   const base: Services = {
     embedder: { textEmbed: async () => [0.1, 0.2, 0.3] },
@@ -59,6 +60,10 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
         return ids;
       },
       bumpServeCount: async (id) => { serveCounts.set(id, (serveCounts.get(id) ?? 0) + 1); },
+      previewsByCollections: async (collectionIds, per) =>
+        collectionIds.flatMap((cid) =>
+          libraryRows.filter((r: any) => r.collection_id === cid).slice(0, per)
+            .map((r: any) => ({ collection_id: cid, id: r.id, prompt: r.prompt, source_url: r.source_url, locally_cached: r.locally_cached }))),
     },
     queries: { recordQuery: async (i) => { recorded.push(i); return i.generate; } },
     keys: {
@@ -106,10 +111,26 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
         collectionRows.set(id, { id, owner_user_id: ownerUserId, name, theme_prompt: themePrompt, created_at: "x", updated_at: "x" });
       },
       get: async (id) => collectionRows.get(id) ?? null,
-      listByOwner: async (userId) => [...collectionRows.values()].filter((c) => c.owner_user_id === userId).map((c) => ({ ...c, image_count: 0, total_serves: 0 })),
+      listByOwner: async (userId) => [...collectionRows.values()].filter((c) => c.owner_user_id === userId).map((c) => ({ ...c, image_count: 0, total_serves: 0, search_count: searchCounts.get(c.id) ?? 0 })),
       countByOwner: async (userId) => [...collectionRows.values()].filter((c) => c.owner_user_id === userId).length,
       patch: async (id, f) => { const c = collectionRows.get(id); if (!c) return; if (f.name != null) c.name = f.name; if (f.themePrompt != null) c.theme_prompt = f.themePrompt; },
       delete: async (id) => { collectionRows.delete(id); },
+      browse: async ({ q, limit, offset }) => {
+        const summarize = (c: any) => {
+          const members = libraryRows.filter((r: any) => r.collection_id === c.id);
+          return {
+            ...c, image_count: members.length,
+            total_serves: members.reduce((n: number, r: any) => n + (serveCounts.get(r.id) ?? 0), 0),
+            search_count: searchCounts.get(c.id) ?? 0,
+          };
+        };
+        return [...collectionRows.values()]
+          .filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()))
+          .map(summarize)
+          .sort((a, b) => b.total_serves - a.total_serves)
+          .slice(offset, offset + limit);
+      },
+      bumpSearchCount: async (id) => { searchCounts.set(id, (searchCounts.get(id) ?? 0) + 1); },
     },
     generations: {
       create: async (g) => {
@@ -162,6 +183,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   (base as any)._collectionRows = collectionRows;
   (base as any)._generationRows = generationRows;
   (base as any)._serveCounts = serveCounts;
+  (base as any)._searchCounts = searchCounts;
   (base as any)._tombstoned = tombstoned;
   return { ...base, ...overrides };
 }

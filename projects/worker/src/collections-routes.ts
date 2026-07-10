@@ -1,20 +1,52 @@
-import type { Env, Services } from "./types";
+import type { Env, Services, ByokRow } from "./types";
 import { resolveApiPrincipal } from "./session";
 import {
   newCollectionId, validateCollectionFields, collectionView, MAX_COLLECTIONS_PER_USER, requiredGenerationsFor,
 } from "./collections";
 import { assetUrls } from "./asset-urls";
+import { deniedTerm } from "./denylist";
+import { moderationFlagged } from "./moderation";
+import { decryptSecret } from "./crypto";
 
 // Management surface: session or bearer key (resolveApiPrincipal), owner-scoped.
 // Non-owner requests on a specific collection answer 404 (not 403): the id is
 // a capability for *searching*; whether someone else owns it is not disclosed.
+// Names and themes are shown on the public browse tab, so create/patch runs
+// them through the same guardrail as generation prompts (denylist + OpenAI
+// moderation, fail-closed).
+
+export interface CollModCfg { kek?: string; moderationKey?: string; fetchFn?: typeof fetch; }
 
 async function auth(request: Request, env: Env, s: Services): Promise<string | null> {
   const p = await resolveApiPrincipal(request, env, s);
   return p ? p.userId : null;
 }
 
-export async function handleCreateCollection(request: Request, env: Env, s: Services): Promise<Response> {
+/** Null when the text is acceptable; otherwise the error Response to return.
+ *  Same key selection as generation: openai users moderate with their own
+ *  key (the endpoint is free), others need the operator OPENAI_API_KEY. */
+async function nameContentCheck(
+  text: string, byok: ByokRow | null, cfg: CollModCfg
+): Promise<Response | null> {
+  const term = deniedTerm(text);
+  if (term) return Response.json({ error: "content_policy", category: `denylist:${term}` }, { status: 422 });
+  let modKey = cfg.moderationKey;
+  if (byok && byok.enabled && byok.provider === "openai" && cfg.kek) {
+    try { modKey = await decryptSecret(byok.key_ciphertext, cfg.kek); }
+    catch (e) { console.error("collection moderation decrypt failed", e); }
+  }
+  if (!modKey) return Response.json({ error: "moderation unavailable" }, { status: 503 });
+  let category: string | null;
+  try { category = await moderationFlagged(text, modKey, cfg.fetchFn ?? fetch); }
+  catch (e) {
+    console.error("collection name moderation failed", e);
+    return Response.json({ error: "moderation unavailable" }, { status: 503 }); // fail closed
+  }
+  if (category) return Response.json({ error: "content_policy", category }, { status: 422 });
+  return null;
+}
+
+export async function handleCreateCollection(request: Request, env: Env, s: Services, cfg: CollModCfg = {}): Promise<Response> {
   const userId = await auth(request, env, s);
   if (!userId) return Response.json({ error: "login required" }, { status: 401 });
   // Valid BYOK = an enabled key row: creation is pointless without a generation path.
@@ -25,6 +57,9 @@ export async function handleCreateCollection(request: Request, env: Env, s: Serv
   try { body = await request.json(); } catch { return Response.json({ error: "invalid JSON body" }, { status: 400 }); }
   const fields = validateCollectionFields(body, false);
   if ("error" in fields) return Response.json({ error: fields.error }, { status: 422 });
+
+  const blocked = await nameContentCheck([fields.name, fields.themePrompt].filter(Boolean).join("\n"), byok, cfg);
+  if (blocked) return blocked;
 
   const existing = await s.collections.countByOwner(userId);
   if (existing >= MAX_COLLECTIONS_PER_USER) {
@@ -57,7 +92,54 @@ export async function handleListCollections(request: Request, env: Env, s: Servi
   });
 }
 
-export async function handlePatchCollection(id: string, request: Request, env: Env, s: Services): Promise<Response> {
+// Public directory (2026-07-10 decision): every collection is listable — the
+// browse tab supersedes unlisted-by-ID sharing. Owner identity still never
+// leaves the server; previews reuse the public library asset shape.
+const BROWSE_MAX_Q = 80; // = MAX_COLLECTION_NAME_LEN; longer can't match anything
+const BROWSE_PREVIEWS = 4;
+
+export async function handleBrowseCollections(
+  url: URL, request: Request, env: Env, s: Services, cfg: { assetBaseUrl?: string }
+): Promise<Response> {
+  const userId = await auth(request, env, s);
+  if (!userId) return Response.json({ error: "login required" }, { status: 401 });
+
+  const q = (url.searchParams.get("q") ?? "").trim();
+  if (q.length > BROWSE_MAX_Q) {
+    return Response.json({ error: `q must be at most ${BROWSE_MAX_Q} characters` }, { status: 400 });
+  }
+  const rawLimit = url.searchParams.get("limit");
+  const rawOffset = url.searchParams.get("offset");
+  let limit = 24;
+  if (rawLimit != null) {
+    const n = Number(rawLimit);
+    if (!Number.isInteger(n)) return Response.json({ error: "limit must be an integer" }, { status: 400 });
+    limit = Math.min(60, Math.max(1, n));
+  }
+  let offset = 0;
+  if (rawOffset != null) {
+    const n = Number(rawOffset);
+    if (!Number.isInteger(n) || n < 0) return Response.json({ error: "offset must be a non-negative integer" }, { status: 400 });
+    offset = n;
+  }
+
+  const rows = await s.collections.browse({ q, limit: limit + 1, offset });
+  const page = rows.slice(0, limit);
+  const previews = await s.assets.previewsByCollections(page.map((c) => c.id), BROWSE_PREVIEWS);
+  const byColl = new Map<string, { thumb_url: string | null; medium_url: string | null; url: string; prompt: string }[]>();
+  for (const p of previews) {
+    const u = assetUrls(p, cfg.assetBaseUrl);
+    const list = byColl.get(p.collection_id) ?? [];
+    list.push({ thumb_url: u.thumb_url, medium_url: u.medium_url, url: u.url, prompt: p.prompt });
+    byColl.set(p.collection_id, list);
+  }
+  return Response.json({
+    collections: page.map((c) => ({ ...collectionView(c), previews: byColl.get(c.id) ?? [] })),
+    has_more: rows.length > limit,
+  });
+}
+
+export async function handlePatchCollection(id: string, request: Request, env: Env, s: Services, cfg: CollModCfg = {}): Promise<Response> {
   const userId = await auth(request, env, s);
   if (!userId) return Response.json({ error: "login required" }, { status: 401 });
   const row = await s.collections.get(id);
@@ -67,6 +149,12 @@ export async function handlePatchCollection(id: string, request: Request, env: E
   try { body = await request.json(); } catch { return Response.json({ error: "invalid JSON body" }, { status: 400 }); }
   const fields = validateCollectionFields(body, true);
   if ("error" in fields) return Response.json({ error: fields.error }, { status: 422 });
+
+  const changed = [fields.name, fields.themePrompt].filter((v) => v != null && v !== "").join("\n");
+  if (changed) {
+    const blocked = await nameContentCheck(changed, await s.byok.get(userId), cfg);
+    if (blocked) return blocked;
+  }
 
   await s.collections.patch(id, fields);
   const updated = await s.collections.get(id);

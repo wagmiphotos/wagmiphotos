@@ -2,7 +2,7 @@ import type {
   AssetRow, AssetStore, LibraryAssetRow, QueryStore, KeyStore,
   User, UserStore, SessionStore, LoginTokenStore,
   ByokRow, ByokStore, ByokUsage,
-  CollectionStore, CollectionRow, CollectionSummary, CollectionImageRow,
+  CollectionStore, CollectionRow, CollectionSummary, CollectionImageRow, CollectionPreviewRow,
   GenerationRow, GenerationStore,
 } from "./types";
 
@@ -82,6 +82,18 @@ export function makeD1Stores(db: D1Database): {
     },
     async bumpServeCount(id) {
       await db.prepare("UPDATE assets SET serve_count = serve_count + 1 WHERE id = ?").bind(id).run();
+    },
+    async previewsByCollections(collectionIds, per) {
+      if (!collectionIds.length) return [];
+      const ph = collectionIds.map(() => "?").join(", ");
+      const { results } = await db.prepare(
+        `SELECT collection_id, id, prompt, source_url, locally_cached FROM (
+           SELECT a.collection_id, a.id, a.prompt, a.source_url, a.locally_cached,
+                  ROW_NUMBER() OVER (PARTITION BY a.collection_id ORDER BY a.created_at DESC, a.id DESC) AS rn
+           FROM live_assets a WHERE a.collection_id IN (${ph})
+         ) WHERE rn <= ?`
+      ).bind(...collectionIds, per).all<CollectionPreviewRow>();
+      return results ?? [];
     },
   };
   const queries: QueryStore = {
@@ -294,7 +306,7 @@ export function makeD1Stores(db: D1Database): {
     async listByOwner(userId) {
       // Aggregates come from live_assets so tombstoned images drop out of both counts.
       const { results } = await db.prepare(
-        `SELECT c.id, c.owner_user_id, c.name, c.theme_prompt, c.created_at, c.updated_at,
+        `SELECT c.id, c.owner_user_id, c.name, c.theme_prompt, c.created_at, c.updated_at, c.search_count,
                 COUNT(a.id) AS image_count, COALESCE(SUM(a.serve_count), 0) AS total_serves
          FROM collections c LEFT JOIN live_assets a ON a.collection_id = c.id
          WHERE c.owner_user_id = ?
@@ -315,6 +327,23 @@ export function makeD1Stores(db: D1Database): {
     },
     async delete(id) {
       await db.prepare("DELETE FROM collections WHERE id = ?").bind(id).run();
+    },
+    async browse({ q, limit, offset }) {
+      // Same live_assets aggregates as listByOwner, unscoped; ESCAPE guards
+      // user-typed % and _ in the name filter (parity with searchAssets).
+      const like = q ? `%${q.replace(/[\\%_]/g, "\\$&")}%` : null;
+      const { results } = await db.prepare(
+        `SELECT c.id, c.owner_user_id, c.name, c.theme_prompt, c.created_at, c.updated_at, c.search_count,
+                COUNT(a.id) AS image_count, COALESCE(SUM(a.serve_count), 0) AS total_serves
+         FROM collections c LEFT JOIN live_assets a ON a.collection_id = c.id
+         ${like ? "WHERE c.name LIKE ? ESCAPE '\\'" : ""}
+         GROUP BY c.id ORDER BY total_serves DESC, c.created_at DESC, c.id DESC
+         LIMIT ? OFFSET ?`
+      ).bind(...(like ? [like] : []), limit, offset).all<CollectionSummary>();
+      return results ?? [];
+    },
+    async bumpSearchCount(id) {
+      await db.prepare("UPDATE collections SET search_count = search_count + 1 WHERE id = ?").bind(id).run();
     },
   };
 

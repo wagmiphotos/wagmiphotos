@@ -260,3 +260,19 @@ it("library scoped browse/fallback: LIKE path filters by collection_id", async (
   expect(res.status).toBe(200);
   expect(s._searchCalls[0].collectionId).toBe("col_abc");
 });
+
+it("library scoped: bumps the collection's search_count; bump failure doesn't break the read", async () => {
+  const s: any = fakeServices();
+  s._collectionRows.set("col_abc", { id: "col_abc", owner_user_id: "u", name: "n", theme_prompt: "", created_at: "x", updated_at: "x" });
+  await handleLibrarySearch(new URL("https://x/v1/library?collection=col_abc"), s, { floorSimMin: 0.75 });
+  await handleLibrarySearch(new URL("https://x/v1/library?collection=col_abc"), s, { floorSimMin: 0.75 });
+  expect(s._searchCounts.get("col_abc")).toBe(2);
+
+  s.collections.bumpSearchCount = async () => { throw new Error("d1 down"); };
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?collection=col_abc"), s, { floorSimMin: 0.75 });
+  expect(res.status).toBe(200);
+
+  // unscoped reads never touch the counter
+  await handleLibrarySearch(new URL("https://x/v1/library"), s, { floorSimMin: 0.75 });
+  expect(s._searchCounts.get("col_abc")).toBe(2);
+});

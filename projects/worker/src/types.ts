@@ -10,8 +10,9 @@ export interface CollectionRow {
   id: string; owner_user_id: string; name: string; theme_prompt: string;
   created_at: string; updated_at: string;
 }
-export interface CollectionSummary extends CollectionRow { image_count: number; total_serves: number; }
+export interface CollectionSummary extends CollectionRow { image_count: number; total_serves: number; search_count: number; }
 export interface CollectionImageRow extends LibraryAssetRow { serve_count: number; }
+export interface CollectionPreviewRow { collection_id: string; id: string; prompt: string; source_url: string | null; locally_cached: number; }
 export interface CollectionStore {
   create(c: { id: string; ownerUserId: string; name: string; themePrompt: string }): Promise<void>;
   get(id: string): Promise<CollectionRow | null>;
@@ -19,6 +20,10 @@ export interface CollectionStore {
   countByOwner(userId: string): Promise<number>;
   patch(id: string, f: { name?: string; themePrompt?: string }): Promise<void>;
   delete(id: string): Promise<void>;
+  /** Public browse: every collection, most-served first. q filters by name (LIKE). */
+  browse(i: { q: string; limit: number; offset: number }): Promise<CollectionSummary[]>;
+  /** Fire-and-forget stat for scoped reads (library search + scoped generate). */
+  bumpSearchCount(id: string): Promise<void>;
 }
 export interface Match { id: string; score: number; }
 export interface Embedder { textEmbed(prompt: string): Promise<number[]>; }
@@ -53,6 +58,8 @@ export interface AssetStore {
   tombstoneByCollection(collectionId: string): Promise<string[]>;
   /** Fire-and-forget serve counter (hit/approximate generation returns only). */
   bumpServeCount(id: string): Promise<void>;
+  /** Up to `per` newest live assets for each listed collection (browse-card previews). */
+  previewsByCollections(collectionIds: string[], per: number): Promise<CollectionPreviewRow[]>;
 }
 export interface QueryStore {
   /** Upserts the query row and returns the row's effective generate state after merging. */

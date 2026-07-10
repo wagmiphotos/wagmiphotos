@@ -51,6 +51,8 @@ export async function handleLibrarySearch(url: URL, s: Services, cfg: LibrarySea
   if (collectionId) {
     coll = await s.collections.get(collectionId);
     if (!coll) return Response.json({ error: "unknown collection" }, { status: 404 });
+    // Best-effort browse/owner stat: every scoped read counts as a "search".
+    try { await s.collections.bumpSearchCount(coll.id); } catch (e) { console.error("bumpSearchCount failed", e); }
   }
 
   if (q) {

@@ -123,3 +123,37 @@ it("generations: collection_id has no FK to collections — deleting a collectio
   expect(row!.status).toBe("succeeded");
   expect(row!.collection_id).toBe("col_g"); // stale reference on purpose, not cleared
 });
+
+it("browse + bumpSearchCount + previews work on the real schema (0017; window fn, LIKE escape)", async () => {
+  const db = realDb();
+  seedUser(db);
+  seedUser(db, "usr_2");
+  const { assets, collections } = makeD1Stores(db);
+  await collections.create({ id: "col_a", ownerUserId: "usr_1", name: "Retro posters", themePrompt: "" });
+  await collections.create({ id: "col_b", ownerUserId: "usr_2", name: "100%_wild", themePrompt: "" });
+  for (let i = 0; i < 5; i++) {
+    await assets.insertGenerated({
+      id: `a${i}`, prompt: `p${i}`, sourceUrl: `https://x/a${i}.png`, mime: "image/png",
+      width: 1, height: 1, modelUsed: "m", provider: "openai", priceUsd: 0.01, createdBy: "usr_1", collectionId: "col_a",
+    });
+  }
+  await assets.bumpServeCount("a0");
+  await collections.bumpSearchCount("col_a");
+
+  const rows = await collections.browse({ q: "", limit: 10, offset: 0 });
+  expect(rows.map((r) => r.id)).toEqual(["col_a", "col_b"]); // most served first
+  expect(rows[0]).toMatchObject({ image_count: 5, total_serves: 1, search_count: 1 });
+
+  const previews = await assets.previewsByCollections(["col_a", "col_b"], 4);
+  expect(previews.filter((p) => p.collection_id === "col_a").length).toBe(4); // capped per collection
+  expect(previews.filter((p) => p.collection_id === "col_b").length).toBe(0);
+  expect(await assets.previewsByCollections([], 4)).toEqual([]);
+
+  // a literal % or _ in the name filter must not act as a wildcard
+  expect((await collections.browse({ q: "100%_", limit: 10, offset: 0 })).map((r) => r.id)).toEqual(["col_b"]);
+  expect((await collections.browse({ q: "0%w", limit: 10, offset: 0 })).length).toBe(0);
+  expect((await collections.browse({ q: "zzz", limit: 10, offset: 0 })).length).toBe(0);
+
+  // owner list now carries search_count too
+  expect((await collections.listByOwner("usr_1"))[0].search_count).toBe(1);
+});

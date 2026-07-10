@@ -48,7 +48,7 @@ export function collectionView(c: CollectionRow | CollectionSummary) {
   return {
     id: c.id, name: c.name, theme_prompt: c.theme_prompt,
     created_at: c.created_at, updated_at: c.updated_at,
-    ...("image_count" in c ? { image_count: c.image_count, total_serves: c.total_serves } : {}),
+    ...("image_count" in c ? { image_count: c.image_count, total_serves: c.total_serves, search_count: c.search_count } : {}),
   };
 }
 

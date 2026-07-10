@@ -17,6 +17,7 @@ import { handlePutByok, handlePatchByok, handleDeleteByok } from "./byok-routes"
 import {
   handleCreateCollection, handleListCollections, handlePatchCollection,
   handleListCollectionImages, handleDeleteCollectionImage, handleDeleteCollection,
+  handleBrowseCollections, type CollModCfg,
 } from "./collections-routes";
 import { handleCreateGeneration, handleGetGeneration } from "./generations-routes";
 import { sweepGenerations, type GenJobsCfg } from "./generation-jobs";
@@ -140,9 +141,13 @@ export default {
 
       const libraryCfg = { floorSimMin: numEnv(env.FLOOR_SIM_MIN, FLOOR_SIM_MIN), assetBaseUrl: env.ASSET_BASE_URL };
 
+      const collModCfg: CollModCfg = { kek: env.BYOK_KEK, moderationKey: env.OPENAI_API_KEY };
       if (url.pathname === "/v1/collections") {
-        if (request.method === "POST") return await handleCreateCollection(request, env, services);
+        if (request.method === "POST") return await handleCreateCollection(request, env, services, collModCfg);
         if (request.method === "GET") return await handleListCollections(request, env, services);
+      }
+      if (url.pathname === "/v1/collections/browse" && request.method === "GET") {
+        return await handleBrowseCollections(url, request, env, services, libraryCfg);
       }
       const genCreate = url.pathname.match(/^\/v1\/collections\/([^/]+)\/generations$/);
       if (genCreate && request.method === "POST") {
@@ -173,7 +178,7 @@ export default {
       if (collOne && (request.method === "PATCH" || request.method === "DELETE")) {
         let id: string;
         try { id = decodeURIComponent(collOne[1]); } catch { return new Response("Not found", { status: 404 }); }
-        if (request.method === "PATCH") return await handlePatchCollection(id, request, env, services);
+        if (request.method === "PATCH") return await handlePatchCollection(id, request, env, services, collModCfg);
         return await handleDeleteCollection(id, request, env, services);
       }
 

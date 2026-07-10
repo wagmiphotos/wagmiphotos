@@ -208,6 +208,7 @@
       gap: 4px 28px;
       width: 580px;
       max-width: calc(100vw - 32px);
+      right: 0; left: auto; /* trigger sits at the right end of the bar; left-anchoring would overflow the viewport */
     }
 
     .nav-col-head {
@@ -244,7 +245,6 @@
       flex-shrink: 0;
     }
 
-    .nav-drop-item.explore .nav-drop-ic { background: rgba(28, 28, 27, 0.05); color: var(--ink); }
 
     .nav-drop-title {
       display: block;
@@ -412,7 +412,45 @@
     .page-tab { border: none; background: transparent; padding: 8px 18px; border-radius: 999px; font: inherit; font-weight: 600; font-size: 0.9rem; color: var(--ink-soft); cursor: pointer; }
     .page-tab:hover { color: var(--ink); }
     .page-tab.active { background: var(--ink); color: #fff; }
-    .library-bar { max-width: 560px; margin: 0 auto 28px; }
+    .library-bar { max-width: 720px; margin: 0 auto 12px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .library-bar[hidden] { display: none; }  /* the hidden attr must beat display:flex */
+    .library-bar .input-field { flex: 1 1 300px; min-width: 0; }
+    #library-grid { margin-top: 16px; }
+
+    /* Public collections browse: preview-mosaic cards */
+    .browse-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; margin-top: 16px; }
+    .browse-card {
+      display: block; width: 100%; text-align: left; cursor: pointer;
+      background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      overflow: hidden; padding: 0; font: inherit; color: inherit;
+      transition: box-shadow 0.15s ease, transform 0.15s ease;
+    }
+    .browse-card:hover { box-shadow: 0 10px 28px rgba(28, 28, 27, 0.1); transform: translateY(-2px); }
+    .browse-previews { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; background: var(--paper); }
+    .browse-previews img, .browse-previews .ph { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--paper); }
+    .browse-card-body { display: block; padding: 12px 14px; }
+    .browse-card-body b { display: block; color: var(--ink); font-family: var(--font-display); font-size: 0.9375rem; }
+    .browse-theme {
+      display: block; font-size: 0.8125rem; color: var(--muted); margin-top: 3px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .browse-stats { display: block; font-size: 0.75rem; color: var(--muted); margin-top: 7px; }
+
+    /* Collections tab: form column left, collection viewer right */
+    .coll-split { display: grid; grid-template-columns: 1fr; gap: 0 24px; align-items: start; }
+    @media (min-width: 960px) { .coll-split { grid-template-columns: 1fr 1.15fr; } }
+    .coll-split > * { min-width: 0; }
+    .coll-viewer-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .coll-viewer-bar .input-field { flex: 1 1 160px; min-width: 0; }
+    .coll-viewer-bar select.input-field { flex: 0 1 auto; width: auto; max-width: 45%; }
+    .coll-meta-row {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 10px 16px; flex-wrap: wrap;
+      border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px 12px; margin-bottom: 14px;
+      font-size: 0.8125rem; color: var(--muted);
+    }
+    .coll-viewer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
     .library-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
     @media (max-width: 1000px) { .library-grid { grid-template-columns: repeat(3, 1fr); } }
     @media (max-width: 640px) { .library-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -1155,6 +1193,9 @@
       gap: 36px;
       align-items: center;
     }
+    /* let columns shrink below the code <pre> min-content width so the pre's
+       own overflow-x:auto engages instead of widening the whole page */
+    .api-grid > * { min-width: 0; }
 
     @media (min-width: 960px) { .api-grid { grid-template-columns: 0.85fr 1.6fr; } }
 
@@ -1470,29 +1511,54 @@
     .site-footer {
       border-top: 1px solid var(--line);
       margin-top: 72px;
-      padding: 28px 0;
+      padding: 48px 0 0;
+      background: var(--card);
     }
 
     .footer-inner {
       max-width: 1140px;
       margin: 0 auto;
       padding: 0 24px;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
       font-size: 0.8125rem;
       color: var(--muted);
     }
 
-    .footer-brand { display: flex; align-items: center; gap: 8px; }
-    .footer-brand img { width: 22px; height: 22px; }
-    .footer-brand b { font-family: var(--font-display); font-weight: 800; color: var(--ink); }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 32px 40px;
+      padding-bottom: 36px;
+    }
+    @media (min-width: 640px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
+    @media (min-width: 960px) { .footer-grid { grid-template-columns: 2fr 1fr 1fr 1fr; } }
 
-    .footer-links { display: flex; flex-wrap: wrap; gap: 12px 18px; }
-    .footer-links a { color: var(--muted); text-decoration: none; }
-    .footer-links a:hover { color: var(--red); }
+    .footer-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .footer-brand img { width: 26px; height: 26px; }
+    .footer-brand b { font-family: var(--font-display); font-weight: 800; font-size: 1rem; color: var(--ink); }
+
+    .footer-blurb { max-width: 300px; line-height: 1.6; margin-bottom: 14px; }
+    .footer-fine { font-size: 0.75rem; line-height: 1.6; }
+    .footer-fine a { color: var(--ink-soft); text-decoration: none; font-weight: 600; }
+    .footer-fine a:hover { color: var(--red); }
+
+    .footer-col-head {
+      font-family: var(--font-display);
+      font-size: 0.6875rem; font-weight: 800;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--ink-soft);
+      margin-bottom: 14px;
+    }
+    .footer-col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+    .footer-col a { color: var(--muted); text-decoration: none; }
+    .footer-col a:hover { color: var(--red); }
+
+    .footer-bottom {
+      border-top: 1px solid var(--line);
+      padding: 18px 0 22px;
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      gap: 8px 20px;
+      font-size: 0.75rem;
+    }
 
     /* ============ Cards (playground / account) ============ */
     .glass-card {
@@ -2136,18 +2202,19 @@
 
       <div class="nav-menu" id="nav-menu">
         <div class="nav-links">
+          <a href="#/" id="nav-home" class="nav-link">Home</a>
           <a href="#/pricing" id="nav-pricing" class="nav-link">Pricing</a>
           <a href="#/library" id="nav-library" class="nav-link">Library</a>
 
-          <!-- Resources mega-dropdown -->
+          <!-- Explore mega-dropdown: Resources + Developers -->
           <div class="nav-item">
             <button type="button" class="nav-link nav-trigger" aria-expanded="false">
-              Resources
+              Explore
               <svg class="caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
             </button>
             <div class="nav-dropdown nav-mega">
               <div class="nav-col">
-                <div class="nav-col-head">On this page</div>
+                <div class="nav-col-head">Resources</div>
                 <a href="#how-it-works" class="nav-drop-item">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg></span>
                   <span><span class="nav-drop-title">How it works</span><span class="nav-drop-sub">Request in, image out.</span></span>
@@ -2170,50 +2237,24 @@
                 </a>
               </div>
               <div class="nav-col">
-                <div class="nav-col-head">Explore</div>
-                <a href="#/pricing" class="nav-drop-item explore">
-                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg></span>
-                  <span><span class="nav-drop-title">Pricing</span><span class="nav-drop-sub">Plans from $0/mo.</span></span>
+                <div class="nav-col-head">Developers</div>
+                <a href="#/docs" id="nav-docs" class="nav-drop-item">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg></span>
+                  <span><span class="nav-drop-title">API reference</span><span class="nav-drop-sub">Endpoints, params, responses.</span></span>
                 </a>
-                <a href="#/account" class="nav-drop-item explore">
-                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-                  <span><span class="nav-drop-title">Account</span><span class="nav-drop-sub">Keys &amp; usage stats.</span></span>
+                <a href="#/openai" id="nav-openai" class="nav-drop-item">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m0 8v3a2 2 0 0 0 2 2h3m8-18h3a2 2 0 0 1 2 2v3m0 8v3a2 2 0 0 1-2 2h-3"/><path d="m9 15 6-6"/><path d="M15 15V9h-6"/></svg></span>
+                  <span><span class="nav-drop-title">OpenAI drop-in</span><span class="nav-drop-sub">Swap the base URL, nothing else.</span></span>
                 </a>
-                <a href="#/terms" class="nav-drop-item explore">
-                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 7h14"/><path d="m5 7-2 6a4 4 0 0 0 8 0z"/><path d="m19 7-2 6a4 4 0 0 0 8 0z"/><path d="M8 21h8"/></svg></span>
-                  <span><span class="nav-drop-title">Terms</span><span class="nav-drop-sub">Use &amp; licensing.</span></span>
+                <a href="#/matching" id="nav-matching" class="nav-drop-item">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="1.5"/><circle cx="17" cy="6" r="1.5"/><circle cx="10" cy="15" r="1.5"/><circle cx="18" cy="16" r="1.5"/><circle cx="5" cy="17" r="1.5"/></svg></span>
+                  <span><span class="nav-drop-title">Semantic matching</span><span class="nav-drop-sub">How prompts find images.</span></span>
                 </a>
-                <a href="#/privacy" class="nav-drop-item explore">
-                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
-                  <span><span class="nav-drop-title">Privacy</span><span class="nav-drop-sub">What we store.</span></span>
+                <a href="#/agents" id="nav-agents" class="nav-drop-item">
+                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M12 4v4M8 2v2M16 2v2"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/></svg></span>
+                  <span><span class="nav-drop-title">Agents</span><span class="nav-drop-sub">Copy-paste skill file.</span></span>
                 </a>
               </div>
-            </div>
-          </div>
-
-          <!-- Developers dropdown -->
-          <div class="nav-item">
-            <button type="button" class="nav-link nav-trigger" aria-expanded="false">
-              Developers
-              <svg class="caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-            </button>
-            <div class="nav-dropdown nav-list">
-              <a href="#/docs" id="nav-docs" class="nav-drop-item">
-                <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg></span>
-                <span><span class="nav-drop-title">API reference</span><span class="nav-drop-sub">Endpoints, params, responses.</span></span>
-              </a>
-              <a href="#/openai" id="nav-openai" class="nav-drop-item">
-                <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m0 8v3a2 2 0 0 0 2 2h3m8-18h3a2 2 0 0 1 2 2v3m0 8v3a2 2 0 0 1-2 2h-3"/><path d="m9 15 6-6"/><path d="M15 15V9h-6"/></svg></span>
-                <span><span class="nav-drop-title">OpenAI drop-in</span><span class="nav-drop-sub">Swap the base URL, nothing else.</span></span>
-              </a>
-              <a href="#/matching" id="nav-matching" class="nav-drop-item">
-                <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="1.5"/><circle cx="17" cy="6" r="1.5"/><circle cx="10" cy="15" r="1.5"/><circle cx="18" cy="16" r="1.5"/><circle cx="5" cy="17" r="1.5"/></svg></span>
-                <span><span class="nav-drop-title">Semantic matching</span><span class="nav-drop-sub">How prompts find images.</span></span>
-              </a>
-              <a href="#/agents" id="nav-agents" class="nav-drop-item">
-                <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M12 4v4M8 2v2M16 2v2"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/></svg></span>
-                <span><span class="nav-drop-title">Agents</span><span class="nav-drop-sub">Copy-paste skill file.</span></span>
-              </a>
             </div>
           </div>
         </div>
@@ -2754,12 +2795,13 @@
       <div class="view-pad">
         <div class="page-head">
           <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>Library</div>
-          <h1 class="section-title">Browse the shared library</h1>
-          <p class="section-sub">Every image the cache has ever served, ranked by semantic closeness to your search — the same BGE prompt embeddings that power generation, not keyword matching. Download anything — it's all public-domain PD12M or cache-generated.</p>
+          <h1 class="section-title" id="lib-page-title">Browse the shared library</h1>
+          <p class="section-sub" id="lib-page-sub">Every image the cache has ever served, ranked by semantic closeness to your search — the same BGE prompt embeddings that power generation, not keyword matching. Download anything — it's all public-domain PD12M or cache-generated.</p>
         </div>
 
         <div class="page-tabs" role="tablist">
-          <button class="page-tab active" data-tab="library" onclick="showLibTab('library')">Library</button>
+          <button class="page-tab active" data-tab="library" onclick="showLibTab('library')">Shared library</button>
+          <button class="page-tab" data-tab="browse" onclick="showLibTab('browse')">Collections</button>
           <button class="page-tab" data-tab="collections" onclick="showLibTab('collections')">My collections</button>
         </div>
         <div id="tab-library">
@@ -2773,41 +2815,92 @@
           <div id="library-status" class="library-status" style="display: none;"></div>
           <button id="library-more" class="btn library-more" style="display: none;" onclick="loadMoreLibrary()">Load more</button>
         </div>
+
+        <!-- Public collections browse -->
+        <div id="tab-browse" hidden>
+          <div id="browse-list">
+            <div class="library-bar">
+              <input id="browse-search" class="input-field" type="search" placeholder="Find a collection, e.g. retro posters…"
+                     aria-label="Find a collection"
+                     oninput="onBrowseInput(this.value)"
+                     onkeydown="if(event.key==='Enter'){clearTimeout(brwDebounce);searchBrowse(this.value.trim());}">
+            </div>
+            <div id="browse-grid" class="browse-grid"></div>
+            <div id="browse-status" class="library-status" style="display: none;"></div>
+            <button id="browse-more" class="btn library-more" style="display: none;" onclick="loadMoreBrowse()">Load more</button>
+          </div>
+          <div id="browse-viewer" hidden>
+            <button type="button" class="link-btn" onclick="closeBrowseViewer()">← All collections</button>
+            <div class="glass-card" style="margin-top: 12px;">
+              <div id="browse-viewer-head"></div>
+              <div class="library-bar" style="max-width: none; margin: 16px 0 0;">
+                <input id="browse-viewer-search" class="input-field" type="search" placeholder="Search this collection…"
+                       aria-label="Search this collection"
+                       oninput="onBrowseViewerSearch(this.value)"
+                       onkeydown="if(event.key==='Enter'){clearTimeout(brwViewDebounce);loadBrowseViewer(this.value.trim());}">
+              </div>
+              <div id="browse-viewer-grid" class="library-grid" style="margin-top: 16px;"></div>
+              <div id="browse-viewer-status" class="library-status" style="display: none;"></div>
+            </div>
+          </div>
+        </div>
         <div id="tab-collections" hidden>
-          <!-- BYOK key card + collections card moved from view-account below; Task 8 adds the generate card above them -->
+          <div class="coll-split">
+            <!-- Left: prompt + key entry + create form -->
+            <div>
+              <!-- Generate Card -->
+              <div class="glass-card">
+                <h3>Create an image</h3>
+                <p class="muted">Generated with your own provider key, straight into one of your collections. <span id="gen-key-status"></span></p>
+                <p class="muted" style="font-size: 0.8125rem;">Collections are shared with all users — anyone can browse and use them for all kinds of things, so keep them child-friendly. Explicit, NSFW, or hateful images aren't allowed; prompts are checked automatically before generation.</p>
+                <div class="form-group">
+                  <label class="field-label" for="gen-coll-select">Collection</label>
+                  <select id="gen-coll-select" class="field-input"></select>
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="gen-prompt">Prompt</label>
+                  <textarea id="gen-prompt" class="field-input" rows="3" placeholder="A watercolor fox in morning fog"></textarea>
+                </div>
+                <button id="btn-generate" class="btn btn-primary" onclick="createInCollection()">Generate</button>
+                <div id="gen-result"></div>
+              </div>
 
-          <!-- Generate Card -->
-          <div class="glass-card">
-            <h3>Create an image</h3>
-            <p class="muted">Generated with your own provider key, straight into one of your collections. <span id="gen-key-status"></span></p>
-            <div class="form-group">
-              <label class="field-label" for="gen-coll-select">Collection</label>
-              <select id="gen-coll-select" class="field-input"></select>
+              <!-- BYOK Card -->
+              <div class="glass-card">
+                <h2 class="card-title">Bring your own key</h2>
+                <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
+                  Add your own OpenAI or GMI Cloud API key so it can generate images on demand into collections you own. Generated images live only in your collections — they never join the shared library. Spend shown is an <b>estimate</b> (images &times; list price) &mdash; actual billing can differ per image. Check your provider for real costs: <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" style="color:var(--red);">OpenAI usage</a> &middot; <a href="https://console.gmicloud.ai" target="_blank" rel="noopener" style="color:var(--red);">GMI Cloud console</a>.
+                </p>
+                <div id="byok-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
+              </div>
+
+              <!-- New Collection Card -->
+              <div class="glass-card">
+                <h2 class="card-title">New collection</h2>
+                <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
+                  A themed set of images generated with your own key. The theme prompt is appended to every image you generate into it. Collections are public — the name and theme are checked automatically, so keep them family-friendly.
+                </p>
+                <div id="coll-create-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
+              </div>
             </div>
-            <div class="form-group">
-              <label class="field-label" for="gen-prompt">Prompt</label>
-              <textarea id="gen-prompt" class="field-input" rows="3" placeholder="A watercolor fox in morning fog"></textarea>
+
+            <!-- Right: browse & search the collection -->
+            <div>
+              <div class="glass-card">
+                <h2 class="card-title">Your collections</h2>
+                <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
+                  Every collection is public: anyone can find it on the <b>Collections</b> tab or scope API searches to its ID (<code style="font-family: var(--font-mono);">"collection": "col_…"</code>). Its images stay out of the shared library.
+                </p>
+                <div class="coll-viewer-bar">
+                  <select id="coll-view-select" class="input-field" aria-label="Collection" onchange="onCollViewChange(this.value)"></select>
+                  <input id="coll-view-search" class="input-field" type="search" placeholder="Search this collection…" aria-label="Search this collection"
+                         oninput="onCollViewSearchInput(this.value)"
+                         onkeydown="if(event.key==='Enter'){clearTimeout(collViewDebounce);loadCollectionViewer(this.value.trim());}">
+                </div>
+                <div id="coll-meta"></div>
+                <div id="coll-viewer-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
+              </div>
             </div>
-            <button id="btn-generate" class="btn btn-primary" onclick="createInCollection()">Generate</button>
-            <div id="gen-result"></div>
-          </div>
-
-          <!-- BYOK Card -->
-          <div class="glass-card">
-            <h2 class="card-title">Bring your own key</h2>
-            <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
-              Add your own OpenAI or GMI Cloud API key so it can generate images on demand into collections you own. Generated images live only in your collections — they never join the shared library. Spend shown is an <b>estimate</b> (images &times; list price) &mdash; actual billing can differ per image. Check your provider for real costs: <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" style="color:var(--red);">OpenAI usage</a> &middot; <a href="https://console.gmicloud.ai" target="_blank" rel="noopener" style="color:var(--red);">GMI Cloud console</a>.
-            </p>
-            <div id="byok-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
-          </div>
-
-          <!-- Collections Card -->
-          <div class="glass-card">
-            <h2 class="card-title">Collections</h2>
-            <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
-              Themed sets of images generated with your own key. The theme prompt is appended to every image you generate into the collection, and anyone who knows the collection ID can scope API searches to it (<code style="font-family: var(--font-mono);">"collection": "col_…"</code>) — images in your collections are searchable only via that collection ID, never through the shared library.
-            </p>
-            <div id="collections-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
           </div>
         </div>
       </div>
@@ -3556,20 +3649,46 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
   <!-- Footer -->
   <footer class="site-footer">
     <div class="footer-inner">
-      <div class="footer-brand">
-        <img src="/assets/logo.webp" alt="" width="22" height="22">
-        <span><b>wagmi<span class="logo-tld">.photos</span></b> — semantic image cache</span>
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <img src="/assets/logo.webp" alt="" width="26" height="26">
+            <b>wagmi<span class="logo-tld">.photos</span></b>
+          </div>
+          <p class="footer-blurb">A free, openly licensed image library shaped by what everyone searches for. The more we all use it, the better it gets.</p>
+          <p class="footer-fine">A <a href="https://suppers.ai/" target="_blank" rel="noopener">Suppers Software Limited</a> project<br>Hamilton, New Zealand</p>
+        </div>
+        <div class="footer-col">
+          <div class="footer-col-head">Product</div>
+          <ul>
+            <li><a href="#/">Home</a></li>
+            <li><a href="#/library">Library</a></li>
+            <li><a href="#/pricing">Pricing</a></li>
+            <li><a href="#/account">Account</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <div class="footer-col-head">Developers</div>
+          <ul>
+            <li><a href="#/docs">API reference</a></li>
+            <li><a href="#/openai">OpenAI drop-in</a></li>
+            <li><a href="#/matching">Semantic matching</a></li>
+            <li><a href="#/agents">Agents</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <div class="footer-col-head">Company</div>
+          <ul>
+            <li><a href="https://suppers.ai/" target="_blank" rel="noopener">suppers.ai</a></li>
+            <li><a href="https://github.com/wagmiphotos/wagmiphotos" target="_blank" rel="noopener">GitHub</a></li>
+            <li><a href="#/terms">Terms</a></li>
+            <li><a href="#/privacy">Privacy</a></li>
+          </ul>
+        </div>
       </div>
-      <span>A <a href="https://suppers.ai/" target="_blank" rel="noopener" style="color: var(--ink-soft); text-decoration: none; font-weight: 600;">Suppers Software Limited</a> project · Hamilton, NZ · Seeded with PD12M (CDLA-Permissive-2.0)</span>
-      <div class="footer-links">
-        <a href="#/library">Library</a>
-        <a href="#/docs">API</a>
-        <a href="#/openai">OpenAI drop-in</a>
-        <a href="#/matching">Matching</a>
-        <a href="#/agents">Agents</a>
-        <a href="#/pricing">Pricing</a>
-        <a href="#/terms">Terms</a>
-        <a href="#/privacy">Privacy</a>
+      <div class="footer-bottom">
+        <span>© 2026 Suppers Software Limited</span>
+        <span>Seeded with PD12M (CDLA-Permissive-2.0)</span>
       </div>
     </div>
   </footer>
@@ -3657,9 +3776,13 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
     // Client-side Router
     const ROUTES = {
-      '#/':           { view: 'view-home' },
+      '#/':           { view: 'view-home', link: 'nav-home' },
       '#/pricing':    { view: 'view-pricing', link: 'nav-pricing' },
-      '#/library':    { view: 'view-library', link: 'nav-library', onShow: () => { initLibrary(); if (activeLibTab === 'collections') { renderByok(); loadCollections(); } } },
+      '#/library':    { view: 'view-library', link: 'nav-library', onShow: () => {
+        initLibrary();
+        if (activeLibTab === 'browse') initBrowse();
+        if (activeLibTab === 'collections') { renderByok(); loadCollections(); }
+      } },
       '#/account':    { view: 'view-account', onShow: async () => {
         const emailEl = document.getElementById('account-email');
         if (emailEl) emailEl.textContent = currentUser ? currentUser.email : '—';
@@ -3966,11 +4089,30 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
     // ---- Library ----
     let activeLibTab = 'library';
+    const LIB_TAB_HEADINGS = {
+      library: {
+        title: 'Browse the shared library',
+        sub: 'Every image the cache has ever served, ranked by semantic closeness to your search — the same BGE prompt embeddings that power generation, not keyword matching. Download anything — it\'s all public-domain PD12M or cache-generated.',
+      },
+      browse: {
+        title: 'Browse everyone\'s collections',
+        sub: 'Themed image sets created by the community with their own keys. Open one to search inside it, or scope your API calls to its ID.',
+      },
+      collections: {
+        title: 'Create a collection — shared with everyone',
+        sub: 'Themed image sets you generate with your own provider key. Every collection is public on the Collections tab and searchable through the API — its images never join the shared library.',
+      },
+    };
     function showLibTab(tab) {
       activeLibTab = tab;
       document.getElementById('tab-library').hidden = tab !== 'library';
+      document.getElementById('tab-browse').hidden = tab !== 'browse';
       document.getElementById('tab-collections').hidden = tab !== 'collections';
       document.querySelectorAll('.page-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+      const head = LIB_TAB_HEADINGS[tab];
+      document.getElementById('lib-page-title').textContent = head.title;
+      document.getElementById('lib-page-sub').textContent = head.sub;
+      if (tab === 'browse') initBrowse();
       if (tab === 'collections') { renderByok(); loadCollections(); }
     }
 
@@ -4035,6 +4177,139 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
           '<div class="library-tags">' + tags + '</div>' +
           '<a class="library-download" href="/v1/library/' + encodeURIComponent(img.id) + '/download">Download</a>' + original +
         '</div></div>';
+    }
+
+    // ---- Public collections browse ----
+    const BRW_PAGE_SIZE = 24;
+    let brwQuery = '', brwOffset = 0, brwLoaded = false, brwSeq = 0, brwDebounce = null;
+    let brwCollections = [];         // everything loaded so far (feeds the viewer head)
+    let brwViewing = null;           // collection object open in the viewer
+    let brwViewSeq = 0, brwViewDebounce = null;
+
+    function initBrowse() { if (!brwLoaded) searchBrowse(''); }
+
+    function onBrowseInput(value) {
+      clearTimeout(brwDebounce);
+      brwDebounce = setTimeout(() => searchBrowse(value.trim()), 300);
+    }
+    function searchBrowse(q) { brwQuery = q; brwOffset = 0; loadBrowse(false); }
+    function loadMoreBrowse() { loadBrowse(true); }
+
+    async function loadBrowse(append) {
+      const seq = ++brwSeq;
+      const grid = document.getElementById('browse-grid');
+      const status = document.getElementById('browse-status');
+      const moreBtn = document.getElementById('browse-more');
+      if (!append) { grid.innerHTML = ''; brwOffset = 0; brwCollections = []; moreBtn.style.display = 'none'; }
+      status.textContent = 'Loading…';
+      status.style.display = 'block';
+      try {
+        const params = new URLSearchParams({ limit: BRW_PAGE_SIZE, offset: brwOffset });
+        if (brwQuery) params.set('q', brwQuery);
+        const res = await fetch('/v1/collections/browse?' + params, { credentials: 'same-origin' });
+        if (res.status === 401) { location.hash = '#/login'; return; }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (seq !== brwSeq) return;
+        brwLoaded = true;
+        brwOffset += data.collections.length;
+        brwCollections.push(...data.collections);
+        grid.insertAdjacentHTML('beforeend', data.collections.map(browseCard).join(''));
+        if (grid.children.length) {
+          status.style.display = 'none';
+        } else {
+          status.textContent = brwQuery
+            ? 'No collections match “' + brwQuery + '”.'
+            : 'No collections yet — be the first: create one under My collections.';
+        }
+        moreBtn.style.display = data.has_more ? 'block' : 'none';
+      } catch (err) {
+        if (seq !== brwSeq) return;
+        status.innerHTML = 'Could not load collections. <button type="button" class="link-btn" onclick="loadBrowse(' + append + ')">Retry</button>';
+        status.style.display = 'block';
+      }
+    }
+
+    function collStatsLine(c) {
+      return `${c.image_count} image${c.image_count === 1 ? '' : 's'} · served ${c.total_serves}× · searched ${c.search_count}×`;
+    }
+
+    function browseCard(c) {
+      const cells = [];
+      for (let i = 0; i < 4; i++) {
+        const p = c.previews[i];
+        cells.push(p
+          ? `<img loading="lazy" src="${escapeHtml(p.thumb_url || p.medium_url || p.url)}" alt="${escapeHtml(p.prompt)}">`
+          : '<span class="ph"></span>');
+      }
+      return `<button type="button" class="browse-card" onclick="openBrowseViewer('${escapeHtml(c.id)}')">
+        <span class="browse-previews">${cells.join('')}</span>
+        <span class="browse-card-body">
+          <b>${escapeHtml(c.name)}</b>
+          ${c.theme_prompt ? `<span class="browse-theme" title="${escapeHtml(c.theme_prompt)}">${escapeHtml(c.theme_prompt)}</span>` : ''}
+          <span class="browse-stats">${collStatsLine(c)}</span>
+        </span>
+      </button>`;
+    }
+
+    function openBrowseViewer(id) {
+      brwViewing = brwCollections.find((c) => c.id === id) || null;
+      if (!brwViewing) return;
+      document.getElementById('browse-list').hidden = true;
+      document.getElementById('browse-viewer').hidden = false;
+      const search = document.getElementById('browse-viewer-search');
+      if (search) search.value = '';
+      document.getElementById('browse-viewer-head').innerHTML = `
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px 16px;flex-wrap:wrap;">
+          <div style="min-width:0;">
+            <h2 class="card-title" style="margin-bottom:4px;">${escapeHtml(brwViewing.name)}</h2>
+            <span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--muted);">${escapeHtml(brwViewing.id)}</span>
+            <button type="button" class="link-btn" onclick="copyCollectionId('${escapeHtml(brwViewing.id)}')">Copy ID</button>
+            ${brwViewing.theme_prompt ? `<p style="font-size:0.8125rem;color:var(--muted);margin-top:6px;">Theme: ${escapeHtml(brwViewing.theme_prompt)}</p>` : ''}
+          </div>
+          <div class="browse-stats" style="margin-top:4px;white-space:nowrap;">${collStatsLine(brwViewing)}</div>
+        </div>`;
+      loadBrowseViewer('');
+      window.scrollTo(0, 0);
+    }
+
+    function closeBrowseViewer() {
+      brwViewing = null;
+      document.getElementById('browse-viewer').hidden = true;
+      document.getElementById('browse-list').hidden = false;
+    }
+
+    function onBrowseViewerSearch(value) {
+      clearTimeout(brwViewDebounce);
+      brwViewDebounce = setTimeout(() => loadBrowseViewer(value.trim()), 300);
+    }
+
+    // Same public search path API callers use — semantic ranking, LIKE fallback.
+    async function loadBrowseViewer(q) {
+      if (!brwViewing) return;
+      const seq = ++brwViewSeq;
+      const grid = document.getElementById('browse-viewer-grid');
+      const status = document.getElementById('browse-viewer-status');
+      grid.innerHTML = '';
+      status.textContent = 'Loading…';
+      status.style.display = 'block';
+      try {
+        const params = new URLSearchParams({ collection: brwViewing.id, limit: 60 });
+        if (q) params.set('q', q);
+        const res = await fetch('/v1/library?' + params, { credentials: 'same-origin' });
+        if (res.status === 401) { location.hash = '#/login'; return; }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const { images } = await res.json();
+        if (seq !== brwViewSeq) return;
+        if (!images.length) {
+          status.textContent = q ? 'No images in this collection match “' + q + '”.' : 'This collection has no images yet.';
+          return;
+        }
+        status.style.display = 'none';
+        grid.innerHTML = images.map(libraryCard).join('');
+      } catch {
+        if (seq === brwViewSeq) { status.textContent = 'Could not load this collection.'; status.style.display = 'block'; }
+      }
     }
 
     function viewProvenance() {
@@ -4236,62 +4511,94 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
     let myCollections = [];
     let mySlots = null;
-    const expandedCollections = new Set();
+    let selectedCollId = '';
+    let collViewQuery = '';
+    let collViewSeq = 0;
+    let collViewDebounce = null;
 
     async function loadCollections() {
-      const el = document.getElementById('collections-body');
-      if (!el) return;
-      if (!currentUser) { el.textContent = 'Log in to manage collections.'; return; }
+      const viewer = document.getElementById('coll-viewer-body');
+      const create = document.getElementById('coll-create-body');
+      if (!viewer || !create) return;
+      if (!currentUser) { viewer.textContent = 'Log in to manage collections.'; create.textContent = 'Log in to create collections.'; return; }
       try {
         const r = await fetch('/v1/collections', { credentials: 'same-origin' });
-        if (r.status === 401) { el.textContent = 'Log in to manage collections.'; return; }
+        if (r.status === 401) { viewer.textContent = 'Log in to manage collections.'; create.textContent = 'Log in to create collections.'; return; }
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const data = await r.json();
         myCollections = data.collections;
         mySlots = data.slots || null;
         renderCollections();
       } catch {
-        el.textContent = 'Could not load collections.';
+        viewer.textContent = 'Could not load collections.';
+        create.textContent = 'Could not load collections.';
       }
       populateGenCollections();
       renderGenKeyStatus();
     }
 
     function renderCollections() {
-      const el = document.getElementById('collections-body');
+      renderCollCreateForm();
+      const sel = document.getElementById('coll-view-select');
+      const meta = document.getElementById('coll-meta');
+      const viewer = document.getElementById('coll-viewer-body');
+      if (!sel || !meta || !viewer) return;
+      if (!myCollections.length) {
+        selectedCollId = '';
+        sel.innerHTML = '<option value="">— no collections yet —</option>';
+        sel.disabled = true;
+        meta.innerHTML = '';
+        viewer.innerHTML = '<div style="font-size:0.8125rem;">No collections yet — create one on the left, then generate images into it.</div>';
+        return;
+      }
+      sel.disabled = false;
+      if (!myCollections.some((c) => c.id === selectedCollId)) { selectedCollId = myCollections[0].id; collViewQuery = ''; }
+      sel.innerHTML = myCollections.map((c) => `<option value="${escapeHtml(c.id)}"${c.id === selectedCollId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
+      renderCollMeta();
+      loadCollectionViewer(collViewQuery);
+    }
+
+    function renderCollCreateForm() {
+      const el = document.getElementById('coll-create-body');
       if (!el) return;
       const canCreate = !!(currentByok && currentByok.enabled);
       const slotLocked = !!(mySlots && mySlots.used < 20 && mySlots.generated < mySlots.next_required);
-      const createForm = !canCreate
-        ? `<div style="font-size:0.8125rem;margin-top:10px;">Add an enabled provider key above to create collections.</div>`
+      el.innerHTML = !canCreate
+        ? `<div style="font-size:0.8125rem;">Add an enabled provider key above to create collections.</div>`
         : slotLocked
-        ? `<div style="font-size:0.8125rem;margin-top:10px;">Generate ${mySlots.next_required - mySlots.generated} more image${mySlots.next_required - mySlots.generated === 1 ? '' : 's'} to unlock collection #${mySlots.used + 1} (${mySlots.generated}/${mySlots.next_required} lifetime images).</div>`
+        ? `<div style="font-size:0.8125rem;">Generate ${mySlots.next_required - mySlots.generated} more image${mySlots.next_required - mySlots.generated === 1 ? '' : 's'} to unlock collection #${mySlots.used + 1} (${mySlots.generated}/${mySlots.next_required} lifetime images).</div>`
         : `
-        <div class="form-group" style="margin-top:14px;">
-          <label>New collection</label>
-          <input id="coll-name" placeholder="Name (e.g. Retro posters)" maxlength="80" class="field-input">
+        <div class="form-group">
+          <label>Name</label>
+          <input id="coll-name" placeholder="e.g. Retro posters" maxlength="80" class="field-input">
           <label style="margin-top:10px;">Theme prompt (appended to every generation)</label>
           <textarea id="coll-theme" maxlength="500" placeholder="e.g. retro travel poster style, muted palette" class="field-input" style="min-height:60px;"></textarea>
           <button class="btn btn-primary" style="height:40px;width:auto;padding:0 18px;margin-top:12px;" onclick="createCollection(this)">Create collection</button>
         </div>`;
-      const rows = myCollections.map((c) => `
-        <div style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-            <div>
-              <b style="color:var(--ink);">${escapeHtml(c.name)}</b>
-              <span style="font-family:var(--font-mono);font-size:0.75rem;"> ${escapeHtml(c.id)}</span>
-              <div style="font-size:0.8125rem;">${c.image_count} image${c.image_count === 1 ? '' : 's'} · returned ${c.total_serves}× · theme: ${c.theme_prompt ? escapeHtml(c.theme_prompt) : '<i>none</i>'}</div>
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn" style="height:32px;width:auto;padding:0 10px;font-size:0.8125rem;" onclick="editCollectionTheme('${c.id}')">Edit theme</button>
-              <button class="btn" style="height:32px;width:auto;padding:0 10px;font-size:0.8125rem;" onclick="toggleCollectionImages('${c.id}')">${expandedCollections.has(c.id) ? 'Hide images' : 'View images'}</button>
-              <button class="btn" style="height:32px;width:auto;padding:0 10px;font-size:0.8125rem;color:var(--danger);" onclick="deleteCollection('${c.id}', this)">Delete</button>
-            </div>
+    }
+
+    function renderCollMeta() {
+      const meta = document.getElementById('coll-meta');
+      if (!meta) return;
+      const c = myCollections.find((x) => x.id === selectedCollId);
+      if (!c) { meta.innerHTML = ''; return; }
+      meta.innerHTML = `
+        <div class="coll-meta-row">
+          <div style="min-width:0;">
+            <span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--ink);">${escapeHtml(c.id)}</span>
+            <button type="button" class="link-btn" onclick="copyCollectionId('${c.id}')">Copy ID</button>
+            <div style="margin-top:4px;">${collStatsLine(c)} · theme: ${c.theme_prompt ? escapeHtml(c.theme_prompt) : '<i>none</i>'}</div>
           </div>
-          <div id="coll-images-${c.id}" style="margin-top:10px;"></div>
-        </div>`).join('');
-      el.innerHTML = (myCollections.length ? rows : '<div style="font-size:0.8125rem;">No collections yet.</div>') + createForm;
-      for (const id of expandedCollections) loadCollectionImages(id);
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn" style="height:32px;width:auto;padding:0 10px;font-size:0.8125rem;" onclick="editCollectionTheme('${c.id}')">Edit theme</button>
+            <button class="btn" style="height:32px;width:auto;padding:0 10px;font-size:0.8125rem;color:var(--danger);" onclick="deleteCollection('${c.id}', this)">Delete</button>
+          </div>
+        </div>`;
+    }
+
+    async function copyCollectionId(id) {
+      try { await navigator.clipboard.writeText(id); showToast('Collection ID copied', 'success'); }
+      catch { showToast('Copy failed — select the ID and copy manually', 'error'); }
     }
 
     async function createCollection(btn) {
@@ -4313,6 +4620,11 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
             : 'Collection limit reached (20)', 'error');
           return;
         }
+        if (r.status === 422 && data.error === 'content_policy') {
+          showToast(`Name or theme blocked by content policy (${data.category || 'flagged'}) — collections are public, keep them family-friendly`, 'error');
+          return;
+        }
+        if (r.status === 503) { showToast('Content check unavailable right now — try again in a minute', 'error'); return; }
         if (!r.ok) { showToast(data.error || 'Could not create the collection', 'error'); return; }
         showToast('Collection created', 'success');
         await loadCollections();
@@ -4330,6 +4642,14 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
           body: JSON.stringify({ theme_prompt: theme }),
         });
         if (r.status === 401) { location.hash = '#/login'; return; }
+        if (r.status === 422) {
+          const data = await r.json().catch(() => ({}));
+          showToast(data.error === 'content_policy'
+            ? `Theme blocked by content policy (${data.category || 'flagged'}) — collections are public, keep them family-friendly`
+            : (data.error || 'Invalid theme'), 'error');
+          return;
+        }
+        if (r.status === 503) { showToast('Content check unavailable right now — try again in a minute', 'error'); return; }
         if (!r.ok) throw new Error('HTTP ' + r.status);
         showToast('Theme updated — applies to future generations', 'success');
         await loadCollections();
@@ -4343,37 +4663,68 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         const r = await fetch('/v1/collections/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin' });
         if (r.status === 401) { location.hash = '#/login'; return; }
         if (!r.ok) throw new Error('HTTP ' + r.status);
-        expandedCollections.delete(id);
         showToast('Collection deleted', 'success');
         await loadCollections();
       } catch { showToast('Could not delete the collection', 'error'); if (btn) btn.disabled = false; }
     }
 
-    function toggleCollectionImages(id) {
-      if (expandedCollections.has(id)) expandedCollections.delete(id); else expandedCollections.add(id);
-      renderCollections();
+    function onCollViewChange(id) {
+      selectedCollId = id;
+      collViewQuery = '';
+      const input = document.getElementById('coll-view-search');
+      if (input) input.value = '';
+      renderCollMeta();
+      loadCollectionViewer('');
     }
 
-    async function loadCollectionImages(id) {
-      const el = document.getElementById('coll-images-' + id);
-      if (!el) return;
+    function onCollViewSearchInput(value) {
+      clearTimeout(collViewDebounce);
+      collViewDebounce = setTimeout(() => loadCollectionViewer(value.trim()), 300);
+    }
+
+    function collTile(img) {
+      const thumb = img.thumb_url || img.medium_url || img.url;
+      const serves = img.serve_count != null
+        ? `<span style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.65);color:#fff;font-size:0.6875rem;padding:1px 6px;border-radius:9px;" title="Times returned by the API">${img.serve_count}×</span>`
+        : '';
+      return `
+        <div style="position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;">
+          <img src="${escapeHtml(thumb)}" alt="${escapeHtml(img.prompt)}" title="${escapeHtml(img.prompt)}" style="width:100%;aspect-ratio:1;object-fit:cover;display:block;">
+          ${serves}
+          <button style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.65);color:#fff;border:0;border-radius:9px;font-size:0.6875rem;padding:1px 7px;cursor:pointer;" title="Delete image" onclick="deleteCollectionImage('${selectedCollId}', '${img.id}')">✕</button>
+        </div>`;
+    }
+
+    // Browse (no query) uses the owner endpoint so serve counts show; searching
+    // goes through /v1/library?collection= — the same semantic path API callers get.
+    async function loadCollectionViewer(q) {
+      collViewQuery = q || '';
+      const el = document.getElementById('coll-viewer-body');
+      if (!el || !selectedCollId) return;
+      const seq = ++collViewSeq;
       el.innerHTML = '<span style="font-size:0.75rem;">Loading images…</span>';
       try {
-        const r = await fetch('/v1/collections/' + encodeURIComponent(id) + '/images?limit=60', { credentials: 'same-origin' });
+        let r;
+        if (collViewQuery) {
+          const params = new URLSearchParams({ collection: selectedCollId, q: collViewQuery, limit: 60 });
+          r = await fetch('/v1/library?' + params, { credentials: 'same-origin' });
+        } else {
+          r = await fetch('/v1/collections/' + encodeURIComponent(selectedCollId) + '/images?limit=60', { credentials: 'same-origin' });
+        }
         if (r.status === 401) { location.hash = '#/login'; return; }
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const { images } = await r.json();
-        if (!images.length) { el.innerHTML = '<span style="font-size:0.75rem;">No images yet — generate into this collection from the API.</span>'; return; }
-        el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;">' + images.map((img) => {
-          const thumb = img.thumb_url || img.medium_url || img.url;
-          return `
-          <div style="position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;">
-            <img src="${escapeHtml(thumb)}" alt="${escapeHtml(img.prompt)}" title="${escapeHtml(img.prompt)}" style="width:100%;aspect-ratio:1;object-fit:cover;display:block;">
-            <span style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.65);color:#fff;font-size:0.6875rem;padding:1px 6px;border-radius:9px;" title="Times returned by the API">${img.serve_count}×</span>
-            <button style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.65);color:#fff;border:0;border-radius:9px;font-size:0.6875rem;padding:1px 7px;cursor:pointer;" title="Delete image" onclick="deleteCollectionImage('${id}', '${img.id}')">✕</button>
-          </div>`;
-        }).join('') + '</div>';
-      } catch { el.innerHTML = '<span style="font-size:0.75rem;">Could not load images.</span>'; }
+        if (seq !== collViewSeq) return;
+        if (!images.length) {
+          el.innerHTML = '<span style="font-size:0.8125rem;">' + (collViewQuery
+            ? 'No images in this collection match “' + escapeHtml(collViewQuery) + '”.'
+            : 'No images yet — generate one on the left.') + '</span>';
+          return;
+        }
+        el.innerHTML = '<div class="coll-viewer-grid">' + images.map(collTile).join('') + '</div>';
+      } catch {
+        if (seq === collViewSeq) el.innerHTML = '<span style="font-size:0.75rem;">Could not load images.</span>';
+      }
     }
 
     async function deleteCollectionImage(collId, assetId) {
@@ -4483,6 +4834,9 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
           (usage ? `<p class="muted">${Number(usage.used) || 0}/${Number(usage.cap) || 0} this month · ~$${(Number(usage.est_spend_usd) || 0).toFixed(2)} est. spend</p>` : '')
         );
         showToast('Image added to your collection', 'success');
+        selectedCollId = collId; collViewQuery = ''; // show the image landing in its collection
+        const searchInput = document.getElementById('coll-view-search');
+        if (searchInput) searchInput.value = '';
         loadCollections(); // refresh counts + grids
       } catch (e) {
         setGenResult(`<p class="muted">⚠️ ${escapeHtml(e.message || String(e))}</p>`);

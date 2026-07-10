@@ -44,6 +44,8 @@ export async function handleGenerate(
     if (combinedPrompt(body.prompt, coll.theme_prompt).length > MAX_PROMPT_LEN) {
       return Response.json({ error: `prompt plus collection theme must be at most ${MAX_PROMPT_LEN} characters` }, { status: 422 });
     }
+    // Best-effort browse/owner stat: every scoped read counts as a "search".
+    try { await s.collections.bumpSearchCount(coll.id); } catch (e) { console.error("bumpSearchCount failed", e); }
   }
   const prompt = coll ? combinedPrompt(body.prompt, coll.theme_prompt) : body.prompt;
   const floor = similarityFloor(DEFAULT_CACHE_TOLERANCE, cfg.floorSimMax, cfg.floorSimMin);
