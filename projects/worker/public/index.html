@@ -2584,6 +2584,11 @@
               wagmi.photos and we return OpenAI-compatible responses with an extra
               <code style="font-family: var(--font-mono); font-size: 0.85em;">shared_cache</code> block.
             </p>
+            <p>
+              The API always returns the closest match with a
+              <code style="font-family: var(--font-mono); font-size: 0.85em;">similarity</code> score —
+              threshold client-side if you need stricter matching.
+            </p>
             <a href="#/library" class="api-link">Try it in the library →</a>
             <div class="api-pills">
               <span class="api-pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m8 6-6 6 6 6"/><path d="m16 6 6 6-6 6"/></svg> Same SDK</span>
@@ -2608,8 +2613,6 @@
 <span class="cl"></span>
 <span class="cl">img = client.images.generate(</span>
 <span class="cl">    prompt=<span class="tk-str">"a corgi wearing sunglasses on a beach"</span>,</span>
-<span class="cl">    extra_body={<span class="tk-str">"cache_tolerance"</span>: <span class="tk-num">0.15</span>,</span>
-<span class="cl">                <span class="tk-str">"generate_on_miss"</span>: <span class="tk-num">True</span>},</span>
 <span class="cl">)</span>
 <span class="cl"><span class="tk-cmd">print</span>(img.data[<span class="tk-num">0</span>].url)</span></pre>
               </div>
@@ -2623,8 +2626,7 @@
                 <pre class="code-example code-numbered"><span class="cl"><span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://api.wagmi.photos/v1/images/generations <span class="tk-flag">\</span></span>
 <span class="cl">  <span class="tk-flag">-H</span> <span class="tk-str">"Authorization: Bearer $WAGMI_KEY"</span> <span class="tk-flag">\</span></span>
 <span class="cl">  <span class="tk-flag">-H</span> <span class="tk-str">"Content-Type: application/json"</span> <span class="tk-flag">\</span></span>
-<span class="cl">  <span class="tk-flag">-d</span> <span class="tk-str">'{"prompt": "a corgi wearing sunglasses on a beach",</span></span>
-<span class="cl">       <span class="tk-str">"cache_tolerance": 0.15, "generate_on_miss": true}'</span></span></pre>
+<span class="cl">  <span class="tk-flag">-d</span> <span class="tk-str">'{"prompt": "a corgi wearing sunglasses on a beach"}'</span></span></pre>
               </div>
             </div>
             <div class="cache-callout">
@@ -2716,12 +2718,12 @@
             <div class="faq-answer">No — you always get the <b>closest existing match</b>, served instantly from the edge. Everyday prompts almost always land a strong match; hyper-specific ones return the nearest image that already exists — close, but maybe not every detail. If nothing close exists yet, your exact prompt is queued and generated in the background, so it becomes a hit for everyone next time.</div>
           </details>
           <details class="faq-item">
-            <summary><span>What does <code>cache_tolerance</code> do?</span></summary>
-            <div class="faq-answer">It sets how close a match has to be to count as a <code>hit</code> versus an <code>approximate</code> match. Without a BYOK key it never changes <b>what</b> you get back — you always receive the closest image — it just controls the label and which prompts get flagged as gaps worth generating. With a <a href="#/account">BYOK key</a> enabled, tolerance also decides when your key fires: anything below the floor generates fresh instead of settling for the closest match.</div>
+            <summary>Can I control how close a match has to be?</summary>
+            <div class="faq-answer">Not on the request — there's no <code>cache_tolerance</code> parameter. The API always returns the closest match with a <code>similarity</code> score in <code>shared_cache</code>; threshold client-side by comparing that score to whatever floor your use case needs.</div>
           </details>
           <details class="faq-item">
             <summary>What happens when my prompt isn't in the library yet?</summary>
-            <div class="faq-answer">By default (<code>generate_on_miss: true</code>) the prompt is queued and generated in the background by the shared backend, then stored in the library — so the pool keeps growing toward real demand. Set <code>generate_on_miss: false</code> to only ever pull from the cache and never trigger a generation.</div>
+            <div class="faq-answer">The prompt is recorded, and if enough people ask for something close to it, it's generated in the background by the shared backend and added to the library — so the pool keeps growing toward real demand. There's no per-request opt-out. Want a fresh image on your own schedule instead? Generate into a <a href="#/account">collection</a> with your own provider key.</div>
           </details>
           <details class="faq-item">
             <summary>Is it OpenAI-compatible?</summary>
@@ -2955,8 +2957,10 @@
               The request shape matches the OpenAI Images API, so the official SDKs work by
               pointing <code>base_url</code> at <code>https://api.wagmi.photos/v1</code>.
               Your prompt is embedded with BGE and matched against the stored prompt of every
-              image in the shared library; the closest match above your tolerance floor is
-              served instantly.
+              image in the shared library. The API always returns the closest match with a
+              <code>similarity</code> score — threshold client-side if you need stricter
+              matching; there is no <code>cache_tolerance</code> or <code>generate_on_miss</code>
+              request parameter.
             </p>
 
             <h3>Request body</h3>
@@ -2971,16 +2975,8 @@
                     <td>What you want. Prompts are normalized (trimmed, lowercased, whitespace collapsed) before matching and queueing.</td>
                   </tr>
                   <tr>
-                    <td>cache_tolerance</td><td>number 0–1</td><td>0.15</td>
-                    <td>How far a match may drift from your prompt. 0 accepts only the closest matches, 1 accepts the loosest. See <a href="#docs-matching" style="color: var(--red);">how matching works</a>.</td>
-                  </tr>
-                  <tr>
-                    <td>generate_on_miss</td><td>boolean</td><td>true</td>
-                    <td>Whether a miss queues background GPU generation for this prompt. Set <code>false</code> for cache-only behaviour. See <a href="#docs-generate-on-miss" style="color: var(--red);">semantics</a>.</td>
-                  </tr>
-                  <tr>
                     <td>collection</td><td>string</td><td>—</td>
-                    <td>Scope matching to a collection by ID (<code>col_…</code>). The collection's theme prompt is appended before matching, and on a miss only the collection owner's BYOK key generates — misses never queue background generation. Official SDKs pass it via <code>extra_body</code>. Additional collections unlock with lifetime generated images (10 for the 2nd, 100 for the 3rd, 1000 for the 4th, …).</td>
+                    <td>Scope matching to a collection by ID (<code>col_…</code>). The collection's theme prompt is appended before matching. Scoped requests never queue background generation — to generate fresh into a collection with your own key, use <a href="#docs-collection-generations" style="color: var(--red);">POST /v1/collections/:id/generations</a> instead. Official SDKs pass it via <code>extra_body</code>. Additional collections unlock with lifetime generated images (10 for the 2nd, 100 for the 3rd, 1000 for the 4th, …).</td>
                   </tr>
                   <tr>
                     <td>n</td><td>integer</td><td>1</td>
@@ -3001,11 +2997,21 @@
             <h3>Example</h3>
             <pre class="docs-pre"><span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://api.wagmi.photos/v1/images/generations <span class="tk-flag">\</span>
   <span class="tk-flag">-H</span> <span class="tk-str">"Authorization: Bearer $WAGMI_KEY"</span> <span class="tk-flag">-H</span> <span class="tk-str">"Content-Type: application/json"</span> <span class="tk-flag">\</span>
-  <span class="tk-flag">-d</span> <span class="tk-str">'{
-    "prompt": "a lighthouse in a storm",
-    "cache_tolerance": 0.15,
-    "generate_on_miss": false
-  }'</span></pre>
+  <span class="tk-flag">-d</span> <span class="tk-str">'{"prompt": "a lighthouse in a storm"}'</span></pre>
+
+            <h3>Example — scoped to a collection</h3>
+            <p>
+              Pass <code>collection</code> to search inside one collection instead of the whole
+              shared library. Official SDKs pass it via <code>extra_body</code>:
+            </p>
+            <pre class="docs-pre"><span class="tk-flag">from</span> openai <span class="tk-flag">import</span> OpenAI
+
+client = OpenAI(base_url=<span class="tk-str">"https://api.wagmi.photos/v1"</span>, api_key=<span class="tk-str">"YOUR_WAGMI_KEY"</span>)
+
+img = client.images.generate(
+    prompt=<span class="tk-str">"a watercolor fox in morning fog"</span>,
+    extra_body={<span class="tk-str">"collection"</span>: <span class="tk-str">"col_abc123"</span>},
+)</pre>
 
             <h3>Response — served from the library (200)</h3>
             <pre class="docs-pre">{
@@ -3047,54 +3053,48 @@
                 <tbody>
                   <tr>
                     <td>hit</td><td>200</td>
-                    <td>Similarity is at or above your tolerance floor. The image is served; nothing is queued.</td>
+                    <td>Similarity is at or above the match floor. The image is served; nothing is queued.</td>
                   </tr>
                   <tr>
                     <td>approximate</td><td>200</td>
-                    <td>The best image falls below your floor. It is served anyway so you have something to show, and the prompt is queued for generation (unless opted out). <code>generation_queued</code> is included and <code>cost_saved_usd</code> is <code>0</code> — only true hits count as savings.</td>
+                    <td>The best image falls below the floor. It is served anyway so you have something to show, and the prompt is queued for demand-ranked background generation. <code>generation_queued</code> is included and <code>cost_saved_usd</code> is <code>0</code> — only true hits count as savings.</td>
                   </tr>
                   <tr>
                     <td>pending</td><td>202</td>
-                    <td>The library has nothing to serve. <code>data</code> is empty and the prompt is queued for generation (unless opted out). Retry the same prompt later — once built, it is a hit for everyone.</td>
-                  </tr>
-                  <tr>
-                    <td>generated</td><td>200</td>
-                    <td>You have a <a href="#/account">BYOK provider key</a> enabled and the result would have been approximate or pending, so a fresh image was generated with your key and added to the shared library. <code>shared_cache.byok</code> carries your usage: <code>{"used", "cap", "est_spend_usd"}</code>. When your key can't fire (monthly cap reached, provider error), the normal approximate/pending response is returned with <code>shared_cache.byok.status</code> set to <code>cap_reached</code> or <code>provider_error</code>.</td>
+                    <td>The library has nothing to serve. <code>data</code> is empty and the prompt is queued for demand-ranked background generation. Retry the same prompt later — once built, it is a hit for everyone.</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <p style="font-size:0.875rem;color:var(--muted);">With BYOK enabled, a prompt that fails the content policy (denylist or moderation) returns <code>400</code> with <code>{"error": "content_policy", "category": "…"}</code> and nothing is generated or counted.</p>
+            <p style="font-size:0.875rem;color:var(--muted);">Want a fresh image on your own schedule instead of waiting on demand-ranked backfill? Generate into a collection with your own <a href="#/account">BYOK provider key</a> — see <a href="#docs-collection-generations" style="color: var(--red);">Create images in your collections</a> below.</p>
 
             <h2 id="docs-matching">How matching works</h2>
             <p>
               Matching is prompt-to-prompt: your prompt's BGE text embedding
               (<code>bge-base-en-v1.5</code> on Workers AI) is compared by cosine similarity
-              against the stored prompt embedding of every library image. Your
-              <code>cache_tolerance</code> (clamped to 0–1) maps linearly to the similarity
-              floor: <code>floor = 0.87 − tolerance × (0.87 − 0.75)</code>, so tolerance 0
-              → floor 0.87 and tolerance 1 → floor 0.75. The single nearest library
-              prompt is compared against that floor — at or above it you get a
-              <code>hit</code>, below it an <code>approximate</code>. Realistic scores live in
-              the ~0.7–0.95 band. See <a href="#/matching" style="color: var(--red);">how
-              semantic matching works</a> for the full picture.
+              against the stored prompt embedding of every library image. The single nearest
+              library prompt is compared against a fixed similarity floor (≈0.85, server-side —
+              not a request parameter) — at or above it you get a <code>hit</code>, below it an
+              <code>approximate</code>. Realistic scores live in the ~0.7–0.95 band. The API
+              always returns the closest match with its <code>similarity</code> score in
+              <code>shared_cache</code>; threshold client-side if you need stricter matching. See
+              <a href="#/matching" style="color: var(--red);">how semantic matching works</a> for
+              the full picture.
             </p>
 
-            <h2 id="docs-generate-on-miss">generate_on_miss semantics</h2>
+            <h2 id="docs-backfill">Background generation semantics</h2>
             <p>
-              Generation costs GPU time, so it is opt-out per request — but the queue is shared,
-              and one prompt can be requested by many callers with different flags. The rules:
+              Every miss (<code>approximate</code> or <code>pending</code>) records the prompt's
+              demand. There is no per-request opt-out — generation is decided centrally by
+              demand-ranking, so the most-requested misses get built first by the shared backfill
+              and become hits for everyone. <code>shared_cache.generation_queued</code> tells you
+              whether this specific request's prompt is in that queue.
             </p>
-            <ul>
-              <li><b>Default is generate.</b> A miss with the field unset (or <code>true</code>) queues the prompt for background generation.</li>
-              <li><b>Opting out is per prompt, not per library.</b> <code>generate_on_miss: false</code> still records the prompt and its demand count — it just tells the backfill to skip it.</li>
-              <li><b>Generation wins.</b> If the prompt is already queued for generation, a later request with <code>false</code> does not un-queue it. And if the prompt was stored opted-out, the first request that arrives with the field unset or <code>true</code> upgrades it, so it gets generated. Once a prompt wants generation, it stays wanted.</li>
-              <li><b>The response tells you the effective state.</b> <code>shared_cache.generation_queued</code> on <code>pending</code> and <code>approximate</code> responses reflects the merged result, not just your request — send <code>false</code> for a prompt someone else queued and you will get <code>generation_queued: true</code> back.</li>
-            </ul>
             <div class="docs-note">
-              <b>When to opt out:</b> use <code>generate_on_miss: false</code> when you only want
-              instant, $0 answers — placeholder art, previews, high-volume UI fills — and a miss
-              should stay a miss instead of spending GPU time.
+              Want a fresh image right now instead of waiting on demand-ranked backfill? Generate
+              into a collection with your own provider key — see
+              <a href="#docs-collection-generations" style="color: var(--red);">Create images in
+              your collections</a> below.
             </div>
 
             <h2 id="docs-errors">Errors</h2>
@@ -3106,12 +3106,56 @@
                 <tbody>
                   <tr><td>400</td><td>Body is not valid JSON, or not a JSON object.</td></tr>
                   <tr><td>401</td><td>Missing or invalid API key.</td></tr>
-                  <tr><td>422</td><td><code>n</code> is set to anything but 1, or <code>generate_on_miss</code> is not a boolean.</td></tr>
+                  <tr><td>422</td><td><code>n</code> is set to anything but 1, <code>prompt</code> is missing/empty/too long, or <code>collection</code> is present but not a non-empty string.</td></tr>
                   <tr><td>429</td><td>Rate limit exceeded — generation requests (per account) and key minting (per IP) are each limited to 10 per minute.</td></tr>
                   <tr><td>502</td><td>An upstream dependency failed; the body includes a <code>detail</code> string.</td></tr>
                 </tbody>
               </table>
             </div>
+
+            <h2 id="docs-collection-generations">Create images in your collections</h2>
+            <p>
+              Generate a fresh image straight into a collection you own, using your own
+              <a href="#/account" style="color: var(--red);">BYOK provider key</a>. Unlike
+              <code>POST /v1/images/generations</code>, this endpoint always spends — it is the
+              deliberate, async escape hatch for when you want your exact prompt now instead of
+              waiting on demand-ranked backfill. It starts a background job and returns
+              immediately; poll the ticket it hands back until it leaves
+              <code>queued</code>/<code>generating</code>.
+            </p>
+
+            <h3>Start a generation</h3>
+            <div class="docs-endpoint"><span class="method">POST</span> /v1/collections/:id/generations</div>
+            <pre class="docs-pre"><span class="tk-flag"># Start a generation (requires your own provider key + a collection you own)</span>
+<span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://api.wagmi.photos/v1/collections/col_abc123/generations <span class="tk-flag">\</span>
+  <span class="tk-flag">-H</span> <span class="tk-str">"Authorization: Bearer sc-..."</span> <span class="tk-flag">-H</span> <span class="tk-str">"Content-Type: application/json"</span> <span class="tk-flag">\</span>
+  <span class="tk-flag">-d</span> <span class="tk-str">'{"prompt": "a watercolor fox in morning fog"}'</span>
+<span class="tk-flag"># -&gt; 202 {"generation": {"id": "gen_...", "status": "generating", ...}, "byok": {"used": 3, "cap": 50, ...}}</span></pre>
+
+            <h3>Poll the ticket</h3>
+            <div class="docs-endpoint"><span class="method">GET</span> /v1/generations/:id</div>
+            <pre class="docs-pre"><span class="tk-flag"># Poll the ticket until it leaves queued/generating</span>
+<span class="tk-cmd">curl</span> https://api.wagmi.photos/v1/generations/gen_... <span class="tk-flag">-H</span> <span class="tk-str">"Authorization: Bearer sc-..."</span>
+<span class="tk-flag"># -&gt; {"generation": {"status": "succeeded", "image": {"url": "...", "thumb_url": "..."}}}</span></pre>
+
+            <h3>Statuses, refunds &amp; ownership</h3>
+            <p>
+              A generation moves through <code>queued</code> → <code>generating</code> →
+              <code>succeeded</code> or <code>failed</code>. Keep polling
+              <code>GET /v1/generations/:id</code> while it is <code>queued</code> or
+              <code>generating</code>; once it reaches a terminal status the response carries the
+              image URLs (on <code>succeeded</code>) or an <code>error</code> string (on
+              <code>failed</code>).
+            </p>
+            <p>
+              A generation that ends in <code>failed</code> is automatically refunded against
+              your monthly cap — a failed attempt never counts toward <code>used</code>.
+            </p>
+            <p>
+              Collections are private capabilities: requesting a generation for a collection you
+              don't own, or fetching a generation id you didn't create, returns <code>404</code>
+              — the same as an unknown id.
+            </p>
 
             <h2 id="docs-health">Health</h2>
             <div class="docs-endpoint"><span class="method">GET</span> /healthz</div>
@@ -3158,14 +3202,11 @@ client = OpenAI(
 
 img = client.images.generate(
     prompt=<span class="tk-str">"a lighthouse in a storm"</span>,
-    extra_body={
-        <span class="tk-str">"cache_tolerance"</span>: <span class="tk-num">0.15</span>,
-        <span class="tk-str">"generate_on_miss"</span>: <span class="tk-num">True</span>,
-    },
 )
 
 <span class="tk-cmd">print</span>(img.data[<span class="tk-num">0</span>].url)
-<span class="tk-flag"># raw response also carries a shared_cache block</span></pre>
+<span class="tk-flag"># shared_cache always carries the closest match + a similarity score.</span>
+<span class="tk-flag"># Scope to a collection with extra_body={"collection": "col_..."}.</span></pre>
             </div>
 
             <h2>JavaScript</h2>
@@ -3180,8 +3221,6 @@ img = client.images.generate(
 
 <span class="tk-flag">const</span> img = <span class="tk-flag">await</span> client.images.generate({
   prompt: <span class="tk-str">"a lighthouse in a storm"</span>,
-  cache_tolerance: <span class="tk-num">0.15</span>,
-  generate_on_miss: <span class="tk-num">true</span>,
 });
 
 console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].url);</pre>
@@ -3211,12 +3250,12 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
                 <ul>
                   <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>A <code>shared_cache</code> block: result, similarity, cost saved</li>
                   <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>~0.1&nbsp;s cache hits at $0 per image</li>
-                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><code>cache_tolerance</code> and <code>generate_on_miss</code> controls</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>Always the closest match, with a <code>similarity</code> score to threshold client-side</li>
                 </ul>
               </div>
             </div>
 
-            <div class="docs-note"><b>Response note:</b> a <code>202</code> means nothing close was cached yet — <code>data</code> is empty and (unless you opted out) the prompt was queued to generate. Handle it like a soft miss: proceed without an image or retry later. Full details in the <a href="#/docs">API reference</a>.</div>
+            <div class="docs-note"><b>Response note:</b> a <code>202</code> means nothing close was cached yet — <code>data</code> is empty and the prompt was queued for demand-ranked background generation. Handle it like a soft miss: proceed without an image or retry later. Full details in the <a href="#/docs">API reference</a>.</div>
           </div>
         </div>
       </div>
@@ -3249,7 +3288,7 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
               <li>Your prompt is normalized (trimmed, lowercased, whitespace collapsed).</li>
               <li>BGE turns it into a 768-dim text vector at the edge.</li>
               <li>Vectorize finds the single nearest stored prompt vector by cosine similarity.</li>
-              <li>That similarity is compared to your tolerance floor — at or above it is a <b>hit</b>; below it is <b>approximate</b>.</li>
+              <li>That similarity is compared to a fixed match floor — at or above it is a <b>hit</b>; below it is <b>approximate</b>.</li>
             </ol>
 
             <h2>Similarity, illustrated</h2>
@@ -3265,16 +3304,16 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
             </div>
             <p style="font-size: 0.8125rem; color: var(--muted);">Illustrative cosine-similarity scores — in practice they land in a fairly narrow ~0.7–0.95 band. The generic prompt lands squarely on an existing prompt; the very specific one only finds a distant cousin.</p>
 
-            <h2>Tolerance sets the floor</h2>
-            <p>Your <code>cache_tolerance</code> (clamped to 0–1) maps linearly to the cosine-similarity floor a match must clear: <code>floor = 0.87 − tolerance × (0.87 − 0.75)</code>.</p>
+            <h2>A fixed floor decides hit vs. approximate</h2>
+            <p>The cosine-similarity floor a match must clear is fixed server-side (≈0.85, between 0.75 and 0.87) — it's not a request parameter, so there's no <code>cache_tolerance</code> to tune. The API always returns the closest match with its <code>similarity</code> score in <code>shared_cache</code>; threshold client-side if your use case needs something stricter.</p>
             <div class="match-scale-wrap">
               <div class="match-scale"></div>
               <div class="match-scale-labels">
-                <span><b>tolerance 0</b> → floor 0.87 · strict, near-exact only</span>
-                <span>floor 0.75 · loose, more hits <b>← tolerance 1</b></span>
+                <span><b>0.87</b> · strict end of the range</span>
+                <span>0.75 · loose end <b>— server floor sits at ≈0.85</b></span>
               </div>
             </div>
-            <p>At or above the floor you get a <code>hit</code>. Below it, the closest image is still served as <code>approximate</code> and the prompt is queued to generate (unless you opted out).</p>
+            <p>At or above the floor you get a <code>hit</code>. Below it, the closest image is still served as <code>approximate</code> and the prompt is queued for demand-ranked background generation.</p>
 
             <div class="docs-note">Same model, same space — that is why a generic prompt reliably hits while a hyper-specific one returns the closest existing image. See the <a href="#docs-matching">matching details</a> in the API reference, or the <a href="#closest-match">walkthrough on the home page</a>.</div>
           </div>
@@ -3321,42 +3360,36 @@ POST https://api.wagmi.photos/v1/images/generations
   Content-Type: application/json
 
 Body fields:
-- prompt            (string, required)
-- cache_tolerance   (0..1, default 0.15)  lower = stricter match
-- generate_on_miss  (bool, default true)  false = never spend GPU on a miss
+- prompt      (string, required)
+- collection  (string, optional) scope the search to a collection you own (col_...)
+- n           (integer, optional) only 1 is supported
+- size        (string, optional) accepted for OpenAI compatibility, ignored
+
+There is no cache_tolerance or generate_on_miss field. The API always returns
+the closest match with a similarity score in shared_cache — threshold
+client-side if the task needs stricter matching.
 
 ## Call it
 curl -X POST https://api.wagmi.photos/v1/images/generations \
   -H "Authorization: Bearer $WAGMI_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "a vintage bicycle against a brick wall",
-       "cache_tolerance": 0.15,
-       "generate_on_miss": true}'
+  -d '{"prompt": "a vintage bicycle against a brick wall"}'
 
 ## Act on shared_cache.result
 - "hit"          (HTTP 200): use data[0].url. Free and instant, you are done.
 - "approximate"  (HTTP 200): a close image is in data[0].url. Use it only if it
-                  fits the task; the exact prompt was queued for next time.
+                  fits the task; the exact prompt was queued for demand-ranked
+                  background generation.
 - "pending"      (HTTP 202): nothing close yet, data is empty. Generate with
-                  your own model if you need an image now. The prompt was queued
-                  (unless you opted out), so retrying later will hit for $0.
-- "generated"    (HTTP 200): the account has a BYOK provider key enabled and a
-                  fresh image was generated with it (below-tolerance requests
-                  only). data[0].url is the new image; shared_cache.byok reports
-                  {used, cap, est_spend_usd}. If byok.status is "cap_reached" or
-                  "provider_error" instead, the response degraded to the normal
-                  approximate/pending shape.
-- HTTP 400 {"error":"content_policy"}: the prompt was blocked by the denylist or
-                  moderation (BYOK path only). Do not retry the same prompt.
+                  your own model if you need an image now. The prompt was
+                  queued, so retrying later will hit for $0.
 
 ## Rules for the agent
-1. Default to the cache. Send generate_on_miss=false when you only want free,
-   instant results and a miss is acceptable.
+1. Always check shared_cache.similarity before treating a result as good
+   enough — the API never withholds a result, it just tells you how close it is.
 2. Never treat "approximate" as exact — verify it matches the request.
 3. On 202, do not block waiting. Proceed without an image or fall back to a real
    generator, then retry the same prompt later for a cheap hit.
-4. "generated" costs the account owner real provider spend — respect
-   generate_on_miss=false as the way to guarantee a $0 call.
 4. Reuse one wagmi.photos key. It is hashed server-side; keep it secret.</pre>
             </div>
 
@@ -3367,14 +3400,14 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
                 <ul>
                   <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>Ask the cache first for anything illustrative.</li>
                   <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>Accept <code>approximate</code> when it fits the task.</li>
-                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>Set <code>generate_on_miss=false</code> for throwaway previews.</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>On <code>pending</code>, don't block waiting — proceed or retry later.</li>
                 </ul>
               </div>
               <div class="dev-list">
                 <h4>When exact matters</h4>
                 <ul>
-                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Lower <code>cache_tolerance</code> toward 0 for near-exact only.</li>
-                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Leave <code>generate_on_miss=true</code> so misses get built.</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Check <code>shared_cache.similarity</code> and reject matches below your own bar.</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Scope to a <code>collection</code> when you need a narrower, themed pool.</li>
                   <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>On <code>pending</code>, fall back to a dedicated model.</li>
                 </ul>
               </div>

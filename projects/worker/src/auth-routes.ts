@@ -60,7 +60,7 @@ export async function handleVerify(url: URL, request: Request, env: Env, s: Serv
   await s.sessions.create(user.id, await sha256Hex(sessionToken));
 
   const secure = isSecureRequest(request);
-  const headers = new Headers({ Location: `${cfg.verifyBase}/#/playground` });
+  const headers = new Headers({ Location: `${cfg.verifyBase}/#/library` });
   headers.append("Set-Cookie", serializeSessionCookie(sessionToken, secure));
   headers.append("Set-Cookie", clearLoginNonceCookie(secure));
   return new Response(null, { status: 302, headers });

@@ -314,9 +314,21 @@ intentionally unused**. Deploy steps:
    - `npx wrangler secret put OPENAI_API_KEY` → operator key; moderates prompts for GMI-key users
      (same key the backfill box uses).
 4. **Deploy:** `cd projects/worker && npm run deploy`.
-5. **Verify:** add a real OpenAI key on `#/account`, set the cap to 2, run a playground prompt obscure
-   enough to be below the floor → expect the ✨ generated badge, the meter at 1/2, the image in the
-   library, and a second+third run to flip to `cap_reached`. Then delete the key.
+5. **Verify:** add a real OpenAI key on `#/account`, set the cap to 2, create (or open) a collection
+   and start a generation with a prompt obscure enough that it wouldn't be a library hit → expect a
+   `202` with a `generation` ticket, `GET /v1/generations/:id` to move `queued`/`generating` →
+   `succeeded` with an image, the meter at 1/2, the image added to the collection, and a second+third
+   run to flip to `cap_reached`. Then delete the key.
+6. **Migration `0016`:** `npx wrangler d1 migrations apply wagmiphotos --remote` (adds the
+   `generations` table backing async collection generation — `POST /v1/collections/:id/generations`
+   + `GET /v1/generations/:id`). Covered by the same `migrations apply` as step 1, but call it out
+   here since it ships alongside this feature.
+7. **Cron sweep ships with the Worker — no extra setup.** `wrangler.toml`'s `[triggers]` block
+   (`crons = ["*/2 * * * *"]`) deploys automatically with `npm run deploy`; after deploying, verify it
+   in the Cloudflare dashboard under Workers & Pages → `wagmiphotos-worker` → Settings → Triggers.
+   Sweep semantics: a generation stuck in `queued`/`generating` past **2 minutes** is re-driven; past
+   **15 minutes** (OpenAI's background-mode retention window) it is failed and refunded against the
+   owner's monthly cap.
 
 ## Collections (namespaced vector index)
 

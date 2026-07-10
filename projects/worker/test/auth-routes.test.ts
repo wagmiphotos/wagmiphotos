@@ -125,12 +125,12 @@ it("login: purge failure is logged, not fatal — login still succeeds", async (
   expect(s._sent.length).toBe(1); // link still sent
 });
 
-it("verify: valid token + matching nonce cookie sets session cookie, clears nonce cookie, 302 to playground", async () => {
+it("verify: valid token + matching nonce cookie sets session cookie, clears nonce cookie, 302 to library", async () => {
   const s = svc();
   const req = verifyReq("TOK", "NON");
   const res = await handleVerify(new URL(req.url), req, {} as any, s, cfg);
   expect(res.status).toBe(302);
-  expect(res.headers.get("Location")).toBe("https://wagmi.photos/#/playground");
+  expect(res.headers.get("Location")).toBe("https://wagmi.photos/#/library");
   const headersAny = res.headers as any;
   const setCookie = typeof headersAny.getSetCookie === "function" ? headersAny.getSetCookie().join(", ") : (res.headers.get("Set-Cookie") ?? "");
   expect(setCookie).toContain(`${SESSION_COOKIE}=TOK`);
