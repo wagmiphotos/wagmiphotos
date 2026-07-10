@@ -1,0 +1,77 @@
+import type { Env, Services, GenerationRow, AssetRow } from "./types";
+import { resolveApiPrincipal } from "./session";
+import { combinedPrompt } from "./collections";
+import { MAX_PROMPT_LEN } from "./handler";
+import { startGeneration, driveGeneration, type GenJobsCfg } from "./generation-jobs";
+import { assetUrls } from "./asset-urls";
+
+// Creation surface: session or bearer key, owner-only. Non-owner requests on
+// a collection answer 404 (not 403) — the id is a capability for *searching*;
+// whether someone else owns it is not disclosed (same as collections-routes).
+
+export function generationView(row: GenerationRow, asset: AssetRow | null, assetBaseUrl?: string) {
+  const view: Record<string, unknown> = {
+    id: row.id, status: row.status, collection: row.collection_id,
+    prompt: row.prompt, created_at: row.created_at,
+  };
+  if (row.status === "failed" && row.error) view.error = row.error;
+  if (row.status === "succeeded" && asset) {
+    const u = assetUrls(asset, assetBaseUrl);
+    view.image = { id: asset.id, url: u.url, thumb_url: u.thumb_url, medium_url: u.medium_url, original_url: u.original_url };
+  }
+  return view;
+}
+
+export async function handleCreateGeneration(
+  collectionId: string, request: Request, env: Env, s: Services, cfg: GenJobsCfg, assetBaseUrl?: string
+): Promise<Response> {
+  const p = await resolveApiPrincipal(request, env, s);
+  if (!p) return Response.json({ error: "login required" }, { status: 401 });
+  const coll = await s.collections.get(collectionId);
+  if (!coll || coll.owner_user_id !== p.userId) return Response.json({ error: "unknown collection" }, { status: 404 });
+  if (!(await s.rateLimiter.limit(`bgen:${p.userId}`))) {
+    return Response.json({ error: "Too many requests" }, { status: 429 });
+  }
+  let body: any;
+  try { body = await request.json(); } catch { return Response.json({ error: "invalid JSON body" }, { status: 400 }); }
+  if (typeof body?.prompt !== "string" || body.prompt.trim() === "") {
+    return Response.json({ error: "prompt required" }, { status: 422 });
+  }
+  if (body.prompt.length > MAX_PROMPT_LEN) {
+    return Response.json({ error: `prompt must be at most ${MAX_PROMPT_LEN} characters` }, { status: 422 });
+  }
+  const prompt = combinedPrompt(body.prompt, coll.theme_prompt);
+  if (prompt.length > MAX_PROMPT_LEN) {
+    return Response.json({ error: `prompt plus collection theme must be at most ${MAX_PROMPT_LEN} characters` }, { status: 422 });
+  }
+  const out = await startGeneration({ userId: p.userId, collectionId: coll.id, prompt }, s, cfg);
+  switch (out.kind) {
+    case "accepted":
+      return Response.json(
+        { generation: generationView(out.row, null, assetBaseUrl), byok: { used: out.used, cap: out.cap, est_spend_usd: out.estSpendUsd } },
+        { status: 202 }
+      );
+    case "content_policy":
+      return Response.json({ error: "content_policy", category: out.category }, { status: 400 });
+    case "cap_reached":
+      return Response.json({ error: "monthly cap reached", used: out.used, cap: out.cap }, { status: 429 });
+    case "byok_unconfigured":
+      return Response.json({ error: "byok required", detail: "add an enabled provider key first" }, { status: 403 });
+    case "provider_error":
+      return Response.json({ error: "generation failed to start" }, { status: 502 });
+  }
+}
+
+export async function handleGetGeneration(
+  id: string, request: Request, env: Env, s: Services, cfg: GenJobsCfg, assetBaseUrl?: string
+): Promise<Response> {
+  const p = await resolveApiPrincipal(request, env, s);
+  if (!p) return Response.json({ error: "login required" }, { status: 401 });
+  let row = await s.generations.get(id);
+  if (!row || row.user_id !== p.userId) return Response.json({ error: "not found" }, { status: 404 });
+  if (row.status === "queued" || row.status === "generating") {
+    row = (await driveGeneration(id, s, cfg)) ?? row;
+  }
+  const asset = row.status === "succeeded" && row.asset_id ? await s.assets.getAsset(row.asset_id) : null;
+  return Response.json({ generation: generationView(row, asset, assetBaseUrl) });
+}

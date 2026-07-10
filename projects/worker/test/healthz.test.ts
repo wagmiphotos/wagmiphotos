@@ -3,7 +3,7 @@ import worker from "../src/index";
 
 describe("healthz", () => {
   it("returns ok", async () => {
-    const res = await worker.fetch(new Request("https://x/healthz"), {} as any);
+    const res = await worker.fetch(new Request("https://x/healthz"), {} as any, { waitUntil: () => {} } as any);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ status: "ok" });
   });

@@ -19,6 +19,8 @@ import {
   handleCreateCollection, handleListCollections, handlePatchCollection,
   handleListCollectionImages, handleDeleteCollectionImage, handleDeleteCollection,
 } from "./collections-routes";
+import { handleCreateGeneration, handleGetGeneration } from "./generations-routes";
+import { sweepGenerations, type GenJobsCfg } from "./generation-jobs";
 
 function buildServices(env: Env): Services {
   const { assets, queries, keys, users, sessions, loginTokens, byok, collections, generations } = makeD1Stores(env.DB);
@@ -79,8 +81,17 @@ async function handleStars(env: Env): Promise<Response> {
   }
 }
 
+function genJobsCfg(env: Env, waitUntil?: (p: Promise<unknown>) => void): GenJobsCfg {
+  return {
+    kek: env.BYOK_KEK, moderationKey: env.OPENAI_API_KEY,
+    bucket: env.BYOK_ORIGINALS, publicUrlBase: env.BYOK_PUBLIC_URL_BASE,
+    now: () => Math.floor(Date.now() / 1000),
+    waitUntil,
+  };
+}
+
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url);
       const verifyBase = env.PUBLIC_SITE_URL || "https://wagmi.photos";
@@ -133,6 +144,18 @@ export default {
       if (url.pathname === "/v1/collections") {
         if (request.method === "POST") return await handleCreateCollection(request, env, services);
         if (request.method === "GET") return await handleListCollections(request, env, services);
+      }
+      const genCreate = url.pathname.match(/^\/v1\/collections\/([^/]+)\/generations$/);
+      if (genCreate && request.method === "POST") {
+        let id: string;
+        try { id = decodeURIComponent(genCreate[1]); } catch { return new Response("Not found", { status: 404 }); }
+        return await handleCreateGeneration(id, request, env, services, genJobsCfg(env, (p) => ctx.waitUntil(p)), env.ASSET_BASE_URL);
+      }
+      const genGet = url.pathname.match(/^\/v1\/generations\/([^/]+)$/);
+      if (genGet && request.method === "GET") {
+        let id: string;
+        try { id = decodeURIComponent(genGet[1]); } catch { return new Response("Not found", { status: 404 }); }
+        return await handleGetGeneration(id, request, env, services, genJobsCfg(env, (p) => ctx.waitUntil(p)), env.ASSET_BASE_URL);
       }
       const collImages = url.pathname.match(/^\/v1\/collections\/([^/]+)\/images$/);
       if (collImages && request.method === "GET") {
@@ -232,5 +255,12 @@ export default {
       console.error(err);
       return Response.json({ error: "internal error" }, { status: 500 });
     }
+  },
+
+  // Cron backstop for async generation jobs nobody polled to completion:
+  // re-drives recoverable ones, fails+refunds abandoned ones.
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    const services = buildServices(env);
+    ctx.waitUntil(sweepGenerations(services, genJobsCfg(env, (p) => ctx.waitUntil(p))));
   },
 };
