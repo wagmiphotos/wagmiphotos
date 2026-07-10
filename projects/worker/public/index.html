@@ -2078,12 +2078,15 @@
       gap: 8px;
     }
     .dev-list ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-    .dev-list li { display: flex; align-items: flex-start; gap: 9px; font-size: 0.875rem; color: var(--ink-soft); line-height: 1.5; }
+    .dev-list li { display: flex; align-items: flex-start; gap: 9px; font-size: 0.875rem; color: var(--ink-soft); line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }
+    .dev-list li svg { flex: none; margin-top: 3px; }
     .dev-list li svg { flex-shrink: 0; margin-top: 3px; color: var(--red); }
 
     /* copy-to-clipboard code block */
     .copy-wrap { position: relative; }
     .copy-wrap .docs-pre, .copy-wrap .skill-pre { margin-bottom: 16px; }
+    /* narrow screens: reserve the Copy button's row so it never overlaps code */
+    @media (max-width: 640px) { .copy-wrap .docs-pre, .copy-wrap .skill-pre { padding-top: 46px; } }
     .copy-btn {
       position: absolute;
       top: 12px;
