@@ -408,6 +408,10 @@
     .view-pad { padding: 40px 0 64px; }
 
     /* ============ Library ============ */
+    .page-tabs { display: inline-flex; gap: 4px; margin: 0 0 18px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
+    .page-tab { border: none; background: transparent; padding: 8px 18px; border-radius: 999px; font: inherit; font-weight: 600; font-size: 0.9rem; color: var(--ink-soft); cursor: pointer; }
+    .page-tab:hover { color: var(--ink); }
+    .page-tab.active { background: var(--ink); color: #fff; }
     .library-bar { max-width: 560px; margin: 0 auto 28px; }
     .library-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
     @media (max-width: 1000px) { .library-grid { grid-template-columns: repeat(3, 1fr); } }
@@ -1717,27 +1721,6 @@
 
     .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
-    /* ============ Playground viewport ============ */
-    .viewport-card {
-      min-height: 400px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      position: relative;
-      overflow: hidden;
-      border: 1px dashed #d5d2ce;
-      background: var(--paper);
-    }
-
-    .viewport-card.has-content {
-      border-style: solid;
-      border-color: var(--line);
-      background: var(--card);
-      justify-content: flex-start;
-      padding: 0;
-    }
-
     .state-placeholder {
       display: flex;
       flex-direction: column;
@@ -1856,71 +1839,6 @@
     .badge-approximate { background: var(--warning-tint); color: var(--warning); border: 1px solid rgba(180, 83, 9, 0.3); }
     .badge-pending { background: rgba(28, 28, 27, 0.07); color: var(--muted); border: 1px solid var(--line); }
     .badge-generated { background: var(--success-tint); color: var(--success); border: 1px solid rgba(14, 138, 77, 0.3); }
-
-    /* ============ Presets & history ============ */
-    .presets-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-
-    .preset-pill {
-      background: var(--paper);
-      border: 1px solid var(--line);
-      border-radius: 20px;
-      padding: 6px 12px;
-      font-family: inherit;
-      font-size: 0.75rem;
-      line-height: inherit;
-      color: var(--muted);
-      cursor: pointer;
-      transition: color 0.2s ease, border-color 0.2s ease;
-    }
-
-    .preset-pill:hover { color: var(--ink); border-color: var(--ink); }
-
-    .history-list {
-      max-height: 250px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .history-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: 100%;
-      text-align: left;
-      font-family: inherit;
-      background: var(--paper);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px 12px;
-      cursor: pointer;
-      transition: border-color 0.2s ease;
-    }
-
-    .history-item:hover { border-color: var(--ink); }
-
-    .history-prompt {
-      font-size: 0.8125rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 70%;
-      color: var(--ink);
-    }
-
-    .history-badge {
-      font-size: 0.625rem;
-      padding: 2px 6px;
-      border-radius: 4px;
-      text-transform: uppercase;
-      font-weight: 700;
-    }
-
-    .history-badge.hit { color: var(--success); background: var(--success-tint); }
-    .history-badge.approximate { color: var(--warning); background: var(--warning-tint); }
-    .history-badge.pending { color: var(--muted); background: rgba(28, 28, 27, 0.07); }
-    .history-badge.generated { color: var(--success); background: var(--success-tint); }
 
     /* ============ Toast ============ */
     .toast {
@@ -2362,10 +2280,6 @@
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg></span>
                   <span><span class="nav-drop-title">Pricing</span><span class="nav-drop-sub">Plans from $0/mo.</span></span>
                 </a>
-                <a href="#/playground" id="nav-playground" class="nav-drop-item explore">
-                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span>
-                  <span><span class="nav-drop-title">Playground</span><span class="nav-drop-sub">Try a live prompt.</span></span>
-                </a>
                 <a href="#/account" class="nav-drop-item explore">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
                   <span><span class="nav-drop-title">Account</span><span class="nav-drop-sub">Keys &amp; usage stats.</span></span>
@@ -2463,7 +2377,7 @@
             images. The more we all search, the better it gets for all of us.
           </p>
           <div class="hero-cta rise rise-4">
-            <a href="#/playground" class="btn-solid">Launch playground →</a>
+            <a href="#/library" class="btn-solid">Browse the library →</a>
             <a href="#/pricing" class="btn-outline">View pricing</a>
           </div>
           <div class="hero-proof rise rise-5">
@@ -2775,7 +2689,7 @@
               wagmi.photos and we return OpenAI-compatible responses with an extra
               <code style="font-family: var(--font-mono); font-size: 0.85em;">shared_cache</code> block.
             </p>
-            <a href="#/playground" class="api-link">Try it in the playground →</a>
+            <a href="#/library" class="api-link">Try it in the library →</a>
             <div class="api-pills">
               <span class="api-pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m8 6-6 6 6 6"/><path d="m16 6 6 6-6 6"/></svg> Same SDK</span>
               <span class="api-pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"/><path d="M16 3h1a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2 2 2 0 0 0-2 2v5a2 2 0 0 1-2 2h-1"/></svg> Same response shape</span>
@@ -2857,7 +2771,7 @@
               <li class="cross">Commercial-use license &amp; indemnity</li>
               <li class="cross">Unlimited rate + API access</li>
             </ul>
-            <a href="#/playground" class="btn-outline">Start browsing</a>
+            <a href="#/library" class="btn-outline">Start browsing</a>
           </div>
 
           <div class="pricing-card popular">
@@ -2885,7 +2799,7 @@
           <p>Every image here is openly licensed — the seed pool is public-domain PD12M, and generated images are shared under the same permissive terms. Reach for wagmi.photos when you don't need a pixel-exact, one-off render: you need a good image now, with a license you don't have to think about. Need guaranteed commercial use? That's the one upgrade.</p>
         </div>
         <div class="actions">
-          <a href="#/playground" class="btn-solid red">Launch playground →</a>
+          <a href="#/library" class="btn-solid red">Browse the library →</a>
           <a href="#/pricing" class="btn-outline">View pricing</a>
         </div>
       </section>
@@ -2938,141 +2852,6 @@
       <div class="pricing-grid" id="pricing-grid-clone" style="margin-bottom: 64px;"></div>
     </div>
 
-    <!-- VIEW 2: PLAYGROUND -->
-    <div id="view-playground" class="spa-view">
-      <div class="view-pad">
-      <div class="dashboard-grid">
-
-        <!-- Controls Column -->
-        <div class="controls-column">
-          <div class="glass-card">
-            <h2 class="card-title">Generator config</h2>
-
-            <div class="form-group">
-              <label for="prompt">Prompt text</label>
-              <textarea id="prompt" class="input-field" placeholder="Describe the image you want to generate or match..."></textarea>
-              <div class="presets-container">
-                <button type="button" class="preset-pill" onclick="applyPreset('A high-resolution photograph of a glowing futuristic neon city, cyberpunk aesthetics')">Neon City</button>
-                <button type="button" class="preset-pill" onclick="applyPreset('A cute fluffy golden retriever puppy sitting in a meadow, sunny day, soft focus')">Cute Puppy</button>
-                <button type="button" class="preset-pill" onclick="applyPreset('Abstract 3D rendering of fluid gradient shapes, purple and blue holographic waves')">Abstract Art</button>
-                <button type="button" class="preset-pill" onclick="applyPreset('Plate of fresh delicious chocolate chip cookies, cozy kitchen background, steam rising')">Cookies</button>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <span class="field-label">When there's no close match</span>
-              <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 0.8125rem; color: var(--muted); line-height: 1.45; text-transform: none; letter-spacing: normal; font-weight: 400; margin: 0;">
-                <input type="checkbox" id="gen-on-miss" checked onchange="updateGenGating()" style="width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; accent-color: var(--red);">
-                <span><b style="color: var(--ink); font-weight: 600;">Create a fresh image.</b> If the library has nothing close enough, a new image is made for your prompt and added to the library.</span>
-              </label>
-              <div id="gen-key-status" style="font-size: 0.75rem; color: var(--muted); margin-top: 8px;"></div>
-            </div>
-
-            <div class="form-group" id="tol-group">
-              <label for="tol">Match strictness</label>
-              <div class="slider-container">
-                <div class="slider-header">
-                  <span>Exact match</span>
-                  <span>Loose match</span>
-                </div>
-                <input type="range" id="tol" min="0" max="1" step="0.01" value="0.15" oninput="updateToleranceValue(this.value)">
-                <div class="slider-info" id="tolerance-info-box">
-                  <span>Tolerance: <span class="slider-val" id="tol-val">0.15</span></span>
-                  <span id="tolerance-indicator" style="font-weight: 600; color: var(--red);">Normal Match</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="form-group" id="coll-picker-group" hidden>
-              <label for="coll-select">Collection</label>
-              <select id="coll-select" class="field-input" style="width:auto;">
-                <option value="">Library (everything)</option>
-              </select>
-              <span style="font-size: 0.75rem; color: var(--muted); margin-top: 6px; display: block;">
-                Scope matching to one of your collections; its theme prompt is appended when a new image is generated.
-              </span>
-            </div>
-
-            <button id="btn-submit" class="btn btn-primary" onclick="generateImage()">
-              <span>Generate image</span>
-            </button>
-          </div>
-
-          <!-- History Console Card -->
-          <div class="glass-card">
-            <h2 class="card-title">Session history</h2>
-            <div id="history-list" class="history-list">
-              <div style="font-size: 0.75rem; color: var(--muted); text-align: center; padding: 12px;">No runs yet.</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Viewport Column -->
-        <div class="viewport-column">
-
-          <!-- Image Viewport Card -->
-          <div id="viewport" class="glass-card viewport-card">
-            <div id="state-placeholder" class="state-placeholder">
-              <span class="state-placeholder-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></span>
-              <p style="font-size: 0.9375rem; font-weight: 500; color: var(--ink);">No image rendered</p>
-              <p style="font-size: 0.8125rem; max-width: 280px; margin-top: -6px;">Enter a prompt and click generate to query the cache and generate images.</p>
-              <p id="placeholder-msg" style="font-size: 0.8125rem; max-width: 280px; color: var(--ink);"></p>
-            </div>
-
-            <div id="state-loader" class="state-loader">
-              <div class="spinner"></div>
-              <p id="loader-msg" style="font-size: 0.875rem; font-weight: 500; letter-spacing: 0.02em;">Searching the library&hellip;</p>
-            </div>
-
-            <div id="img-wrapper" class="img-wrapper">
-              <img id="out-img" alt="Cache result" onerror="imageLoadError()">
-            </div>
-
-            <!-- Details Panel -->
-            <div id="result-details" class="result-details">
-              <div class="result-header">
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                  <span id="saved-ticker" style="font-family: var(--font-display); font-size: 1.25rem; font-weight: 800; color: var(--success);">Saved $0.00</span>
-                  <span style="font-size: 0.6875rem; color: var(--muted); text-transform: uppercase;">Total savings added</span>
-                </div>
-                <span id="result-badge" class="result-badge">HIT</span>
-              </div>
-
-              <div class="details-grid">
-                <div class="details-item">
-                  <span class="details-label">Cosine similarity</span>
-                  <span class="details-val mono" id="val-similarity">-</span>
-                </div>
-                <div class="details-item">
-                  <span class="details-label">Model</span>
-                  <span class="details-val" id="val-model">-</span>
-                </div>
-                <div class="details-item">
-                  <span class="details-label">Source</span>
-                  <span class="details-val" id="val-provider">-</span>
-                </div>
-                <div class="details-item">
-                  <span class="details-label">Cache latency</span>
-                  <span class="details-val mono" id="val-latency">-</span>
-                </div>
-                <div class="details-item" id="val-collection-item" style="display:none;">
-                  <span class="details-label">Collection</span>
-                  <span class="details-val" id="val-collection">-</span>
-                </div>
-              </div>
-
-              <a id="view-original" class="view-original-link" target="_blank" rel="noopener" hidden>View original ↗</a>
-
-              <button class="btn" style="height: 38px; font-size: 0.8125rem; background: var(--paper); border: 1px solid var(--line); color: var(--ink);" onclick="viewProvenance()">
-                View provenance manifest
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      </div>
-    </div>
-
     <!-- VIEW: LIBRARY -->
     <div id="view-library" class="spa-view" style="display: none;">
       <div class="view-pad">
@@ -3082,15 +2861,42 @@
           <p class="section-sub">Every image the cache has ever served, ranked by semantic closeness to your search — the same BGE prompt embeddings that power generation, not keyword matching. Download anything — it's all public-domain PD12M or cache-generated.</p>
         </div>
 
-        <div class="library-bar">
-          <input id="library-search" class="input-field" type="search" placeholder="Search prompts, e.g. flamingo sunset…"
-                 aria-label="Search prompts"
-                 oninput="onLibraryInput(this.value)" onkeydown="onLibraryKeydown(event)">
+        <div class="page-tabs" role="tablist">
+          <button class="page-tab active" data-tab="library" onclick="showLibTab('library')">Library</button>
+          <button class="page-tab" data-tab="collections" onclick="showLibTab('collections')">My collections</button>
         </div>
+        <div id="tab-library">
+          <div class="library-bar">
+            <input id="library-search" class="input-field" type="search" placeholder="Search prompts, e.g. flamingo sunset…"
+                   aria-label="Search prompts"
+                   oninput="onLibraryInput(this.value)" onkeydown="onLibraryKeydown(event)">
+          </div>
 
-        <div id="library-grid" class="library-grid"></div>
-        <div id="library-status" class="library-status" style="display: none;"></div>
-        <button id="library-more" class="btn library-more" style="display: none;" onclick="loadMoreLibrary()">Load more</button>
+          <div id="library-grid" class="library-grid"></div>
+          <div id="library-status" class="library-status" style="display: none;"></div>
+          <button id="library-more" class="btn library-more" style="display: none;" onclick="loadMoreLibrary()">Load more</button>
+        </div>
+        <div id="tab-collections" hidden>
+          <!-- BYOK key card + collections card moved from view-account below; Task 8 adds the generate card above them -->
+
+          <!-- BYOK Card -->
+          <div class="glass-card">
+            <h2 class="card-title">Bring your own key</h2>
+            <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
+              Add your own OpenAI or GMI Cloud API key so a fresh image is generated whenever the library has no close-enough match. Generated images join the shared library. Spend shown is an <b>estimate</b> (images &times; list price) &mdash; actual billing can differ per image. Check your provider for real costs: <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" style="color:var(--red);">OpenAI usage</a> &middot; <a href="https://console.gmicloud.ai" target="_blank" rel="noopener" style="color:var(--red);">GMI Cloud console</a>.
+            </p>
+            <div id="byok-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
+          </div>
+
+          <!-- Collections Card -->
+          <div class="glass-card">
+            <h2 class="card-title">Collections</h2>
+            <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
+              Themed sets of images generated with your own key. The theme prompt is appended to every image you generate into the collection, and anyone who knows the collection ID can scope API searches to it (<code style="font-family: var(--font-mono);">"collection": "col_…"</code>). Images also join the shared library.
+            </p>
+            <div id="collections-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -3137,24 +2943,6 @@
         <div id="plan-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
       </div>
 
-      <!-- BYOK Card -->
-      <div class="glass-card">
-        <h2 class="card-title">Bring your own key</h2>
-        <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
-          Add your own OpenAI or GMI Cloud API key and the playground generates a fresh image whenever the library has no close-enough match. Generated images join the shared library. Spend shown is an <b>estimate</b> (images &times; list price) &mdash; actual billing can differ per image. Check your provider for real costs: <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" style="color:var(--red);">OpenAI usage</a> &middot; <a href="https://console.gmicloud.ai" target="_blank" rel="noopener" style="color:var(--red);">GMI Cloud console</a>.
-        </p>
-        <div id="byok-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
-      </div>
-
-      <!-- Collections Card -->
-      <div class="glass-card">
-        <h2 class="card-title">Collections</h2>
-        <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
-          Themed sets of images generated with your own key. The theme prompt is appended to every image you generate into the collection, and anyone who knows the collection ID can scope API searches to it (<code style="font-family: var(--font-mono);">"collection": "col_…"</code>). Images also join the shared library.
-        </p>
-        <div id="collections-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
-      </div>
-
       <!-- Credentials Card -->
       <div class="glass-card">
         <h2 class="card-title">Credentials &amp; authentication</h2>
@@ -3169,7 +2957,7 @@
         <div class="form-group">
           <label>API keys</label>
           <span style="font-size: 0.75rem; color: var(--muted); margin: 2px 0 12px; display: block;">
-            For calling the wagmi.photos API from your own code (<code style="font-family: var(--font-mono);">Authorization: Bearer sc-…</code>). The playground here is already authenticated by your login.
+            For calling the wagmi.photos API from your own code (<code style="font-family: var(--font-mono);">Authorization: Bearer sc-…</code>). This site is already authenticated by your login.
           </span>
           <button id="create-key-btn" class="btn btn-primary" style="height: 40px; width: auto; padding: 0 18px; font-size: 0.875rem;" onclick="openCreateKey()">Create API key</button>
           <span id="key-gate-hint" hidden style="display:block;margin-top:10px;font-size:0.75rem;color:var(--muted);">API keys are an Unlimited feature — <a href="#" onclick="document.getElementById('plan-body')?.scrollIntoView({behavior:'smooth'});return false;" style="color:var(--red);">upgrade to create one</a>.</span>
@@ -3181,7 +2969,7 @@
       <div class="glass-card" style="border-color: rgba(211, 28, 36, 0.25); background: rgba(211, 28, 36, 0.02);">
         <h2 class="card-title" style="color: var(--danger);">Advanced actions</h2>
         <p style="font-size: 0.875rem; color: var(--muted); margin-bottom: 16px;">
-          This clears your browser's local state — the telemetry counters, session history, and playground settings. Your account and API keys are stored server-side and are not affected.
+          This clears your browser's local state — the telemetry counters. Your account and API keys are stored server-side and are not affected.
         </p>
         <button class="btn" style="background: rgba(211, 28, 36, 0.06); border: 1px solid rgba(211, 28, 36, 0.3); color: var(--danger);" onclick="resetSession()">
           Reset browser settings &amp; telemetry
@@ -3782,7 +3570,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
             <li><strong>API keys, as hashes</strong> — stored only as a SHA-256 hash; we cannot recover or display the key itself, so keep your copy safe.</li>
             <li><strong>Prompts and images</strong> — stored (with demand counts) to run the shared cache and rank background generation; generated images join the shared, openly licensed library. Please don't put private or personal information in prompts.</li>
             <li><strong>Terms-acceptance record</strong> — when you accept our Terms of Use we record the version, the time, your IP address, and your browser's user-agent, as proof of consent.</li>
-            <li><strong>Local browser state</strong> — the playground's counters and history live only in your browser and can be cleared any time from the Account page.</li>
+            <li><strong>Local browser state</strong> — the telemetry counters live only in your browser and can be cleared any time from the Account page.</li>
           </ul>
 
           <h2>2. How we use it</h2>
@@ -3830,7 +3618,6 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       </div>
       <span>A <a href="https://suppers.ai/" target="_blank" rel="noopener" style="color: var(--ink-soft); text-decoration: none; font-weight: 600;">Suppers Software Limited</a> project · Hamilton, NZ · Seeded with PD12M (CDLA-Permissive-2.0)</span>
       <div class="footer-links">
-        <a href="#/playground">Playground</a>
         <a href="#/library">Library</a>
         <a href="#/docs">API</a>
         <a href="#/openai">OpenAI drop-in</a>
@@ -3912,15 +3699,10 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     let saved = finiteOrZero(parseFloat(lsGet('saved') || '0.00'));
     let hits = finiteOrZero(parseInt(lsGet('hits') || '0', 10));
     let misses = finiteOrZero(parseInt(lsGet('misses') || '0', 10));
-    let runHistory;
-    try { runHistory = JSON.parse(lsGet('history') || '[]'); } catch { runHistory = []; }
-    if (!Array.isArray(runHistory)) runHistory = [];
-    const HISTORY_MAX = 50;
     let currentManifest = null;
 
     // Load stats initially
     updateStats();
-    renderHistory();
 
     // The #/pricing view mirrors the home pricing cards — clone once at startup
     (function clonePricingGrid() {
@@ -3933,8 +3715,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     const ROUTES = {
       '#/':           { view: 'view-home' },
       '#/pricing':    { view: 'view-pricing', link: 'nav-pricing' },
-      '#/library':    { view: 'view-library', link: 'nav-library', onShow: initLibrary },
-      '#/playground': { view: 'view-playground', link: 'nav-playground', onShow: () => { loadPlaygroundCollections(); updateGenGating(); } },
+      '#/library':    { view: 'view-library', link: 'nav-library', onShow: () => { initLibrary(); if (activeLibTab === 'collections') { renderByok(); loadCollections(); } } },
       '#/account':    { view: 'view-account', onShow: async () => {
         const emailEl = document.getElementById('account-email');
         if (emailEl) emailEl.textContent = currentUser ? currentUser.email : '—';
@@ -3947,8 +3728,6 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
           history.replaceState(null, '', '#/account');
         }
         renderPlan();
-        renderByok();
-        loadCollections();
       } },
       '#/terms':      { view: 'view-terms' },
       '#/privacy':    { view: 'view-privacy' },
@@ -3967,7 +3746,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       } },
     };
     const PATH_TO_HASH = {
-      '/playground': '#/playground', '/docs': '#/docs', '/pricing': '#/pricing',
+      '/playground': '#/library', '/docs': '#/docs', '/pricing': '#/pricing',
       '/account': '#/account', '/terms': '#/terms', '/privacy': '#/privacy', '/legal': '#/terms', '/openai': '#/openai',
       '/matching': '#/matching', '/clip': '#/matching', '/agents': '#/agents',
       '/library': '#/library',
@@ -3988,7 +3767,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     }
     function closeMenus() { closeDropdowns(); closeMobile(); }
 
-    const GATED = new Set(['#/playground', '#/library', '#/account']);
+    const GATED = new Set(['#/library', '#/account']);
     let currentUser = null;
     let currentPlan = null;
     let currentByok = null;
@@ -3996,6 +3775,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     function showRoute(route) {
       const path = route.split('?')[0];
       if (path === '#/clip') { location.replace('#/matching'); return; } // legacy route
+      if (path === '#/playground') { location.replace('#/library'); return; } // merged into Library
       if (GATED.has(path) && !currentUser) {
         sessionStorage.setItem('wagmi_return', path);
         route = '#/login';
@@ -4203,28 +3983,6 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       sel.removeAllRanges();
     }
 
-    // Form logic helpers
-    function applyPreset(text) {
-      document.getElementById('prompt').value = text;
-      showToast("Preset prompt loaded!", "info");
-    }
-
-    function updateToleranceValue(val) {
-      document.getElementById('tol-val').textContent = val;
-      const indicator = document.getElementById('tolerance-indicator');
-
-      if (val < 0.1) {
-        indicator.textContent = "Strict (Exact Match)";
-        indicator.style.color = 'var(--success)'; // Strict = Green
-      } else if (val < 0.25) {
-        indicator.textContent = "Normal Match";
-        indicator.style.color = 'var(--red)'; // Normal = Brand red
-      } else {
-        indicator.textContent = "Concept Match (Loose)";
-        indicator.style.color = 'var(--warning)'; // Loose = Amber
-      }
-    }
-
     let toastTimer = null;
     function showToast(message, type = "error") {
       const toast = document.getElementById('toast');
@@ -4258,38 +4016,20 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       localStorage.setItem('wagmiphotos_misses', misses.toString());
     }
 
-    function renderHistory() {
-      const histContainer = document.getElementById('history-list');
-      if (runHistory.length === 0) {
-        histContainer.innerHTML = `<div style="font-size:0.75rem; color:var(--muted); text-align:center; padding:12px;">No runs yet.</div>`;
-        return;
-      }
-
-      histContainer.innerHTML = runHistory.map((item, idx) => `
-        <button type="button" class="history-item" onclick="replayHistory(${idx})">
-          <span class="history-prompt" title="${escapeHtml(item.prompt)}">${escapeHtml(item.prompt)}</span>
-          <div style="display:flex; align-items:center; gap:6px;">
-            <span style="font-size:0.7rem; color:var(--muted);">tol: ${escapeHtml(String(item.tolerance))}</span>
-            <span class="history-badge ${escapeHtml(String(item.result))}">${escapeHtml(String(item.result))}</span>
-          </div>
-        </button>
-      `).join('');
-    }
-
-    function replayHistory(idx) {
-      const item = runHistory[idx];
-      document.getElementById('prompt').value = item.prompt;
-      document.getElementById('tol').value = item.tolerance;
-      updateToleranceValue(item.tolerance);
-      navigateTo('#/playground');
-      showToast("History query loaded!", "info");
-    }
-
     function escapeHtml(str) {
       return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
 
     // ---- Library ----
+    let activeLibTab = 'library';
+    function showLibTab(tab) {
+      activeLibTab = tab;
+      document.getElementById('tab-library').hidden = tab !== 'library';
+      document.getElementById('tab-collections').hidden = tab !== 'collections';
+      document.querySelectorAll('.page-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+      if (tab === 'collections') { renderByok(); loadCollections(); }
+    }
+
     const LIB_PAGE_SIZE = 24;
     let libQuery = '', libOffset = 0, libLoaded = false, libSeq = 0, libDebounce = null;
 
@@ -4432,7 +4172,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         </div>`;
       } else {
         el.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-          <div><b style="color:var(--ink);">Free</b> · playground &amp; closest-match search</div>
+          <div><b style="color:var(--ink);">Free</b> · library &amp; closest-match search</div>
           <button class="btn btn-primary" style="height:40px;width:auto;padding:0 18px;" onclick="startCheckout(this)">Upgrade to Unlimited — $24/yr</button>
         </div>`;
       }
@@ -4676,7 +4416,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         if (r.status === 401) { location.hash = '#/login'; return; }
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const { images } = await r.json();
-        if (!images.length) { el.innerHTML = '<span style="font-size:0.75rem;">No images yet — generate into this collection from the playground or API.</span>'; return; }
+        if (!images.length) { el.innerHTML = '<span style="font-size:0.75rem;">No images yet — generate into this collection from the API.</span>'; return; }
         el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;">' + images.map((img) => {
           const thumb = img.thumb_url || img.medium_url || img.url;
           return `
@@ -4698,50 +4438,6 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         showToast('Image deleted', 'success');
         await loadCollections();
       } catch { showToast('Could not delete the image', 'error'); }
-    }
-
-    async function loadPlaygroundCollections() {
-      const group = document.getElementById('coll-picker-group');
-      const sel = document.getElementById('coll-select');
-      if (!group || !sel) return;
-      if (!currentUser) { group.hidden = true; return; }
-      try {
-        const r = await fetch('/v1/collections', { credentials: 'same-origin' });
-        if (!r.ok) { group.hidden = true; return; }
-        const { collections } = await r.json();
-        myCollections = collections;
-        if (!collections.length) { group.hidden = true; return; }
-        const prev = sel.value;
-        sel.innerHTML = '<option value="">Library (everything)</option>' +
-          collections.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-        if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
-        group.hidden = false;
-      } catch { group.hidden = true; }
-    }
-
-    // Tolerance only matters when a miss can create something: greyed +
-    // default when "create a fresh image" is off. Also shows which key a
-    // fresh generation would use (or that the shared queue applies).
-    function updateGenGating() {
-      const on = document.getElementById('gen-on-miss')?.checked ?? true;
-      const tolGroup = document.getElementById('tol-group');
-      const tol = document.getElementById('tol');
-      if (tolGroup) tolGroup.style.opacity = on ? '' : '0.45';
-      if (tol) tol.disabled = !on;
-      const tolValEl = document.getElementById('tol-val');
-      if (tolValEl && tol) tolValEl.textContent = on ? tol.value : '0.15 (default)';
-      const el = document.getElementById('gen-key-status');
-      if (!el) return;
-      if (!on) { el.innerHTML = ''; return; }
-      if (currentByok && currentByok.enabled) {
-        const name = currentByok.provider === 'openai' ? 'OpenAI' : 'GMI Cloud';
-        el.innerHTML = `<span style="color:var(--success);">✓</span> Uses your ${name} key <span style="font-family:var(--font-mono);">••••${escapeHtml(currentByok.key_last4)}</span> — ${currentByok.used_this_month}/${currentByok.monthly_cap} images this month · <a href="#/account" style="color:var(--red);">Manage</a>`;
-      } else if (currentByok) {
-        const name = currentByok.provider === 'openai' ? 'OpenAI' : 'GMI Cloud';
-        el.innerHTML = `⚠ Your ${name} key is disabled — <a href="#/account" style="color:var(--red);">fix it in Account</a>.`;
-      } else {
-        el.innerHTML = `No provider key set — your prompt joins the shared generation queue instead (can take a while). <a href="#/account" style="color:var(--red);">Add your key →</a>`;
-      }
     }
 
     async function startCheckout(btn) {
@@ -4806,237 +4502,16 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     }
 
     function resetSession() {
-      if (confirm("Reset local telemetry stats and playground state? Your account and API keys aren't affected.")) {
+      if (confirm("Reset local telemetry stats? Your account and API keys aren't affected.")) {
         localStorage.clear();
         saved = 0.00;
         hits = 0;
         misses = 0;
-        runHistory = [];
         currentManifest = null;
 
-        document.getElementById('prompt').value = '';
-
-        // Reset viewport
-        const placeholder = document.getElementById('state-placeholder');
-        const placeholderMsg = document.getElementById('placeholder-msg');
-        const imgWrapper = document.getElementById('img-wrapper');
-        const resultDetails = document.getElementById('result-details');
-        const viewport = document.getElementById('viewport');
-
-        placeholder.style.display = 'flex';
-        placeholderMsg.textContent = '';
-        imgWrapper.style.display = 'none';
-        resultDetails.style.display = 'none';
-        viewport.classList.remove('has-content');
-
         updateStats();
-        renderHistory();
 
         showToast("Local settings reset completed successfully.", "success");
-      }
-    }
-
-    // Call generations endpoint
-    function appendResultNote(text) {
-      const details = document.querySelector('.result-details');
-      if (!details) return;
-      const note = document.createElement('div');
-      note.className = 'result-note';
-      note.style.cssText = 'font-size:0.8125rem;color:var(--muted);margin-top:8px;';
-      note.textContent = text;
-      details.appendChild(note);
-    }
-
-    async function generateImage() {
-      const promptField = document.getElementById('prompt');
-      const promptVal = promptField.value.trim();
-
-      if (!promptVal) {
-        showToast("Please enter a prompt before generating.", "error");
-        return;
-      }
-
-      const tolVal = parseFloat(document.getElementById('tol').value);
-      const submitBtn = document.getElementById('btn-submit');
-
-      const placeholder = document.getElementById('state-placeholder');
-      const placeholderMsg = document.getElementById('placeholder-msg');
-      const loader = document.getElementById('state-loader');
-      const imgWrapper = document.getElementById('img-wrapper');
-      const outImg = document.getElementById('out-img');
-      const resultDetails = document.getElementById('result-details');
-      const viewport = document.getElementById('viewport');
-
-      // Setup loading states
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = `<span>Processing match...</span>`;
-      placeholder.style.display = 'none';
-      placeholderMsg.textContent = '';
-      imgWrapper.style.display = 'none';
-      resultDetails.style.display = 'none';
-      loader.style.display = 'flex';
-      viewport.classList.remove('has-content');
-      outImg.classList.remove('loaded');
-
-      const startTime = performance.now();
-
-      // Staged wait feedback: cache lookups return in ~1-2s; anything longer
-      // means a fresh generation is running (gpt-image-2 medium: usually
-      // 30-90s, no reliable progress signal — show honest elapsed time).
-      const loaderMsg = document.getElementById('loader-msg');
-      if (loaderMsg) loaderMsg.textContent = 'Searching the library\u2026';
-      const genOnMissChecked = document.getElementById('gen-on-miss').checked;
-      const loaderTimer = setInterval(() => {
-        if (!loaderMsg) return;
-        const elapsed = Math.round((performance.now() - startTime) / 1000);
-        if (elapsed >= 3 && genOnMissChecked && currentByok && currentByok.enabled) {
-          const pname = currentByok.provider === 'openai' ? 'OpenAI' : 'GMI Cloud';
-          loaderMsg.textContent = '\u2728 Creating a fresh image with your ' + pname + ' key \u2014 usually 30\u201390 seconds (' + elapsed + 's)';
-        }
-      }, 1000);
-
-      try {
-        const genOnMiss = document.getElementById('gen-on-miss').checked;
-        const collSel = document.getElementById('coll-select');
-        const collId = collSel && !document.getElementById('coll-picker-group').hidden ? collSel.value : '';
-
-        const response = await fetch('/v1/images/generations', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: promptVal,
-            ...(genOnMiss ? { cache_tolerance: tolVal } : {}),
-            generate_on_miss: genOnMiss,
-            ...(collId ? { collection: collId } : {})
-          })
-        });
-
-        const latency = Math.round(performance.now() - startTime);
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            location.hash = '#/login';
-            throw new Error('Session expired — log in again.');
-          }
-          if (response.status === 429) {
-            throw new Error('Too many requests — wait a moment and try again.');
-          }
-          let msg = 'Request failed (HTTP ' + response.status + ')';
-          let ej = null;
-          try { ej = await response.json(); } catch { /* non-JSON error body */ }
-          if (response.status === 400 && ej && ej.error === 'content_policy') {
-            throw new Error('This prompt was blocked by content policy (' + (ej.category || 'flagged') + ').');
-          }
-          if (ej) {
-            const m = (ej.error && ej.error.message) || ej.error || ej.detail || ej.message;
-            if (typeof m === 'string' && m) msg = m;
-          }
-          throw new Error(msg);
-        }
-
-        const data = await response.json();
-        const sc = data.shared_cache;
-        if (!sc) throw new Error('Unexpected response — missing shared_cache block.');
-
-        const rawUrl = (data.data && data.data[0]) ? data.data[0].url : null;
-        if (sc.result === 'pending' || !rawUrl) {
-          // No image yet — the backfill will build it.
-          outImg.removeAttribute('src');
-          placeholderMsg.textContent = sc.generation_queued
-            ? 'Generating — the backfill is building this image. Check back shortly.'
-            : 'No close match cached. Generation was not requested ("Create a fresh image" is off).';
-          placeholder.style.display = 'flex';
-          loader.style.display = 'none';
-          imgWrapper.style.display = 'none';
-          viewport.classList.remove('has-content');
-          resultDetails.style.display = 'block';
-        } else {
-          placeholderMsg.textContent = '';
-          outImg.src = rawUrl;
-
-          loader.style.display = 'none';
-          imgWrapper.style.display = 'block';
-          viewport.classList.add('has-content');
-
-          outImg.onload = () => {
-            outImg.classList.add('loaded');
-            resultDetails.style.display = 'block';
-          };
-        }
-
-        saved += (sc.cost_saved_usd || 0);
-        if (sc.result === 'hit') {
-          hits++;
-        } else {
-          misses++;
-        }
-        updateStats();
-
-        const badge = document.getElementById('result-badge');
-        badge.className = `result-badge badge-${sc.result}`;
-        badge.textContent = sc.result;
-
-        // BYOK notices: fresh generation + graceful-degrade statuses
-        document.querySelectorAll('.result-details .result-note').forEach(n => n.remove());
-        if (sc.result === 'generated' && sc.byok) {
-          appendResultNote(`✨ Generated with your key — ${sc.byok.used} / ${sc.byok.cap} this month (est. $${Number(sc.byok.est_spend_usd).toFixed(2)})`);
-          if (currentByok) { currentByok.used_this_month = sc.byok.used; updateGenGating(); }
-        } else if (sc.byok && sc.byok.status === 'cap_reached') {
-          appendResultNote('Your monthly BYOK cap is reached — showing the closest match instead. Raise the cap on the Account page.');
-        } else if (sc.byok && sc.byok.status === 'provider_error') {
-          appendResultNote('Your provider key failed — showing the closest match instead. If this keeps happening with an OpenAI key, check that your OpenAI organization is verified for image generation, then check the Account page.');
-        }
-
-        document.getElementById('saved-ticker').textContent = `Saved $${(sc.cost_saved_usd ?? 0).toFixed(2)}`;
-        document.getElementById('val-similarity').textContent = (sc.similarity ?? 0).toFixed(4);
-        document.getElementById('val-model').textContent = sc.model_used ?? '—';
-        document.getElementById('val-provider').textContent = sc.source ?? '—';
-        document.getElementById('val-latency').textContent = `${latency}ms`;
-
-        const collItem = document.getElementById('val-collection-item');
-        if (collItem) {
-          const collName = sc.collection ? ((myCollections.find((c) => c.id === sc.collection) || {}).name || sc.collection) : null;
-          collItem.style.display = collName ? '' : 'none';
-          const collVal = document.getElementById('val-collection');
-          if (collVal) collVal.textContent = collName || '-';
-        }
-
-        const viewOriginal = document.getElementById('view-original');
-        if (sc.original_url) {
-          viewOriginal.href = sc.original_url;
-          viewOriginal.hidden = false;
-        } else {
-          viewOriginal.hidden = true;
-          viewOriginal.removeAttribute('href');
-        }
-
-        currentManifest = {
-          client_prompt: promptVal,
-          resolved_url: rawUrl,
-          shared_cache: sc,
-          timestamp: new Date().toISOString()
-        };
-
-        runHistory.unshift({
-          prompt: promptVal,
-          tolerance: genOnMiss ? tolVal : 0.15,
-          result: sc.result
-        });
-        if (runHistory.length > HISTORY_MAX) runHistory.length = HISTORY_MAX;
-        localStorage.setItem('wagmiphotos_history', JSON.stringify(runHistory));
-        renderHistory();
-
-      } catch (err) {
-        console.error(err);
-        showToast(err.message || "Network connection failure.", "error");
-
-        loader.style.display = 'none';
-        placeholder.style.display = 'flex';
-      } finally {
-        clearInterval(loaderTimer);
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = `<span>Generate image</span>`;
       }
     }
   </script>
