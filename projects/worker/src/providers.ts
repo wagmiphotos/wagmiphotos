@@ -25,9 +25,9 @@ const PINNED: Record<string, { model: string; price_per_image_usd: number }> = (
 
 // Every BYOK outbound fetch is bounded so a hung provider/moderation call
 // never hangs the user's request (and a stranded refund).
-// 300s: community/vendor guidance for image endpoints (medium ~44-80s,
-// high p95 ~280s); raising only this layer — the others stay tight.
-const OPENAI_GENERATE_TIMEOUT_MS = 300_000;
+const OPENAI_HOST_MODEL = "gpt-5-mini"; // cheap Responses host; the image tool does the actual work
+const OPENAI_SUBMIT_TIMEOUT_MS = 15_000;
+const OPENAI_POLL_TIMEOUT_MS = 15_000;
 const OPENAI_VALIDATE_TIMEOUT_MS = 10_000;
 const GMI_SUBMIT_TIMEOUT_MS = 15_000;
 const GMI_POLL_TIMEOUT_MS = 15_000;
@@ -41,63 +41,49 @@ const GMI_MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 
 const OPENAI_API = "https://api.openai.com/v1";
 
-/** Reads an SSE body and returns the parsed `data:` payload of the first
- *  event whose `type` matches; null when the stream ends without one. Events
- *  are blank-line separated; a partial image (~2MB base64) is the largest
- *  single block, so peak buffering stays bounded per event. */
-async function readSseEvent(res: Response, wantType: string): Promise<any | null> {
-  if (!res.body) return null;
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    // SSE permits \r\n line endings; JSON payloads escape any literal \r, so
-    // stripping it per-chunk is loss-free and \r can't span a chunk boundary.
-    if (value) buf += decoder.decode(value, { stream: true }).replace(/\r/g, "");
-    let idx;
-    while ((idx = buf.indexOf("\n\n")) >= 0) {
-      const block = buf.slice(0, idx);
-      buf = buf.slice(idx + 2);
-      for (const line of block.split("\n")) {
-        if (!line.startsWith("data: ")) continue;
-        try {
-          const d = JSON.parse(line.slice(6));
-          if (d?.type === wantType) {
-            reader.cancel().catch(() => { /* stream already finished */ });
-            return d;
-          }
-        } catch { /* non-JSON data line: ignore */ }
-      }
-    }
-    if (done) return null;
-  }
-}
-
-function makeOpenAiProvider(fetchFn: typeof fetch): ImageProvider {
+function makeOpenAiProvider(fetchFn: typeof fetch): AsyncImageProvider {
   return {
-    mode: "sync" as const,
-    async generate(prompt, apiKey) {
-      const res = await fetchFn(`${OPENAI_API}/images/generations`, {
+    mode: "async",
+    async submit(prompt, apiKey) {
+      const res = await fetchFn(`${OPENAI_API}/responses`, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        // quality pinned to medium: matches the contract price estimate ($0.04/img)
-        // and avoids auto resolving to high (~4x cost, slower generations).
-        // webp@85: ~10x smaller payload. stream + partial_images=1: OpenAI's
-        // gateway intermittently kills SILENT image connections after ~20s
-        // (billed but undelivered — diagnosed live 2026-07-09; gpt-image-2
-        // medium runs 44-80s). SSE events keep the connection non-idle; only
-        // the completed event carries the final image (~$0.003 partial cost).
-        body: JSON.stringify({ model: PINNED.openai.model, prompt, n: 1, size: "1024x1024", quality: "medium", output_format: "webp", output_compression: 85, stream: true, partial_images: 1 }),
-        signal: AbortSignal.timeout(OPENAI_GENERATE_TIMEOUT_MS),
+        // background+store: OpenAI runs the job server-side; every connection
+        // we hold is short — the ~20s silent-connection idle-kill (diagnosed
+        // live 2026-07-09) can't bite. Prompt passed verbatim via instruction
+        // (fidelity verified by scripts/probe-openai-background.sh).
+        body: JSON.stringify({
+          model: OPENAI_HOST_MODEL, background: true, store: true,
+          input: `Call the image generation tool with exactly this prompt, verbatim, then stop: ${prompt}`,
+          tools: [{ type: "image_generation", model: PINNED.openai.model, size: "1024x1024", quality: "medium", output_format: "webp", output_compression: 85 }],
+          tool_choice: "required",
+        }),
+        signal: AbortSignal.timeout(OPENAI_SUBMIT_TIMEOUT_MS),
       });
       if (res.status === 401 || res.status === 403) throw new ProviderAuthError(`openai ${res.status}`);
-      if (!res.ok) throw new Error(`openai images ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
-      const completed: any = await readSseEvent(res, "image_generation.completed");
-      const b64 = completed?.b64_json;
-      if (typeof b64 !== "string") throw new Error("openai images: stream ended without a completed image");
-      const fmt = typeof completed.output_format === "string" ? completed.output_format : "webp";
-      return { bytes: Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer, mime: `image/${fmt}` };
+      if (!res.ok) throw new Error(`openai responses ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
+      const body: any = await res.json();
+      if (!body?.id) throw new Error("openai responses: no id");
+      return String(body.id);
+    },
+    async check(jobId, apiKey) {
+      const res = await fetchFn(`${OPENAI_API}/responses/${jobId}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(OPENAI_POLL_TIMEOUT_MS),
+      });
+      if (res.status === 401 || res.status === 403) throw new ProviderAuthError(`openai ${res.status}`);
+      if (!res.ok) throw new Error(`openai poll ${res.status}`);
+      const body: any = await res.json();
+      const status = String(body?.status ?? "");
+      if (status === "queued" || status === "in_progress") return { state: "pending" };
+      if (status !== "completed") {
+        const msg = body?.error?.message ?? body?.incomplete_details?.reason ?? "";
+        return { state: "failed", error: `openai background ${status}: ${msg}`.slice(0, 300) };
+      }
+      const call = (body?.output ?? []).find((o: any) => o?.type === "image_generation_call" && typeof o?.result === "string");
+      if (!call) return { state: "failed", error: "openai background completed without an image_generation_call result" };
+      const fmt = typeof call.output_format === "string" ? call.output_format : "webp";
+      return { state: "done", image: { bytes: Uint8Array.from(atob(call.result), (c) => c.charCodeAt(0)).buffer, mime: `image/${fmt}` } };
     },
     async validateKey(apiKey) {
       const res = await fetchFn(`${OPENAI_API}/models`, {

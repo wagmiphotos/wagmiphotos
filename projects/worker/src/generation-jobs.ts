@@ -142,8 +142,10 @@ export async function startGeneration(
       return { kind: "provider_error" };
     }
   } else {
-    // Sync provider (openai gpt-image-1, 13-20s: ducks the ~20s idle-kill).
-    // The whole job runs after the 202; the ticket GET only reads D1 for it.
+    // Sync provider path: no configured provider uses it as of the openai
+    // gpt-image-2 re-pin (2026-07-10, both openai and gmicloud are async) —
+    // kept for a future provider without background polling. The whole job
+    // runs after the 202; the ticket GET only reads D1 for it.
     const run = runSyncJob(id, i.userId, month, row.provider, i.prompt, provider, apiKey, s, cfg)
       .catch((e) => console.error("sync generation job crashed", e));
     if (cfg.waitUntil) cfg.waitUntil(run); else await run;

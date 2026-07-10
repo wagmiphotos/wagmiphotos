@@ -24,7 +24,7 @@
     "manifest": "assets/{id}/manifest.json"
   },
   "byok_providers": {
-    "openai":   { "model": "gpt-image-1",          "price_per_image_usd": 0.04 },
+    "openai":   { "model": "gpt-image-2",          "price_per_image_usd": 0.055 },
     "gmicloud": { "model": "gpt-image-2-generate", "price_per_image_usd": 0.055 }
   },
   "denylist_terms": [

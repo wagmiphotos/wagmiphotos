@@ -197,9 +197,9 @@ it("11. sync happy path: publishes, succeeds, spends, namespace-only vector writ
   const inserted = (s as any)._generatedInserts[0];
   expect(inserted.createdBy).toBe("u1");
   expect(inserted.collectionId).toBe("col_scope1");
-  expect((await s.byok.getUsage("u1", MONTH)).est_spend_usd).toBeCloseTo(0.04);
+  expect((await s.byok.getUsage("u1", MONTH)).est_spend_usd).toBeCloseTo(0.055);
   expect(out.used).toBe(1);
-  expect(out.estSpendUsd).toBeCloseTo(0.04);
+  expect(out.estSpendUsd).toBeCloseTo(0.055);
   // namespace-ONLY vector write (spec decision 2): the shared-library shard stays untouched
   expect((s as any)._nsUpserted).toEqual([{ id: "g11", vector: [0.1, 0.2, 0.3], namespace: "col_scope1" }]);
   expect((s as any)._upserted).toEqual([]);
@@ -450,7 +450,7 @@ it("22. sync path: generations.succeed() throws once -> recovers to succeeded, n
   expect(row.status).toBe("succeeded");
   expect(row.asset_id).toBe(assetIdFor("gen_g22"));
   expect((await s.byok.getUsage("u1", MONTH)).count).toBe(1); // NO refund
-  expect((await s.byok.getUsage("u1", MONTH)).est_spend_usd).toBeCloseTo(0.04); // recorded exactly once
+  expect((await s.byok.getUsage("u1", MONTH)).est_spend_usd).toBeCloseTo(0.055); // recorded exactly once
   expect((s as any)._generatedInserts).toHaveLength(1);
   expect((s as any)._generatedInserts[0].id).toBe(assetIdFor("gen_g22"));
 });

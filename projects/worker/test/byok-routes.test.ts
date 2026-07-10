@@ -45,7 +45,7 @@ it("PUT validates and stores the key encrypted with last4 + defaults", async () 
   expect(await decryptSecret(row.key_ciphertext, KEK)).toBe("sk-user-12345");
   const body: any = await res.json();
   expect(body.byok.key_last4).toBe("2345");
-  expect(body.byok.price_per_image).toBeCloseTo(0.04);
+  expect(body.byok.price_per_image).toBeCloseTo(0.055);
 });
 
 it("PUT rejects a key the provider refuses", async () => {
