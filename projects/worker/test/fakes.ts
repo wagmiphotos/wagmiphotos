@@ -1,4 +1,4 @@
-import type { Services, AssetRow, LibraryAssetRow, Match, ByokRow, CollectionRow } from "../src/types";
+import type { Services, AssetRow, LibraryAssetRow, Match, ByokRow, CollectionRow, GenerationRow } from "../src/types";
 
 export function fakeServices(overrides: Partial<Services> = {}): Services {
   const assets = new Map<string, AssetRow>();
@@ -15,6 +15,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   const byokRows = new Map<string, ByokRow>();
   const byokUsage = new Map<string, { count: number; est_spend_usd: number }>();
   const collectionRows = new Map<string, CollectionRow>();
+  const generationRows = new Map<string, GenerationRow>();
   const serveCounts = new Map<string, number>();
   const tombstoned: string[] = [];
   const base: Services = {
@@ -110,6 +111,39 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
       patch: async (id, f) => { const c = collectionRows.get(id); if (!c) return; if (f.name != null) c.name = f.name; if (f.themePrompt != null) c.theme_prompt = f.themePrompt; },
       delete: async (id) => { collectionRows.delete(id); },
     },
+    generations: {
+      create: async (g) => {
+        generationRows.set(g.id, {
+          id: g.id, user_id: g.userId, collection_id: g.collectionId, prompt: g.prompt,
+          provider: g.provider, provider_job_id: null, status: "queued", asset_id: null,
+          error: null, month: g.month, attempts: 0, claimed_at: null,
+          created_at: "2026-07-10 00:00:00", updated_at: "2026-07-10 00:00:00",
+        });
+      },
+      get: async (id) => generationRows.get(id) ?? null,
+      setProviderJob: async (id, pj) => {
+        const r = generationRows.get(id);
+        if (r && r.status === "queued") { r.provider_job_id = pj; r.status = "generating"; }
+      },
+      claim: async (id) => {
+        const r = generationRows.get(id);
+        if (!r || (r.status !== "queued" && r.status !== "generating") || r.claimed_at) return false;
+        r.claimed_at = "claimed"; r.attempts += 1; return true;
+      },
+      release: async (id) => { const r = generationRows.get(id); if (r) r.claimed_at = null; },
+      succeed: async (id, assetId) => {
+        const r = generationRows.get(id);
+        if (!r || (r.status !== "queued" && r.status !== "generating")) return false;
+        r.status = "succeeded"; r.asset_id = assetId; r.claimed_at = null; return true;
+      },
+      fail: async (id, error) => {
+        const r = generationRows.get(id);
+        if (!r || (r.status !== "queued" && r.status !== "generating")) return false;
+        r.status = "failed"; r.error = error; r.claimed_at = null; return true;
+      },
+      listStale: async (_olderThanSec, limit) =>
+        [...generationRows.values()].filter((r) => r.status === "queued" || r.status === "generating").slice(0, limit),
+    },
   };
   // expose internals for assertions
   (base as any)._assets = assets;
@@ -126,6 +160,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   (base as any)._byokRows = byokRows;
   (base as any)._byokUsage = byokUsage;
   (base as any)._collectionRows = collectionRows;
+  (base as any)._generationRows = generationRows;
   (base as any)._serveCounts = serveCounts;
   (base as any)._tombstoned = tombstoned;
   return { ...base, ...overrides };

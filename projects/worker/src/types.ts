@@ -112,6 +112,29 @@ export interface ByokStore {
   /** Lifetime successful generations (net of refunds) summed across all months. */
   totalGenerated(userId: string): Promise<number>;
 }
+export interface GenerationRow {
+  id: string; user_id: string; collection_id: string; prompt: string;
+  provider: string; provider_job_id: string | null;
+  status: "queued" | "generating" | "succeeded" | "failed";
+  asset_id: string | null; error: string | null; month: string;
+  attempts: number; claimed_at: string | null; created_at: string; updated_at: string;
+}
+export interface GenerationStore {
+  create(g: { id: string; userId: string; collectionId: string; prompt: string; provider: string; month: string }): Promise<void>;
+  get(id: string): Promise<GenerationRow | null>;
+  /** Records the provider-side job id and moves queued -> generating. */
+  setProviderJob(id: string, providerJobId: string): Promise<void>;
+  /** Atomic drive claim (60s TTL): true when THIS caller may touch the provider.
+   *  Also bumps attempts and refreshes updated_at (keeps the row out of listStale). */
+  claim(id: string): Promise<boolean>;
+  release(id: string): Promise<void>;
+  /** Terminal transitions are guarded (status IN queued/generating) and return
+   *  whether THIS call transitioned — the caller refunds/accounts only on true. */
+  succeed(id: string, assetId: string): Promise<boolean>;
+  fail(id: string, error: string): Promise<boolean>;
+  /** Open jobs whose updated_at is older than olderThanSec — sweep targets. */
+  listStale(olderThanSec: number, limit: number): Promise<GenerationRow[]>;
+}
 export interface RateLimiter { limit(key: string): Promise<boolean>; }
 /** Minimal structural type for the unsafe `ratelimit` binding (no exported type in workers-types). */
 export interface RateLimitBinding { limit(opts: { key: string }): Promise<{ success: boolean }>; }
@@ -125,6 +148,7 @@ export interface Services {
   keys: KeyStore; rateLimiter: RateLimiter; rateLimiterPaid: RateLimiter;
   users: UserStore; sessions: SessionStore; loginTokens: LoginTokenStore;
   email: EmailSender; stripe: StripeClient; byok: ByokStore; collections: CollectionStore;
+  generations: GenerationStore;
 }
 export interface Env {
   DB: D1Database; VECTORIZE_0: VectorizeIndex; VECTORIZE_1: VectorizeIndex; VECTORIZE_2: VectorizeIndex;

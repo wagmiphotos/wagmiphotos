@@ -3,6 +3,7 @@ import type {
   User, UserStore, SessionStore, LoginTokenStore,
   ByokRow, ByokStore, ByokUsage,
   CollectionStore, CollectionRow, CollectionSummary, CollectionImageRow,
+  GenerationRow, GenerationStore,
 } from "./types";
 
 // Reads select FROM live_assets (migration 0008): the view owns the
@@ -17,7 +18,7 @@ function escapeLike(s: string): string {
 export function makeD1Stores(db: D1Database): {
   assets: AssetStore; queries: QueryStore; keys: KeyStore;
   users: UserStore; sessions: SessionStore; loginTokens: LoginTokenStore;
-  byok: ByokStore; collections: CollectionStore;
+  byok: ByokStore; collections: CollectionStore; generations: GenerationStore;
 } {
   const assets: AssetStore = {
     async getAsset(id) {
@@ -313,5 +314,57 @@ export function makeD1Stores(db: D1Database): {
     },
   };
 
-  return { assets, queries, keys, users, sessions, loginTokens, byok, collections };
+  const GEN_COLS =
+    "id, user_id, collection_id, prompt, provider, provider_job_id, status, asset_id, error, month, attempts, claimed_at, created_at, updated_at";
+  const generations: GenerationStore = {
+    async create(g) {
+      await db.prepare(
+        "INSERT INTO generations (id, user_id, collection_id, prompt, provider, month) VALUES (?, ?, ?, ?, ?, ?)"
+      ).bind(g.id, g.userId, g.collectionId, g.prompt, g.provider, g.month).run();
+    },
+    async get(id) {
+      const row = await db.prepare(`SELECT ${GEN_COLS} FROM generations WHERE id = ?`).bind(id).first<GenerationRow>();
+      return row ?? null;
+    },
+    async setProviderJob(id, providerJobId) {
+      await db.prepare(
+        "UPDATE generations SET provider_job_id = ?, status = 'generating', updated_at = datetime('now') WHERE id = ? AND status = 'queued'"
+      ).bind(providerJobId, id).run();
+    },
+    // Single guarded UPDATE = the atomic claim (same shape as byok.reserve):
+    // two concurrent polls cannot both drive the provider. Stale (>60s) claims
+    // are reclaimable so a crashed driver never wedges the job.
+    async claim(id) {
+      const row = await db.prepare(
+        `UPDATE generations SET claimed_at = datetime('now'), attempts = attempts + 1, updated_at = datetime('now')
+         WHERE id = ? AND status IN ('queued','generating')
+           AND (claimed_at IS NULL OR claimed_at < datetime('now','-60 seconds'))
+         RETURNING id`
+      ).bind(id).first();
+      return !!row;
+    },
+    async release(id) {
+      await db.prepare("UPDATE generations SET claimed_at = NULL, updated_at = datetime('now') WHERE id = ?").bind(id).run();
+    },
+    async succeed(id, assetId) {
+      const row = await db.prepare(
+        "UPDATE generations SET status = 'succeeded', asset_id = ?, claimed_at = NULL, updated_at = datetime('now') WHERE id = ? AND status IN ('queued','generating') RETURNING id"
+      ).bind(assetId, id).first();
+      return !!row;
+    },
+    async fail(id, error) {
+      const row = await db.prepare(
+        "UPDATE generations SET status = 'failed', error = ?, claimed_at = NULL, updated_at = datetime('now') WHERE id = ? AND status IN ('queued','generating') RETURNING id"
+      ).bind(error, id).first();
+      return !!row;
+    },
+    async listStale(olderThanSec, limit) {
+      const { results } = await db.prepare(
+        `SELECT ${GEN_COLS} FROM generations WHERE status IN ('queued','generating') AND updated_at < datetime('now', ?) ORDER BY updated_at ASC LIMIT ?`
+      ).bind(`-${olderThanSec} seconds`, limit).all<GenerationRow>();
+      return results ?? [];
+    },
+  };
+
+  return { assets, queries, keys, users, sessions, loginTokens, byok, collections, generations };
 }
