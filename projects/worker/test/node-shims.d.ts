@@ -5,6 +5,7 @@
 // global Node type dependency for the whole project.
 declare module "node:fs" {
   export function readFileSync(path: string, encoding: "utf8"): string;
+  export function readdirSync(path: string): string[];
 }
 declare module "node:path" {
   export function join(...paths: string[]): string;
@@ -19,6 +20,13 @@ declare module "node:module" {
   }
 }
 declare const __dirname: string;
+
+// test/real-d1.ts uses import.meta.url to locate the migrations dir relative
+// to this test file; this project's tsconfig has no DOM/node lib pulling in
+// the ambient ImportMeta.url member, so declare it globally (test-only need).
+declare interface ImportMeta {
+  url: string;
+}
 
 declare module "node:sqlite" {
   export class DatabaseSync {

@@ -109,3 +109,17 @@ it("generations: listStale returns only stale open jobs", async () => {
   db._raw.exec(`UPDATE generations SET updated_at = datetime('now', '-10 minutes') WHERE id = 'gen_3'`);
   expect((await generations.listStale(120, 10)).map((r: any) => r.id)).toEqual(["gen_3"]);
 });
+
+it("generations: collection_id has no FK to collections — deleting a collection with a succeeded generation does not throw, and the generation row survives (0016 fix)", async () => {
+  const db = realDb();
+  seedGeneration(db); // seeds usr_1 + collection col_g
+  const { generations, collections } = makeD1Stores(db);
+  await generations.create({ id: "gen_fk1", userId: "usr_1", collectionId: "col_g", prompt: "p", provider: "gmicloud", month: "2026-07" });
+  expect(await generations.succeed("gen_fk1", "asset-fk1")).toBe(true);
+  await expect(collections.delete("col_g")).resolves.not.toThrow();
+  expect(await collections.get("col_g")).toBeNull();
+  const row = await generations.get("gen_fk1");
+  expect(row).not.toBeNull(); // generation rows are billing/audit history: they outlive the collection
+  expect(row!.status).toBe("succeeded");
+  expect(row!.collection_id).toBe("col_g"); // stale reference on purpose, not cleared
+});

@@ -29,9 +29,11 @@ export function monthKey(nowSec: number): string {
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/webp": "webp" };
 /** Sweep: open jobs untouched this long get re-driven. */
 export const SWEEP_STALE_SEC = 120;
-/** Sweep: jobs this old are failed+refunded. Past OpenAI's ~10-min background
- *  retention nothing is recoverable, and a lost sync waitUntil can't resume. */
-export const SWEEP_ABANDON_SEC = 900;
+/** Sweep: jobs this old are failed+refunded. OpenAI's background-mode
+ *  retention is ~10 min; 12 min gives margin while cutting futile re-drives
+ *  past the point nothing is recoverable (a lost sync waitUntil can't resume
+ *  either). */
+export const SWEEP_ABANDON_SEC = 720;
 const SWEEP_BATCH = 20;
 
 export type StartOutcome =
@@ -78,8 +80,8 @@ async function terminalFail(
 }
 
 // The async-generation start path. Ordering is load-bearing (inherited from
-// tryByokGenerate): guardrails (fail-closed) -> atomic quota reserve -> job
-// row -> provider submit. Failures after the reserve refund it (and an auth
+// the pre-split sync path): guardrails (fail-closed) -> atomic quota reserve
+// -> job row -> provider submit. Failures after the reserve refund it (and an auth
 // failure also disables the key). Nothing here waits for the image: async
 // providers return after submit; sync providers run the whole job in
 // waitUntil so the 202 returns immediately.
@@ -151,7 +153,22 @@ export async function startGeneration(
     if (cfg.waitUntil) cfg.waitUntil(run); else await run;
   }
 
-  const fresh = await s.generations.get(id);
+  // The job is already live (row created; for async providers, submitted) —
+  // a transient D1 read failure here must not 500 the client. Fall back to
+  // an in-memory ticket carrying the real id; the next GET/poll re-reads the
+  // durable row once D1 recovers.
+  let fresh: GenerationRow;
+  try {
+    fresh = (await s.generations.get(id))!;
+  } catch (e) {
+    console.error("gen post-submit read failed", e);
+    fresh = {
+      id, user_id: i.userId, collection_id: i.collectionId, prompt: i.prompt, provider: row.provider,
+      provider_job_id: null, status: provider.mode === "async" ? "generating" : "queued",
+      asset_id: null, error: null, month, attempts: 0, claimed_at: null,
+      created_at: "", updated_at: "",
+    };
+  }
   let used = 1;
   let estSpendUsd = pinned.price_per_image_usd;
   try {
@@ -159,7 +176,7 @@ export async function startGeneration(
     used = usage.count;
     estSpendUsd = usage.est_spend_usd;
   } catch (e) { console.error("byok usage read failed", e); }
-  return { kind: "accepted", row: fresh!, used, cap: row.monthly_cap, estSpendUsd };
+  return { kind: "accepted", row: fresh, used, cap: row.monthly_cap, estSpendUsd };
 }
 
 async function runSyncJob(

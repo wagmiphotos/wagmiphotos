@@ -3,10 +3,15 @@
 -- reserve; GET /v1/generations/:id drives it (poll-through) under the claim;
 -- the cron sweep finishes abandoned rows. month records which byok_usage row
 -- the reservation went into, so a terminal failure refunds the right month.
+-- collection_id deliberately has NO FK to collections(id): generation rows
+-- are billing/audit history and must survive collection deletion, same
+-- precedent as 0015's assets.collection_id (also FK-less, for the same
+-- reason). A FK here would brick `DELETE FROM collections` the moment a
+-- collection had ever generated — generation rows are never deleted.
 CREATE TABLE IF NOT EXISTS generations (
   id              TEXT PRIMARY KEY,                 -- 'gen_' + uuid
   user_id         TEXT NOT NULL REFERENCES users(id),
-  collection_id   TEXT NOT NULL REFERENCES collections(id),
+  collection_id   TEXT NOT NULL,
   prompt          TEXT NOT NULL,                    -- combined (user + theme) prompt
   provider        TEXT NOT NULL,                    -- 'openai' | 'gmicloud'
   provider_job_id TEXT,                             -- GMI request id / OpenAI response id; NULL while queued and for sync-mode jobs

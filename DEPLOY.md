@@ -264,7 +264,7 @@ prefetched verify link alone can't log anyone in. Deploy steps:
    prod must never set — see step 5) login fails closed: no email is sent and no
    link is logged or returned. Never deploy prod without the Resend secret.
 3. **Confirm** `wrangler deploy --dry-run` bundles; after deploy, a logged-out visit
-   to `#/playground` should redirect to `#/login`, and a real email should receive a
+   to `#/library` should redirect to `#/login`, and a real email should receive a
    working magic link.
 
 ### Security fast-follows (not blocking; do before real traffic)
@@ -314,7 +314,7 @@ intentionally unused**. Deploy steps:
    - `npx wrangler secret put OPENAI_API_KEY` → operator key; moderates prompts for GMI-key users
      (same key the backfill box uses).
 4. **Deploy:** `cd projects/worker && npm run deploy`.
-5. **Verify:** add a real OpenAI key on `#/account`, set the cap to 2, create (or open) a collection
+5. **Verify:** add a real OpenAI key on the Collections tab on `#/library`, set the cap to 2, create (or open) a collection
    and start a generation with a prompt obscure enough that it wouldn't be a library hit → expect a
    `202` with a `generation` ticket, `GET /v1/generations/:id` to move `queued`/`generating` →
    `succeeded` with an image, the meter at 1/2, the image added to the collection, and a second+third
@@ -327,8 +327,31 @@ intentionally unused**. Deploy steps:
    (`crons = ["*/2 * * * *"]`) deploys automatically with `npm run deploy`; after deploying, verify it
    in the Cloudflare dashboard under Workers & Pages → `wagmiphotos-worker` → Settings → Triggers.
    Sweep semantics: a generation stuck in `queued`/`generating` past **2 minutes** is re-driven; past
-   **15 minutes** (OpenAI's background-mode retention window) it is failed and refunded against the
-   owner's monthly cap.
+   **12 minutes** (OpenAI's background-mode retention window is ~10 minutes; 12 gives margin) it is
+   failed and refunded against the owner's monthly cap.
+8. **One-time purge of legacy dual-written collection vectors.** Between the collections
+   launch (2026-07-09) and the read/write split (2026-07-10), the old synchronous BYOK path
+   (`tryByokGenerate`) dual-wrote every collection-scoped generation into **both** the
+   namespaced `wagmiphotos-coll` index **and** the global `wagmiphotos-bge-{0,1,2}` shards.
+   That is exactly what decision 2 (collection assets never enter the shared library) forbids,
+   so any surviving global-shard vectors for collection-scoped assets must be purged once,
+   before/at this deploy:
+   ```bash
+   # 1. Find collection-scoped asset ids (remote D1):
+   npx wrangler d1 execute wagmiphotos --remote \
+     --command "SELECT id FROM assets WHERE collection_id IS NOT NULL AND dead_at IS NULL"
+
+   # 2. Delete those ids from all three global shards. Deleting an id that was
+   #    never written to a given shard (it only ever lives on one, by
+   #    fnv1a32(id) % 3) is a no-op, so it's safe to run against all three
+   #    with the full id list rather than compute the shard per id:
+   for i in 0 1 2; do
+     npx wrangler vectorize delete-vectors "wagmiphotos-bge-$i" --ids <id1> <id2> ...
+   done
+   ```
+   Do **not** touch the `wagmiphotos-coll` namespace vectors for these ids — those are the
+   correct, intended copies. As of this writing prod has run for under a day with the old
+   path, so expect **≤2** affected asset ids; re-run the `SELECT` first to get the current list.
 
 ## Collections (namespaced vector index)
 

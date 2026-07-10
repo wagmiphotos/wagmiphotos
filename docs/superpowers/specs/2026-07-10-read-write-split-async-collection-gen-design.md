@@ -105,7 +105,10 @@ Migration 0016: `generations` table — `id`, `user_id`, `collection_id`,
 `prompt`, `provider`, `provider_job_id`, `status`
 (`queued|generating|succeeded|failed`), `asset_id`, `error`, `claimed_at`,
 `attempts`, `month` (for the refund), `created_at`, `updated_at`.
-Index `(status, updated_at)` for the sweep.
+Index `(status, updated_at)` for the sweep. `collection_id` deliberately
+carries no FK to `collections(id)` — generation rows are billing/audit
+history and must survive collection deletion, so `DELETE FROM collections`
+never has to touch (or be blocked by) them.
 
 ## 4. SPA — one page, two tabs
 

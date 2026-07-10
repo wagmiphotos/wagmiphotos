@@ -73,5 +73,14 @@ export async function handleGetGeneration(
     row = (await driveGeneration(id, s, cfg)) ?? row;
   }
   const asset = row.status === "succeeded" && row.asset_id ? await s.assets.getAsset(row.asset_id) : null;
-  return Response.json({ generation: generationView(row, asset, assetBaseUrl) });
+  // Same usage block shape as the 202 (createInCollection) response, but read
+  // fresh here so a post-spend poll reflects the actual month-to-date spend
+  // rather than the pre-spend snapshot from the create call.
+  const usage = await s.byok.getUsage(row.user_id, row.month);
+  const key = await s.byok.get(row.user_id);
+  const cap = key ? key.monthly_cap : 0;
+  return Response.json({
+    generation: generationView(row, asset, assetBaseUrl),
+    byok: { used: usage.count, cap, est_spend_usd: usage.est_spend_usd },
+  });
 }

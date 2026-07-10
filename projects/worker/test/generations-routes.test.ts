@@ -234,6 +234,10 @@ it("13. get: fake provider check=done -> 200 succeeded with image.url/thumb_url 
   expect(body.generation.image).toHaveProperty("thumb_url");
   expect(body.generation.image).toHaveProperty("medium_url");
   expect(body.generation.image).toHaveProperty("original_url");
+  expect(body.byok).toBeDefined();
+  expect(typeof body.byok.used).toBe("number");
+  expect(typeof body.byok.cap).toBe("number");
+  expect(typeof body.byok.est_spend_usd).toBe("number");
 });
 
 it("14. get: failed job -> 200 status 'failed' with error string", async () => {

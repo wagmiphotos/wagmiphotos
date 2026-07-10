@@ -2723,7 +2723,7 @@
           </details>
           <details class="faq-item">
             <summary>What happens when my prompt isn't in the library yet?</summary>
-            <div class="faq-answer">The prompt is recorded, and if enough people ask for something close to it, it's generated in the background by the shared backend and added to the library — so the pool keeps growing toward real demand. There's no per-request opt-out. Want a fresh image on your own schedule instead? Generate into a <a href="#/account">collection</a> with your own provider key.</div>
+            <div class="faq-answer">The prompt is recorded, and if enough people ask for something close to it, it's generated in the background by the shared backend and added to the library — so the pool keeps growing toward real demand. There's no per-request opt-out. Want a fresh image on your own schedule instead? Generate into a collection with your own provider key on the <a href="#/library">Collections tab</a>.</div>
           </details>
           <details class="faq-item">
             <summary>Is it OpenAI-compatible?</summary>
@@ -2796,7 +2796,7 @@
           <div class="glass-card">
             <h2 class="card-title">Bring your own key</h2>
             <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
-              Add your own OpenAI or GMI Cloud API key so a fresh image is generated whenever the library has no close-enough match. Generated images join the shared library. Spend shown is an <b>estimate</b> (images &times; list price) &mdash; actual billing can differ per image. Check your provider for real costs: <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" style="color:var(--red);">OpenAI usage</a> &middot; <a href="https://console.gmicloud.ai" target="_blank" rel="noopener" style="color:var(--red);">GMI Cloud console</a>.
+              Add your own OpenAI or GMI Cloud API key so it can generate images on demand into collections you own. Generated images live only in your collections — they never join the shared library. Spend shown is an <b>estimate</b> (images &times; list price) &mdash; actual billing can differ per image. Check your provider for real costs: <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" style="color:var(--red);">OpenAI usage</a> &middot; <a href="https://console.gmicloud.ai" target="_blank" rel="noopener" style="color:var(--red);">GMI Cloud console</a>.
             </p>
             <div id="byok-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
           </div>
@@ -2805,7 +2805,7 @@
           <div class="glass-card">
             <h2 class="card-title">Collections</h2>
             <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
-              Themed sets of images generated with your own key. The theme prompt is appended to every image you generate into the collection, and anyone who knows the collection ID can scope API searches to it (<code style="font-family: var(--font-mono);">"collection": "col_…"</code>). Images also join the shared library.
+              Themed sets of images generated with your own key. The theme prompt is appended to every image you generate into the collection, and anyone who knows the collection ID can scope API searches to it (<code style="font-family: var(--font-mono);">"collection": "col_…"</code>) — images in your collections are searchable only via that collection ID, never through the shared library.
             </p>
             <div id="collections-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
           </div>
@@ -3066,7 +3066,7 @@ img = client.images.generate(
                 </tbody>
               </table>
             </div>
-            <p style="font-size:0.875rem;color:var(--muted);">Want a fresh image on your own schedule instead of waiting on demand-ranked backfill? Generate into a collection with your own <a href="#/account">BYOK provider key</a> — see <a href="#docs-collection-generations" style="color: var(--red);">Create images in your collections</a> below.</p>
+            <p style="font-size:0.875rem;color:var(--muted);">Want a fresh image on your own schedule instead of waiting on demand-ranked backfill? Generate into a collection with your own BYOK provider key on the <a href="#/library" style="color: var(--red);">Collections tab</a> — see <a href="#docs-collection-generations" style="color: var(--red);">Create images in your collections</a> below.</p>
 
             <h2 id="docs-matching">How matching works</h2>
             <p>
@@ -3116,7 +3116,7 @@ img = client.images.generate(
             <h2 id="docs-collection-generations">Create images in your collections</h2>
             <p>
               Generate a fresh image straight into a collection you own, using your own
-              <a href="#/account" style="color: var(--red);">BYOK provider key</a>. Unlike
+              BYOK provider key set up on the <a href="#/library" style="color: var(--red);">Collections tab</a>. Unlike
               <code>POST /v1/images/generations</code>, this endpoint always spends — it is the
               deliberate, async escape hatch for when you want your exact prompt now instead of
               waiting on demand-ranked backfill. It starts a background job and returns
@@ -4337,7 +4337,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     }
 
     async function deleteCollection(id, btn) {
-      if (!confirm('Delete this collection AND all its images? They are removed from the shared library too. This cannot be undone.')) return;
+      if (!confirm('Delete this collection AND all its images? This cannot be undone.')) return;
       if (btn) btn.disabled = true;
       try {
         const r = await fetch('/v1/collections/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin' });
@@ -4377,7 +4377,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     }
 
     async function deleteCollectionImage(collId, assetId) {
-      if (!confirm('Delete this image? It is removed from the shared library too.')) return;
+      if (!confirm('Delete this image?')) return;
       try {
         const r = await fetch('/v1/collections/' + encodeURIComponent(collId) + '/images/' + encodeURIComponent(assetId), { method: 'DELETE', credentials: 'same-origin' });
         if (r.status === 401) { location.hash = '#/login'; return; }
@@ -4418,8 +4418,10 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       while (performance.now() - startTime < GEN_POLL_MAX_MS) {
         await new Promise((r) => setTimeout(r, GEN_POLL_MS));
         let data = null;
+        let status = null;
         try {
           const r = await fetch(`/v1/generations/${encodeURIComponent(genId)}`, { credentials: 'same-origin' });
+          status = r.status;
           if (r.status === 401) {
             // Session died mid-poll: stop quietly; only yank to login if the
             // user is still on the page that started the generation.
@@ -4429,11 +4431,16 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
           data = await r.json();
         } catch (e) { /* transient network error: keep polling */ }
         const gen = data && data.generation;
-        if (gen && gen.status === 'succeeded') return gen;
+        if (gen && gen.status === 'succeeded') return { gen, byok: data.byok };
         if (gen && gen.status === 'failed') throw new Error(gen.error || 'Generation failed');
         if (!gen) {
-          missing++;
-          if (missing >= 4) throw new Error('Generation not found — it may have failed to start. If anything was reserved, it is refunded automatically.');
+          // Only a definitive 404 means the ticket itself is gone — other
+          // non-401 statuses (5xx, a body without .generation) are treated
+          // as transient and just keep polling; the 6-min cap bounds it.
+          if (status === 404) {
+            missing++;
+            if (missing >= 4) throw new Error('Generation not found — it may have failed to start. If anything was reserved, it is refunded automatically.');
+          }
         } else {
           missing = 0;
         }
@@ -4467,10 +4474,13 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         if (!r.ok || !data.generation) throw new Error(data.error || `Error ${r.status}`);
         const done = await pollGeneration(data.generation.id, startTime);
         if (!done) return;
-        const img = done.image || {};
+        const img = done.gen.image || {};
+        // Prefer the poll result's byok block (post-spend) over the 202
+        // snapshot (pre-spend); fall back if the GET response omitted it.
+        const usage = done.byok || data.byok;
         setGenResult(
           `<img src="${escapeHtml(img.medium_url || img.url || '')}" alt="${escapeHtml(prompt)}" style="max-width:100%;border-radius:12px;margin-top:12px;" />` +
-          (data.byok ? `<p class="muted">${Number(data.byok.used) || 0}/${Number(data.byok.cap) || 0} this month · ~$${Number(data.byok.est_spend_usd).toFixed(2)} est. spend</p>` : '')
+          (usage ? `<p class="muted">${Number(usage.used) || 0}/${Number(usage.cap) || 0} this month · ~$${(Number(usage.est_spend_usd) || 0).toFixed(2)} est. spend</p>` : '')
         );
         showToast('Image added to your collection', 'success');
         loadCollections(); // refresh counts + grids

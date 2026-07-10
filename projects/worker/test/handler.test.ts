@@ -257,6 +257,21 @@ it("scoped hit: serves the collection asset, echoes collection, bumps serve_coun
   expect(s._recorded).toEqual([]); // backfill exclusion: no queries write, ever
 });
 
+it("scoped approximate: best namespace match below floor -> result approximate, generation_queued false, no demand row, serve_count still bumped", async () => {
+  const s: any = fakeServices();
+  const id = withCollection(s);
+  s._assets.set("a1", { id: "a1", prompt: "a cat, watercolor style", source: "byok", source_id: null, model_used: "gpt-image-1", width: 1024, height: 1024, mime: "image/png", source_url: "https://x/a1.png", locally_cached: 0 });
+  s._nsMatches.push({ id: "a1", score: 0.20, ns: id }); // below floor(~0.3245)
+  const res = await handleGenerate({ prompt: "a cat", collection: id }, s, cfg);
+  expect(res.status).toBe(200);
+  const body: any = await res.json();
+  expect(body.shared_cache.result).toBe("approximate");
+  expect(body.shared_cache.generation_queued).toBe(false);
+  expect(body.shared_cache.collection).toBe(id);
+  expect(s._recorded).toEqual([]); // scoped never writes demand, even on a miss
+  expect(s._serveCounts.get("a1")).toBe(1); // still served, so still counted
+});
+
 it("scoped empty pool -> 202 pending, generation_queued false, no demand row (backfill exclusion)", async () => {
   const s: any = fakeServices();
   const id = withCollection(s);
