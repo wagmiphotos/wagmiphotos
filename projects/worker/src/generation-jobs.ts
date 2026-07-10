@@ -45,8 +45,33 @@ function providerOf(cfg: GenJobsCfg, name: string): ImageProvider {
   return (cfg.providerFor ?? ((n: string) => realProviderFor(n, cfg.fetchFn ?? fetch)))(name);
 }
 
-/** Terminal failure exactly once: only the transitioning caller refunds. */
-async function terminalFail(s: Services, gen: { id: string; user_id: string; month: string }, msg: string): Promise<void> {
+/** Deterministic asset id derived from a gen id (the gen id's uuid part).
+ *  Shared by publish() and terminalFail()'s durable-recovery check so both
+ *  agree on the same key. */
+function assetIdFor(genId: string): string {
+  return genId.startsWith("gen_") ? genId.slice(4) : `${genId}-a`;
+}
+
+/** Terminal failure exactly once: only the transitioning caller refunds.
+ *  Durable-aware: if the job's asset already exists, the user was billed for
+ *  a DELIVERED image — recover to succeeded instead of refunding (constraint:
+ *  never refund after insertGenerated). Covers a succeed() throw inside the
+ *  sync path's publish and the sweep's abandon racing a mid-publish drive. */
+async function terminalFail(
+  s: Services, gen: { id: string; user_id: string; month: string; provider: string }, msg: string
+): Promise<void> {
+  try {
+    const assetId = assetIdFor(gen.id);
+    if (await s.assets.getAsset(assetId)) {
+      if (await s.generations.succeed(gen.id, assetId)) {
+        const pinned = (contract as any).byok_providers[gen.provider];
+        if (pinned) {
+          try { await s.byok.addSpend(gen.user_id, gen.month, pinned.price_per_image_usd); } catch (e) { console.error("gen addSpend failed", e); }
+        }
+      }
+      return;
+    }
+  } catch (e) { console.error("gen terminal recovery check failed", e); } // fall through: fail+refund
   if (await s.generations.fail(gen.id, msg)) {
     try { await s.byok.refund(gen.user_id, gen.month); } catch (e) { console.error("gen refund failed", e); }
   }
@@ -110,7 +135,7 @@ export async function startGeneration(
       await s.generations.setProviderJob(id, jobId);
     } catch (e) {
       console.error("gen submit failed", e);
-      await terminalFail(s, { id, user_id: i.userId, month }, "provider submit failed");
+      await terminalFail(s, { id, user_id: i.userId, month, provider: row.provider }, "provider submit failed");
       if (e instanceof ProviderAuthError) {
         try { await s.byok.disable(i.userId, "provider_auth_failed"); } catch (de) { console.error("byok disable failed", de); }
       }
@@ -119,7 +144,7 @@ export async function startGeneration(
   } else {
     // Sync provider (openai gpt-image-1, 13-20s: ducks the ~20s idle-kill).
     // The whole job runs after the 202; the ticket GET only reads D1 for it.
-    const run = runSyncJob(id, i.userId, month, i.prompt, provider, apiKey, s, cfg)
+    const run = runSyncJob(id, i.userId, month, row.provider, i.prompt, provider, apiKey, s, cfg)
       .catch((e) => console.error("sync generation job crashed", e));
     if (cfg.waitUntil) cfg.waitUntil(run); else await run;
   }
@@ -136,18 +161,18 @@ export async function startGeneration(
 }
 
 async function runSyncJob(
-  genId: string, userId: string, month: string, prompt: string,
-  provider: SyncImageProvider, apiKey: string, s: Services, cfg: GenJobsCfg
+  genId: string, userId: string, month: string, provider: string, prompt: string,
+  syncProvider: SyncImageProvider, apiKey: string, s: Services, cfg: GenJobsCfg
 ): Promise<void> {
   // Claim so the sweep can't race a live sync run; updated_at refresh also
   // keeps the row out of listStale while we work.
   if (!(await s.generations.claim(genId))) return;
   try {
-    const img = await provider.generate(prompt, apiKey);
+    const img = await syncProvider.generate(prompt, apiKey);
     await publish(genId, s, cfg, img);
   } catch (e) {
     console.error("sync generation failed", e);
-    await terminalFail(s, { id: genId, user_id: userId, month }, "generation failed");
+    await terminalFail(s, { id: genId, user_id: userId, month, provider }, "generation failed");
     if (e instanceof ProviderAuthError) {
       try { await s.byok.disable(userId, "provider_auth_failed"); } catch (de) { console.error("byok disable failed", de); }
     }
@@ -163,7 +188,7 @@ async function publish(genId: string, s: Services, cfg: GenJobsCfg, img: Generat
   const row = await s.generations.get(genId);
   if (!row || (row.status !== "queued" && row.status !== "generating")) return;
   const pinned = (contract as any).byok_providers[row.provider];
-  const assetId = row.id.startsWith("gen_") ? row.id.slice(4) : `${row.id}-a`;
+  const assetId = assetIdFor(row.id);
   const key = `byok/${assetId}/original.${EXT[img.mime] ?? "png"}`;
   await cfg.bucket!.put(key, img.bytes, { httpMetadata: { contentType: img.mime } });
   const sourceUrl = `${cfg.publicUrlBase!.replace(/\/+$/, "")}/${key}`;

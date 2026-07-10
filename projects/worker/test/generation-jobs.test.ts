@@ -422,3 +422,68 @@ it("21. sweep: sync job (no provider_job_id) within the window is left untouched
   expect(row.provider_job_id).toBeNull();
   expect((await s.byok.getUsage("u1", MONTH)).count).toBe(1); // untouched: no refund
 });
+
+// --- terminal failure is durable-aware: never refund a delivered asset ---
+
+// Mirrors the module's assetIdFor() so tests derive the same id it would.
+const assetIdFor = (genId: string): string => genId.startsWith("gen_") ? genId.slice(4) : `${genId}-a`;
+
+it("22. sync path: generations.succeed() throws once -> recovers to succeeded, no refund, spend recorded once", async () => {
+  const s = await seededServices({ provider: "openai" });
+  const origSucceed = s.generations.succeed.bind(s.generations);
+  let succeedCalls = 0;
+  s.generations.succeed = async (id, assetId) => {
+    succeedCalls += 1;
+    if (succeedCalls === 1) throw new Error("d1 hiccup");
+    return origSucceed(id, assetId);
+  };
+  const provider: SyncImageProvider = {
+    mode: "sync",
+    generate: async () => ({ bytes: PNG, mime: "image/webp" }),
+    validateKey: async () => true,
+  };
+  const out = await startGeneration({ userId: "u1", collectionId: "col_1", prompt: "x" }, s,
+    cfg({ providerFor: () => provider, uuid: () => "g22" }));
+  expect(out.kind).toBe("accepted");
+  if (out.kind !== "accepted") return;
+  const row = (s as any)._generationRows.get("gen_g22");
+  expect(row.status).toBe("succeeded");
+  expect(row.asset_id).toBe(assetIdFor("gen_g22"));
+  expect((await s.byok.getUsage("u1", MONTH)).count).toBe(1); // NO refund
+  expect((await s.byok.getUsage("u1", MONTH)).est_spend_usd).toBeCloseTo(0.04); // recorded exactly once
+  expect((s as any)._generatedInserts).toHaveLength(1);
+  expect((s as any)._generatedInserts[0].id).toBe(assetIdFor("gen_g22"));
+});
+
+it("23. sweep abandon racing a mid-publish drive: asset already durable -> recovers to succeeded, no refund", async () => {
+  const s = await seededServices({ provider: "gmicloud" });
+  const provider: AsyncImageProvider = {
+    mode: "async",
+    submit: async () => "job-23",
+    check: async () => { throw new Error("must not be called — abandon short-circuits before driving"); },
+    validateKey: async () => true,
+  };
+  const startCfg = cfg({ providerFor: () => provider, uuid: () => "g23" });
+  await startGeneration({ userId: "u1", collectionId: "col_scope23", prompt: "x" }, s, startCfg);
+  const genId = "gen_g23";
+  const assetId = assetIdFor(genId);
+
+  // Simulate a drive that inserted the durable asset but crashed/was abandoned
+  // before generations.succeed() transitioned the row.
+  await s.assets.insertGenerated({
+    id: assetId, prompt: "x", sourceUrl: "https://byok.example/byok/g23/original.png", mime: "image/png",
+    width: 1024, height: 1024, modelUsed: "gpt-image-2-generate", provider: "gmicloud", priceUsd: 0.055,
+    createdBy: "u1", collectionId: "col_scope23",
+  });
+
+  const row = (s as any)._generationRows.get(genId);
+  row.created_at = "2020-01-01 00:00:00"; // well past SWEEP_ABANDON_SEC
+  row.claimed_at = null;
+
+  const sweepCfg = cfg({ providerFor: () => provider, now: () => CREATED_EPOCH + SWEEP_ABANDON_SEC + 100 });
+  await sweepGenerations(s, sweepCfg);
+
+  expect(row.status).toBe("succeeded"); // not failed
+  expect(row.asset_id).toBe(assetId);
+  expect((await s.byok.getUsage("u1", MONTH)).count).toBe(1); // no refund
+});
