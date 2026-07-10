@@ -11,9 +11,29 @@
 > generate box + BYOK key management. Shared library is operator-backfill-only
 > (collection assets excluded from unscoped reads). New real-schema D1 test harness
 > (`test/real-d1.ts`) — it caught a would-be-shipped FK bug in review.
-> **REMAINING: prod browser smoke with a real key** (generate → poll → image lands in
-> collection; kill-tab mid-poll → sweep finishes it) + the deferred post-merge list at
-> the end of `.superpowers/sdd/progress.md`. Spec:
+> **REMAINING — Joris, do later (everything else is deployed):**
+>
+> 1. **Prod smoke with a real key:** wagmi.photos → log in → Library → **Collections
+>    tab** → confirm key status → pick/create a collection → generate. The loader
+>    polls (~70s on gpt-image-2); the image must land in the collection grid, and
+>    must **NOT** appear in the shared library search. Usage/spend note should read
+>    real numbers (no $0.00 after success, no NaN).
+> 2. **Sweep check:** start a generation, close the tab, wait ~4 min, reopen the
+>    ticket-holding collection — the cron sweep should have finished (or refunded)
+>    it. Optionally watch one generation via `npx wrangler tail`.
+> 3. **OpenAI refund ticket** for the pre-split billed-undelivered generations
+>    (~$1.50, user action — unchanged from the morning handoff).
+> 4. **Live Stripe config** still pending (Upgrade button errors until done; see
+>    HANDOFF-2026-07-09).
+> 5. Deferred post-merge polish (non-blocking, list at the end of
+>    `.superpowers/sdd/progress.md`): `bpoll:` limiter on the ticket GET,
+>    org-verification hint in the generate-card error path, provider test gaps
+>    (GMI media_urls object shape, 401/403 halves), observe one live OpenAI
+>    background *failure* payload before trusting its error-field parsing,
+>    stale-claim-TTL + GET-404-row-missing test coverage, `?tab=` deep link for
+>    the Collections tab.
+>
+> Spec:
 > [`docs/superpowers/specs/2026-07-10-read-write-split-async-collection-gen-design.md`](docs/superpowers/specs/2026-07-10-read-write-split-async-collection-gen-design.md).
 
 > **2026-07-10 (morning):** Big day shipped and verified live: **collections + progressive slots**,
