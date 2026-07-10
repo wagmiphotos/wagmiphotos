@@ -4373,7 +4373,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       else el.innerHTML = '<strong>Add an enabled provider key below to generate.</strong>';
     }
 
-    function setGenResult(html) { document.getElementById('gen-result').innerHTML = html; }
+    function setGenResult(html) { const el = document.getElementById('gen-result'); if (!el) return; el.innerHTML = html; }
 
     function genLoaderHtml(startTime) {
       const secs = Math.round((performance.now() - startTime) / 1000);
@@ -4381,17 +4381,29 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     }
 
     async function pollGeneration(genId, startTime) {
+      let missing = 0;
       while (performance.now() - startTime < GEN_POLL_MAX_MS) {
         await new Promise((r) => setTimeout(r, GEN_POLL_MS));
         let data = null;
         try {
           const r = await fetch(`/v1/generations/${encodeURIComponent(genId)}`, { credentials: 'same-origin' });
-          if (r.status === 401) { location.hash = '#/login'; return null; }
+          if (r.status === 401) {
+            // Session died mid-poll: stop quietly; only yank to login if the
+            // user is still on the page that started the generation.
+            if (location.hash.startsWith('#/library')) location.hash = '#/login';
+            return null;
+          }
           data = await r.json();
         } catch (e) { /* transient network error: keep polling */ }
         const gen = data && data.generation;
         if (gen && gen.status === 'succeeded') return gen;
         if (gen && gen.status === 'failed') throw new Error(gen.error || 'Generation failed');
+        if (!gen) {
+          missing++;
+          if (missing >= 4) throw new Error('Generation not found — it may have failed to start. If anything was reserved, it is refunded automatically.');
+        } else {
+          missing = 0;
+        }
         setGenResult(genLoaderHtml(startTime));
       }
       throw new Error('Timed out waiting for the image. If it never completes, the reservation is refunded automatically.');
@@ -4425,7 +4437,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         const img = done.image || {};
         setGenResult(
           `<img src="${escapeHtml(img.medium_url || img.url || '')}" alt="${escapeHtml(prompt)}" style="max-width:100%;border-radius:12px;margin-top:12px;" />` +
-          (data.byok ? `<p class="muted">${data.byok.used}/${data.byok.cap} this month · ~$${Number(data.byok.est_spend_usd).toFixed(2)} est. spend</p>` : '')
+          (data.byok ? `<p class="muted">${Number(data.byok.used) || 0}/${Number(data.byok.cap) || 0} this month · ~$${Number(data.byok.est_spend_usd).toFixed(2)} est. spend</p>` : '')
         );
         showToast('Image added to your collection', 'success');
         loadCollections(); // refresh counts + grids
