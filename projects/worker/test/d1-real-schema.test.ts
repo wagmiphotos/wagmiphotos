@@ -22,6 +22,19 @@ it("insertGenerated writes a row the REAL schema accepts and live_assets exposes
   expect(listed.map((r) => r.id)).toEqual(["a1"]);
 });
 
+it("unscoped searchAssets excludes collection assets (shared library is operator-curated)", async () => {
+  const db = realDb();
+  seedUser(db);
+  const { assets, collections } = makeD1Stores(db);
+  await collections.create({ id: "col_x", ownerUserId: "usr_1", name: "n", themePrompt: "" });
+  await assets.insertGenerated({ id: "pub1", prompt: "green fox", sourceUrl: "https://x/1.webp", mime: "image/webp", width: 1024, height: 1024, modelUsed: "m", provider: "openai", priceUsd: 0.04, createdBy: "usr_1", collectionId: null });
+  await assets.insertGenerated({ id: "col1", prompt: "green fox scoped", sourceUrl: "https://x/2.webp", mime: "image/webp", width: 1024, height: 1024, modelUsed: "m", provider: "openai", priceUsd: 0.04, createdBy: "usr_1", collectionId: "col_x" });
+  const unscoped = await assets.searchAssets({ q: "green fox", limit: 10, offset: 0 });
+  expect(unscoped.map((r) => r.id)).toEqual(["pub1"]);
+  const scoped = await assets.searchAssets({ q: "green fox", limit: 10, offset: 0, collectionId: "col_x" });
+  expect(scoped.map((r) => r.id)).toEqual(["col1"]);
+});
+
 it("tombstoneAsset hides the row from every live_assets read", async () => {
   const db = realDb();
   seedUser(db);

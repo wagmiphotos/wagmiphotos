@@ -3,8 +3,6 @@ import { handleGenerate, handleKeygen } from "../src/handler";
 import { fakeServices } from "./fakes";
 import { sha256Hex } from "../src/auth";
 import type { AssetRow } from "../src/types";
-import { encryptSecret } from "../src/crypto";
-import type { ByokCfg } from "../src/byok";
 
 const BASE = "https://cdn.example.com";
 const cfg = { floorSimMax: 0.35, floorSimMin: 0.18, imagePrice: 0.055, now: () => 1000, assetBaseUrl: BASE };
@@ -38,27 +36,24 @@ it("prompt validation: exactly 2000 chars is accepted", async () => {
   expect(res.status).toBe(202); // empty pool, but past validation
 });
 
-it("cache_tolerance validation: non-number, NaN, and out-of-range -> 422", async () => {
+it("cache_tolerance and generate_on_miss are ignored fields: same response as without them, never 422", async () => {
   const s = fakeServices();
-  for (const tol of ["0.5", NaN, Infinity, -0.1, 1.1, {}]) {
-    const res = await handleGenerate({ prompt: "x", cache_tolerance: tol } as any, s, cfg);
-    expect(res.status).toBe(422);
-    const j: any = await res.json();
-    expect(typeof j.error).toBe("string");
-  }
-});
-
-it("cache_tolerance validation: boundary values 0 and 1 are accepted", async () => {
-  const s = fakeServices();
-  expect((await handleGenerate({ prompt: "x", cache_tolerance: 0 }, s, cfg)).status).toBe(202);
-  expect((await handleGenerate({ prompt: "x", cache_tolerance: 1 }, s, cfg)).status).toBe(202);
+  (s as any)._assets.set("a1", asset());
+  // score 0.20 is below the DEFAULT_CACHE_TOLERANCE floor (~0.3245) but ABOVE
+  // the floor a tolerance of 0.9 would produce (~0.197) — if the field were
+  // honored this would flip to "hit". It doesn't: tolerance is pinned server-side.
+  (s as any)._matches.push({ id: "a1", score: 0.20 });
+  const res = await handleGenerate({ prompt: "a fox", cache_tolerance: 0.9, generate_on_miss: false } as any, s, cfg);
+  expect(res.status).toBe(200); // not 422 — unknown fields are simply ignored
+  const j: any = await res.json();
+  expect(j.shared_cache.result).toBe("approximate");
 });
 
 it("hit: score >= floor, cached -> result hit + cost saved", async () => {
   const s = fakeServices();
   (s as any)._assets.set("a1", asset());
   (s as any)._matches.push({ id: "a1", score: 0.40 });
-  const res = await handleGenerate({ prompt: "a fox", cache_tolerance: 0.15 }, s, cfg);
+  const res = await handleGenerate({ prompt: "a fox" }, s, cfg);
   const j: any = await res.json();
   expect(res.status).toBe(200);
   expect(j.data[0].url).toBe(`${BASE}/assets/a1/image.webp`);
@@ -87,36 +82,40 @@ it("hit-not-rehosted: serves source_url, still result hit", async () => {
   expect(j.shared_cache.original_url).toBe("https://ext/x.jpg"); // pre-rehost: same as data[0].url
 });
 
-it("approximate: score < floor -> result approximate + pending query, nothing saved", async () => {
+it("approximate: score < floor -> result approximate with similarity + image url, recordQuery generate: true, nothing saved", async () => {
   const s = fakeServices();
   (s as any)._assets.set("a1", asset());
-  (s as any)._matches.push({ id: "a1", score: 0.20 }); // below floor(0.15)~0.32
-  const res = await handleGenerate({ prompt: "a fox", cache_tolerance: 0.15 }, s, cfg);
+  (s as any)._matches.push({ id: "a1", score: 0.20 }); // below floor(~0.3245)
+  const res = await handleGenerate({ prompt: "a fox" }, s, cfg);
   const j: any = await res.json();
+  expect(res.status).toBe(200);
   expect(j.shared_cache.result).toBe("approximate");
+  expect(j.shared_cache.similarity).toBe(0.20);
+  expect(j.data[0].url).toBe(`${BASE}/assets/a1/image.webp`);
   // a paid generation is still queued: nothing was saved
   expect(j.shared_cache.cost_saved_usd).toBe(0);
-  expect((s as any)._recorded[0]).toMatchObject({ built: false, assetId: "a1" });
+  expect((s as any)._recorded[0]).toMatchObject({ built: false, assetId: "a1", generate: true });
 });
 
 it("hit: recordQuery throws -> logging is best-effort, still 200 with asset url", async () => {
   const s = fakeServices({ queries: { recordQuery: async () => { throw new Error("d1 write failed"); } } });
   (s as any)._assets.set("a1", asset());
   (s as any)._matches.push({ id: "a1", score: 0.40 });
-  const res = await handleGenerate({ prompt: "a fox", cache_tolerance: 0.15 }, s, cfg);
+  const res = await handleGenerate({ prompt: "a fox" }, s, cfg);
   const j: any = await res.json();
   expect(res.status).toBe(200);
   expect(j.data[0].url).toBe(`${BASE}/assets/a1/image.webp`);
   expect(j.shared_cache.result).toBe("hit");
 });
 
-it("empty pool -> 202 pending, query logged without asset", async () => {
+it("empty pool -> 202 pending, query logged without asset, generation queued (unscoped)", async () => {
   const s = fakeServices(); // no matches
   const res = await handleGenerate({ prompt: "nothing here" }, s, cfg);
   expect(res.status).toBe(202);
   const j: any = await res.json();
   expect(j.shared_cache.result).toBe("pending");
-  expect((s as any)._recorded[0]).toMatchObject({ built: false, assetId: null });
+  expect(j.shared_cache.generation_queued).toBe(true);
+  expect((s as any)._recorded[0]).toMatchObject({ built: false, assetId: null, generate: true });
 });
 
 it("match found but asset row missing -> 202 pending", async () => {
@@ -129,45 +128,13 @@ it("match found but asset row missing -> 202 pending", async () => {
   expect((s as any)._recorded[0]).toMatchObject({ built: false, assetId: null });
 });
 
-it("rejects non-boolean generate_on_miss with 422", async () => {
-  const s = fakeServices();
-  const res = await handleGenerate({ prompt: "x", generate_on_miss: "no" } as any, s, cfg);
-  expect(res.status).toBe(422);
-});
-
-it("miss: generate_on_miss defaults to true and is reported as generation_queued", async () => {
-  const s = fakeServices(); // no matches -> 202
-  const res = await handleGenerate({ prompt: "nothing here" }, s, cfg);
-  expect(res.status).toBe(202);
-  const j: any = await res.json();
-  expect(j.shared_cache.generation_queued).toBe(true);
-  expect((s as any)._recorded[0]).toMatchObject({ built: false, generate: true });
-});
-
-it("miss with generate_on_miss=false: recorded but not queued", async () => {
-  const s = fakeServices();
-  const res = await handleGenerate({ prompt: "nothing here", generate_on_miss: false }, s, cfg);
-  expect(res.status).toBe(202);
-  const j: any = await res.json();
-  expect(j.shared_cache.generation_queued).toBe(false);
-  expect((s as any)._recorded[0]).toMatchObject({ built: false, generate: false });
-});
-
-it("miss with generate_on_miss=false but prompt already queued -> generation_queued true", async () => {
-  // store reports the merged state: an earlier request already asked for generation
-  const s = fakeServices({ queries: { recordQuery: async () => true } });
-  const res = await handleGenerate({ prompt: "nothing here", generate_on_miss: false }, s, cfg);
-  const j: any = await res.json();
-  expect(j.shared_cache.generation_queued).toBe(true);
-});
-
 it("approximate includes generation_queued, hit does not", async () => {
   const s = fakeServices();
   (s as any)._assets.set("a1", asset());
   (s as any)._matches.push({ id: "a1", score: 0.20 }); // below floor -> approximate
-  const approx: any = await (await handleGenerate({ prompt: "a fox", generate_on_miss: false }, s, cfg)).json();
+  const approx: any = await (await handleGenerate({ prompt: "a fox" }, s, cfg)).json();
   expect(approx.shared_cache.result).toBe("approximate");
-  expect(approx.shared_cache.generation_queued).toBe(false);
+  expect(approx.shared_cache.generation_queued).toBe(true);
 
   (s as any)._matches[0] = { id: "a1", score: 0.40 }; // above floor -> hit
   const hit: any = await (await handleGenerate({ prompt: "a fox" }, s, cfg)).json();
@@ -177,7 +144,7 @@ it("approximate includes generation_queued, hit does not", async () => {
 
 it("miss: recordQuery throws -> 202 reports generation_queued false (nothing was queued)", async () => {
   const s = fakeServices({ queries: { recordQuery: async () => { throw new Error("d1 down"); } } });
-  const res = await handleGenerate({ prompt: "nothing here", generate_on_miss: true }, s, cfg);
+  const res = await handleGenerate({ prompt: "nothing here" }, s, cfg);
   expect(res.status).toBe(202);
   const j: any = await res.json();
   expect(j.shared_cache.generation_queued).toBe(false); // demand write failed: not queued
@@ -187,7 +154,7 @@ it("approximate: recordQuery throws -> generation_queued false (nothing was queu
   const s = fakeServices({ queries: { recordQuery: async () => { throw new Error("d1 down"); } } });
   (s as any)._assets.set("a1", asset());
   (s as any)._matches.push({ id: "a1", score: 0.20 }); // below floor -> approximate
-  const res = await handleGenerate({ prompt: "a fox", generate_on_miss: true }, s, cfg);
+  const res = await handleGenerate({ prompt: "a fox" }, s, cfg);
   expect(res.status).toBe(200);
   const j: any = await res.json();
   expect(j.shared_cache.result).toBe("approximate");
@@ -245,113 +212,6 @@ it("keygen 429 when rate limited", async () => {
   expect(res.status).toBe(429);
 });
 
-const KEK = btoa(String.fromCharCode(...Array.from({ length: 32 }, (_, i) => i)));
-const cleanModeration = (async () =>
-  new Response(JSON.stringify({ results: [{ flagged: false, categories: {} }] }), { status: 200 })
-) as unknown as typeof fetch;
-
-async function byokCtx(s: any, over: Partial<ByokCfg> = {}) {
-  await s.byok.put({
-    userId: "u1", provider: "openai",
-    keyCiphertext: await encryptSecret("sk-user", KEK), keyLast4: "user", monthlyCap: 50, enabled: true,
-  });
-  return {
-    userId: "u1",
-    cfg: {
-      kek: KEK, moderationKey: "sk-op", bucket: { put: async () => ({}) },
-      publicUrlBase: "https://byok.example", now: () => 1783468800, // 2026-07-08 UTC
-
-      fetchFn: cleanModeration,
-      providerFor: () => ({ mode: "sync", generate: async () => ({ bytes: new Uint8Array([1]).buffer, mime: "image/png" }), validateKey: async () => true }),
-      uuid: () => "gen-1",
-      ...over,
-    } as ByokCfg,
-  };
-}
-
-it("below-floor + BYOK: returns result=generated with usage block and records built", async () => {
-  const s = fakeServices();
-  (s as any)._matches.push({ id: "a1", score: 0.20 }); // below this file's floor (~0.32)
-  (s as any)._assets.set("a1", { id: "a1", prompt: "old", source: "pd12m", source_id: null, model_used: null, width: 1, height: 1, mime: "image/webp", source_url: "https://ext/x.webp", locally_cached: 0 });
-  const res = await handleGenerate({ prompt: "a red fox" }, s, cfg, await byokCtx(s));
-  const body: any = await res.json();
-  expect(res.status).toBe(200);
-  expect(body.shared_cache.result).toBe("generated");
-  expect(body.shared_cache.source).toBe("byok");
-  expect(body.shared_cache.byok).toEqual({ used: 1, cap: 50, est_spend_usd: 0.04 });
-  expect(body.data[0].url).toBe("https://byok.example/byok/gen-1/original.png");
-  const recorded = (s as any)._recorded;
-  expect(recorded[recorded.length - 1]).toMatchObject({ assetId: "gen-1", built: true });
-});
-
-it("empty pool + BYOK: generates instead of 202 pending", async () => {
-  const s = fakeServices();
-  const res = await handleGenerate({ prompt: "a red fox" }, s, cfg, await byokCtx(s));
-  expect(res.status).toBe(200);
-  expect(((await res.json()) as any).shared_cache.result).toBe("generated");
-});
-
-it("hit is untouched by BYOK", async () => {
-  const s = fakeServices();
-  (s as any)._matches.push({ id: "a1", score: 0.99 });
-  (s as any)._assets.set("a1", { id: "a1", prompt: "p", source: "pd12m", source_id: null, model_used: null, width: 1, height: 1, mime: "image/webp", source_url: "https://ext/x.webp", locally_cached: 0 });
-  const res = await handleGenerate({ prompt: "a red fox" }, s, cfg, await byokCtx(s));
-  expect(((await res.json()) as any).shared_cache.result).toBe("hit");
-});
-
-it("generate_on_miss=false is the kill switch: no BYOK, normal approximate", async () => {
-  const s = fakeServices();
-  (s as any)._matches.push({ id: "a1", score: 0.20 }); // below this file's floor (~0.32)
-  (s as any)._assets.set("a1", { id: "a1", prompt: "p", source: "pd12m", source_id: null, model_used: null, width: 1, height: 1, mime: "image/webp", source_url: "https://ext/x.webp", locally_cached: 0 });
-  const res = await handleGenerate({ prompt: "a red fox", generate_on_miss: false }, s, cfg, await byokCtx(s));
-  const body: any = await res.json();
-  expect(body.shared_cache.result).toBe("approximate");
-  expect(body.shared_cache.byok).toBeUndefined();
-});
-
-it("content policy -> 400 with category", async () => {
-  const s = fakeServices();
-  const res = await handleGenerate({ prompt: "pikachu portrait" }, s, cfg, await byokCtx(s));
-  expect(res.status).toBe(400);
-  expect(await res.json()).toEqual({ error: "content_policy", category: "denylist:pikachu" });
-});
-
-it("cap reached -> approximate fallback with byok status", async () => {
-  const s = fakeServices();
-  (s as any)._matches.push({ id: "a1", score: 0.20 }); // below this file's floor (~0.32)
-  (s as any)._assets.set("a1", { id: "a1", prompt: "p", source: "pd12m", source_id: null, model_used: null, width: 1, height: 1, mime: "image/webp", source_url: "https://ext/x.webp", locally_cached: 0 });
-  const ctx = await byokCtx(s);
-  await s.byok.patch("u1", { monthlyCap: 1 });
-  await s.byok.reserve("u1", "2026-07", 1);
-  const res = await handleGenerate({ prompt: "a red fox" }, s, cfg, ctx);
-  const body: any = await res.json();
-  expect(body.shared_cache.result).toBe("approximate");
-  expect(body.shared_cache.byok).toEqual({ status: "cap_reached" });
-});
-
-it("provider failure on empty pool -> 202 pending with byok status", async () => {
-  const s = fakeServices();
-  const ctx = await byokCtx(s, { providerFor: () => ({ mode: "sync", generate: async () => { throw new Error("boom"); }, validateKey: async () => true }) });
-  const res = await handleGenerate({ prompt: "a red fox" }, s, cfg, ctx);
-  expect(res.status).toBe(202);
-  const body: any = await res.json();
-  expect(body.shared_cache.result).toBe("pending");
-  expect(body.shared_cache.byok).toEqual({ status: "provider_error" });
-});
-
-it("unexpected byok throw (e.g. transient D1 error) never 500s -> degrades to approximate", async () => {
-  const s = fakeServices();
-  (s as any)._matches.push({ id: "a1", score: 0.20 }); // below this file's floor (~0.32)
-  (s as any)._assets.set("a1", { id: "a1", prompt: "p", source: "pd12m", source_id: null, model_used: null, width: 1, height: 1, mime: "image/webp", source_url: "https://ext/x.webp", locally_cached: 0 });
-  const ctx = await byokCtx(s);
-  s.byok.get = async () => { throw new Error("d1 down"); };
-  const res = await handleGenerate({ prompt: "a red fox" }, s, cfg, ctx);
-  expect(res.status).toBe(200);
-  const body: any = await res.json();
-  expect(body.shared_cache.result).toBe("approximate");
-  expect(body.shared_cache.byok).toEqual({ status: "provider_error" });
-});
-
 function withCollection(s: any, id = "col_abc", owner = "usr_owner", theme = "watercolor style") {
   s._collectionRows.set(id, { id, owner_user_id: owner, name: "n", theme_prompt: theme, created_at: "x", updated_at: "x" });
   return id;
@@ -378,7 +238,7 @@ it("scoped: embeds the combined prompt and queries only the namespace", async ()
   s.vectorize.queryNamespace = async (_v: any, ns: string) => { namespaceQueried = ns; return []; };
   s.vectorize.query = async () => { throw new Error("global index must not be queried for scoped requests"); };
   const id = withCollection(s);
-  await handleGenerate({ prompt: "a cat", collection: id, generate_on_miss: false }, s, cfg);
+  await handleGenerate({ prompt: "a cat", collection: id }, s, cfg);
   expect(embedCalls).toEqual(["a cat, watercolor style"]);
   expect(namespaceQueried).toBe(id);
 });
@@ -397,24 +257,7 @@ it("scoped hit: serves the collection asset, echoes collection, bumps serve_coun
   expect(s._recorded).toEqual([]); // backfill exclusion: no queries write, ever
 });
 
-it("scoped approximate (non-owner): closest match served, no generation, no demand row, serve_count bumped", async () => {
-  const s: any = fakeServices();
-  const id = withCollection(s, "col_abc", "usr_owner");
-  s._assets.set("a1", { id: "a1", prompt: "a dog, watercolor style", source: "byok", source_id: null, model_used: "gpt-image-1", width: 1024, height: 1024, mime: "image/png", source_url: "https://x/a1.png", locally_cached: 0 });
-  s._nsMatches.push({ id: "a1", score: 0.2, ns: id }); // below the ≈0.325 floor -> approximate
-  await s.byok.put({ userId: "usr_caller", provider: "openai", keyCiphertext: "ct", keyLast4: "1234", monthlyCap: 50, enabled: true }); // caller has their OWN byok
-  const byokCtx = { userId: "usr_caller", cfg: { kek: "k", bucket: { put: async () => {} }, publicUrlBase: "https://pub", now: () => 123 } };
-  const res = await handleGenerate({ prompt: "a cat", collection: id }, s, cfg, byokCtx as any);
-  const body: any = await res.json();
-  expect(body.shared_cache.result).toBe("approximate");
-  expect(body.shared_cache.generation_queued).toBe(false);
-  expect(body.shared_cache.byok).toBeUndefined(); // non-owner: byok never consulted
-  expect(s._generatedInserts).toEqual([]);        // caller's own key must NOT generate into someone else's collection
-  expect(s._recorded).toEqual([]);
-  expect(s._serveCounts.get("a1")).toBe(1);
-});
-
-it("scoped empty pool (non-owner or no byok): 202 pending, generation_queued false, no demand row", async () => {
+it("scoped empty pool -> 202 pending, generation_queued false, no demand row (backfill exclusion)", async () => {
   const s: any = fakeServices();
   const id = withCollection(s);
   const res = await handleGenerate({ prompt: "a cat", collection: id }, s, cfg);
@@ -446,36 +289,4 @@ it("scoped: 422 on non-string collection", async () => {
   const s: any = fakeServices();
   const res = await handleGenerate({ prompt: "p", collection: 7 as any }, s, cfg);
   expect(res.status).toBe(422);
-});
-
-it("scoped owner + working BYOK: generates on miss, echoes collection, no demand row, no serve bump", async () => {
-  const s: any = fakeServices();
-  const id = withCollection(s, "col_abc", "u1"); // owner IS the BYOK caller (byokCtx seeds u1)
-  const res = await handleGenerate({ prompt: "a cat", collection: id }, s, cfg, await byokCtx(s));
-  expect(res.status).toBe(200);
-  const body: any = await res.json();
-  expect(body.shared_cache.result).toBe("generated");
-  expect(body.shared_cache.collection).toBe(id);
-  expect(body.shared_cache.byok).toEqual({ used: 1, cap: 50, est_spend_usd: 0.04 });
-  expect(s._generatedInserts[0].collectionId).toBe(id);
-  expect(s._nsUpserted).toEqual([{ id: "gen-1", vector: [0.1, 0.2, 0.3], namespace: id }]);
-  expect(s._recorded).toEqual([]);     // scoped: no demand row, even for the generated return
-  expect(s._serveCounts.size).toBe(0); // generated must not bump serve_count
-});
-
-it("scoped owner, cap reached: pending fallback carries byok status, collection echo, generation_queued false, no demand row", async () => {
-  const s: any = fakeServices();
-  const id = withCollection(s, "col_abc", "u1");
-  const ctx = await byokCtx(s);
-  await s.byok.patch("u1", { monthlyCap: 1 });
-  await s.byok.reserve("u1", "2026-07", 1); // spend the month (byokCtx now => 2026-07-08)
-  const res = await handleGenerate({ prompt: "a cat", collection: id }, s, cfg, ctx);
-  expect(res.status).toBe(202); // empty namespace pool -> pending
-  const body: any = await res.json();
-  expect(body.shared_cache.result).toBe("pending");
-  expect(body.shared_cache.byok).toEqual({ status: "cap_reached" });
-  expect(body.shared_cache.generation_queued).toBe(false);
-  expect(body.shared_cache.collection).toBe(id);
-  expect(s._generatedInserts).toEqual([]);
-  expect(s._recorded).toEqual([]);
 });

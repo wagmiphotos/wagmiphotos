@@ -2,7 +2,7 @@ import type { Env, Services } from "./types";
 import { resolveSession } from "./session";
 import { encryptSecret } from "./crypto";
 import { providerFor } from "./providers";
-import { monthKey } from "./byok";
+import { monthKey } from "./generation-jobs";
 import contract from "../../../contract.json";
 
 // Key management is session-cookie only: you manage your provider key from

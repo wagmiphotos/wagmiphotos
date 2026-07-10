@@ -96,7 +96,7 @@ it("keys.deleteKey deletes scoped to the owner (key_hash AND user_id)", async ()
   expect(calls[0].args).toEqual(["hZ", "usr_1"]);   // id bound first, then userId
 });
 
-it("searchAssets browse mode: no WHERE, ordered newest-first, binds limit/offset", async () => {
+it("searchAssets browse mode: no token filter but still excludes collection assets, ordered newest-first, binds limit/offset", async () => {
   const row = { id: "a1", prompt: "p", source: "pd12m", source_id: null,
     model_used: null, width: null, height: null,
     mime: null, source_url: null, locally_cached: 0, created_at: "2026-07-03 00:00:00" };
@@ -104,7 +104,10 @@ it("searchAssets browse mode: no WHERE, ordered newest-first, binds limit/offset
   const { assets } = makeD1Stores(db);
   const got = await assets.searchAssets({ q: "", limit: 25, offset: 0 });
   expect(got).toEqual([row]);
-  expect(calls[0].sql).not.toContain("WHERE");
+  // Unscoped browse still excludes collection assets (spec 2026-07-10, decision
+  // 2): the shared library is operator-curated, so WHERE always appears here.
+  expect(calls[0].sql).toContain("WHERE collection_id IS NULL");
+  expect(calls[0].sql).not.toContain("prompt LIKE");
   expect(calls[0].sql).toContain("ORDER BY created_at DESC, id DESC");
   expect(calls[0].sql).toContain("created_at");
   expect(calls[0].args).toEqual([25, 0]);
@@ -164,11 +167,12 @@ it("getAssetsByIds selects rows by id IN (...), binding every id", async () => {
   expect(calls[0].sql).toContain("FROM live_assets");
 });
 
-it("searchAssets whitespace-only query: browse mode (no WHERE)", async () => {
+it("searchAssets whitespace-only query: browse mode, still excludes collection assets", async () => {
   const { db, calls } = fakeDb(null, []);
   const { assets } = makeD1Stores(db);
   await assets.searchAssets({ q: "   ", limit: 24, offset: 0 });
-  expect(calls[0].sql).not.toContain("WHERE");
+  expect(calls[0].sql).toContain("WHERE collection_id IS NULL");
+  expect(calls[0].sql).not.toContain("prompt LIKE");
   expect(calls[0].args).toEqual([24, 0]);
 });
 

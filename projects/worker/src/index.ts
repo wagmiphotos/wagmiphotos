@@ -14,7 +14,6 @@ import { handleLoginRequest, handleVerify, handleMe, handleLogout, handleAcceptT
 import { handleCheckout, handlePortal, handleStripeWebhook } from "./stripe-routes";
 import { isPaid } from "./entitlement";
 import { handlePutByok, handlePatchByok, handleDeleteByok } from "./byok-routes";
-import type { ByokCfg } from "./byok";
 import {
   handleCreateCollection, handleListCollections, handlePatchCollection,
   handleListCollectionImages, handleDeleteCollectionImage, handleDeleteCollection,
@@ -231,19 +230,7 @@ export default {
           now: () => Math.floor(Date.now() / 1000),
           assetBaseUrl: env.ASSET_BASE_URL,
         };
-        // BYOK is active only when fully configured; master/dev principals have
-        // no byok row and fall through to "skipped" inside the orchestrator.
-        const byokCtx = env.BYOK_KEK && env.BYOK_ORIGINALS && env.BYOK_PUBLIC_URL_BASE
-          ? {
-              userId: principal.userId,
-              cfg: {
-                kek: env.BYOK_KEK, moderationKey: env.OPENAI_API_KEY,
-                bucket: env.BYOK_ORIGINALS, publicUrlBase: env.BYOK_PUBLIC_URL_BASE,
-                now: cfg.now,
-              } satisfies ByokCfg,
-            }
-          : null;
-        return await handleGenerate(body, services, cfg, byokCtx);
+        return await handleGenerate(body, services, cfg);
       }
 
       if (url.pathname.startsWith("/v1/")) {

@@ -29,7 +29,11 @@ export function makeD1Stores(db: D1Database): {
       const tokens = q.split(/\s+/).filter(Boolean);
       const where: string[] = tokens.map(() => "prompt LIKE ? ESCAPE '\\'");
       const args: unknown[] = tokens.map((t) => `%${escapeLike(t)}%`);
+      // Scoped search sees the collection; unscoped search must never surface
+      // collection assets — the shared library is operator-curated (spec
+      // 2026-07-10, decision 2).
       if (collectionId) { where.push("collection_id = ?"); args.push(collectionId); }
+      else { where.push("collection_id IS NULL"); }
       const cond = where.length ? `WHERE ${where.join(" AND ")} ` : "";
       const { results } = await db.prepare(
         `SELECT ${ASSET_COLS}, created_at FROM live_assets ${cond}ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`
