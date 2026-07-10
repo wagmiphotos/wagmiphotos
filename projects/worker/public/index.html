@@ -1516,18 +1516,9 @@
       letter-spacing: -0.01em;
     }
 
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 24px;
-    }
-
-    @media (min-width: 1024px) {
-      .dashboard-grid { grid-template-columns: 420px 1fr; }
-    }
-
     /* ============ Forms ============ */
     .form-group { margin-bottom: 20px; }
+    .muted { color: var(--muted); font-size: 0.8125rem; }
 
     label, .field-label {
       display: block;
@@ -1721,87 +1712,9 @@
 
     .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
-    .state-placeholder {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-      color: var(--muted);
-      text-align: center;
-      padding: 40px;
-    }
-
-    .state-placeholder-icon {
-      font-size: 3rem;
-      opacity: 0.35;
-      animation: floaty 4s ease-in-out infinite;
-    }
-
-    @keyframes floaty {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-8px); }
-    }
-
-    .state-loader {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-      color: var(--muted);
-    }
-
-    .spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid var(--line);
-      border-top-color: var(--red);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .img-wrapper {
-      display: none;
-      width: 100%;
-      position: relative;
-      background: var(--ink);
-      border-top-left-radius: 15px;
-      border-top-right-radius: 15px;
-      overflow: hidden;
-    }
-
-    .img-wrapper img {
-      width: 100%;
-      height: auto;
-      display: block;
-      opacity: 0;
-      transform: scale(0.98);
-      transition: opacity 0.5s ease, transform 0.5s ease;
-    }
-
-    .img-wrapper img.loaded { opacity: 1; transform: scale(1); }
-
-    .result-details {
-      display: none;
-      width: 100%;
-      border-top: 1px solid var(--line);
-      padding: 20px;
-      background: var(--card);
-    }
-
     .view-original-link { display: inline-block; margin-bottom: 12px; font-size: 0.8125rem; color: var(--muted); text-decoration: underline; }
     .view-original-link:hover { color: var(--ink); }
     .view-original-link[hidden] { display: none; }
-
-    .details-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
-      margin-bottom: 20px;
-    }
-
-    @media (min-width: 640px) { .details-grid { grid-template-columns: repeat(4, 1fr); } }
 
     .details-item { display: flex; flex-direction: column; gap: 4px; }
 
@@ -1821,24 +1734,6 @@
       align-items: center;
       margin-bottom: 20px;
     }
-
-    .result-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-family: var(--font-display);
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .badge-hit { color: var(--success); background: var(--success-tint); border: 1px solid rgba(14, 138, 77, 0.3); }
-    .badge-approximate { background: var(--warning-tint); color: var(--warning); border: 1px solid rgba(180, 83, 9, 0.3); }
-    .badge-pending { background: rgba(28, 28, 27, 0.07); color: var(--muted); border: 1px solid var(--line); }
-    .badge-generated { background: var(--success-tint); color: var(--success); border: 1px solid rgba(14, 138, 77, 0.3); }
 
     /* ============ Toast ============ */
     .toast {
@@ -2878,6 +2773,22 @@
         </div>
         <div id="tab-collections" hidden>
           <!-- BYOK key card + collections card moved from view-account below; Task 8 adds the generate card above them -->
+
+          <!-- Generate Card -->
+          <div class="glass-card">
+            <h3>Create an image</h3>
+            <p class="muted">Generated with your own provider key, straight into one of your collections. <span id="gen-key-status"></span></p>
+            <div class="form-group">
+              <label class="field-label" for="gen-coll-select">Collection</label>
+              <select id="gen-coll-select" class="field-input"></select>
+            </div>
+            <div class="form-group">
+              <label class="field-label" for="gen-prompt">Prompt</label>
+              <textarea id="gen-prompt" class="field-input" rows="3" placeholder="A watercolor fox in morning fog"></textarea>
+            </div>
+            <button id="btn-generate" class="btn btn-primary" onclick="createInCollection()">Generate</button>
+            <div id="gen-result"></div>
+          </div>
 
           <!-- BYOK Card -->
           <div class="glass-card">
@@ -4189,6 +4100,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     function renderByok() {
       const el = document.getElementById('byok-body');
       if (!el) return;
+      renderGenKeyStatus(); // key changes (added/removed/enabled toggle) update the generate-card hint
       if (!currentByok) {
         el.innerHTML = `<div class="form-group">
           <label>Provider</label>
@@ -4308,6 +4220,8 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       } catch {
         el.textContent = 'Could not load collections.';
       }
+      populateGenCollections();
+      renderGenKeyStatus();
     }
 
     function renderCollections() {
@@ -4438,6 +4352,90 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         showToast('Image deleted', 'success');
         await loadCollections();
       } catch { showToast('Could not delete the image', 'error'); }
+    }
+
+    const GEN_POLL_MS = 2500;
+    const GEN_POLL_MAX_MS = 6 * 60 * 1000;
+    let genBusy = false;
+
+    function populateGenCollections() {
+      const sel = document.getElementById('gen-coll-select');
+      if (!sel) return;
+      sel.innerHTML = myCollections.length
+        ? myCollections.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')
+        : '<option value="">— create a collection below first —</option>';
+    }
+
+    function renderGenKeyStatus() {
+      const el = document.getElementById('gen-key-status');
+      if (!el) return;
+      if (currentByok && currentByok.enabled) el.innerHTML = `<span class="muted">Using your ${escapeHtml(currentByok.provider)} key.</span>`;
+      else el.innerHTML = '<strong>Add an enabled provider key below to generate.</strong>';
+    }
+
+    function setGenResult(html) { document.getElementById('gen-result').innerHTML = html; }
+
+    function genLoaderHtml(startTime) {
+      const secs = Math.round((performance.now() - startTime) / 1000);
+      return `<p class="muted">Generating… ${secs}s. Long generations can take a minute or two; if it never lands, the reservation is refunded automatically.</p>`;
+    }
+
+    async function pollGeneration(genId, startTime) {
+      while (performance.now() - startTime < GEN_POLL_MAX_MS) {
+        await new Promise((r) => setTimeout(r, GEN_POLL_MS));
+        let data = null;
+        try {
+          const r = await fetch(`/v1/generations/${encodeURIComponent(genId)}`, { credentials: 'same-origin' });
+          if (r.status === 401) { location.hash = '#/login'; return null; }
+          data = await r.json();
+        } catch (e) { /* transient network error: keep polling */ }
+        const gen = data && data.generation;
+        if (gen && gen.status === 'succeeded') return gen;
+        if (gen && gen.status === 'failed') throw new Error(gen.error || 'Generation failed');
+        setGenResult(genLoaderHtml(startTime));
+      }
+      throw new Error('Timed out waiting for the image. If it never completes, the reservation is refunded automatically.');
+    }
+
+    async function createInCollection() {
+      if (genBusy) return;
+      const prompt = document.getElementById('gen-prompt').value.trim();
+      const collId = document.getElementById('gen-coll-select').value;
+      if (!prompt) { showToast('Enter a prompt first', 'error'); return; }
+      if (!collId) { showToast('Create a collection first', 'error'); return; }
+      genBusy = true;
+      const btn = document.getElementById('btn-generate');
+      btn.disabled = true;
+      const startTime = performance.now();
+      setGenResult(genLoaderHtml(startTime));
+      try {
+        const r = await fetch(`/v1/collections/${encodeURIComponent(collId)}/generations`, {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt }),
+        });
+        if (r.status === 401) { location.hash = '#/login'; return; }
+        const data = await r.json().catch(() => ({}));
+        if (r.status === 400 && data.error === 'content_policy') throw new Error(`Blocked by content policy (${data.category || 'flagged'})`);
+        if (r.status === 403) throw new Error('Add an enabled provider key first (below)');
+        if (r.status === 429) throw new Error(data.error === 'monthly cap reached' ? `Monthly cap reached (${data.used}/${data.cap})` : 'Too many requests — slow down');
+        if (!r.ok || !data.generation) throw new Error(data.error || `Error ${r.status}`);
+        const done = await pollGeneration(data.generation.id, startTime);
+        if (!done) return;
+        const img = done.image || {};
+        setGenResult(
+          `<img src="${escapeHtml(img.medium_url || img.url || '')}" alt="${escapeHtml(prompt)}" style="max-width:100%;border-radius:12px;margin-top:12px;" />` +
+          (data.byok ? `<p class="muted">${data.byok.used}/${data.byok.cap} this month · ~$${Number(data.byok.est_spend_usd).toFixed(2)} est. spend</p>` : '')
+        );
+        showToast('Image added to your collection', 'success');
+        loadCollections(); // refresh counts + grids
+      } catch (e) {
+        setGenResult(`<p class="muted">⚠️ ${escapeHtml(e.message || String(e))}</p>`);
+        showToast(e.message || 'Generation failed', 'error');
+      } finally {
+        genBusy = false;
+        btn.disabled = false;
+      }
     }
 
     async function startCheckout(btn) {
