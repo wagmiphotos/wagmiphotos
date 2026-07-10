@@ -1,5 +1,20 @@
 # wagmi.photos — Handoff / Resume Here
 
+> **2026-07-10 (evening wave): PUBLIC COLLECTIONS + UI WAVE DEPLOYED** (main@1dd7dc1,
+> worker `8a3f306a`, migration **0017** applied remote). Collections are now
+> **public by design** (supersedes unlisted-by-ID): `GET /v1/collections/browse`
+> lists every collection most-served-first with stats + 4 preview thumbs and a
+> `?q=` name filter; `collections.search_count` bumps on every scoped read;
+> collection **names/themes are moderated** (denylist + OpenAI moderation,
+> fail-closed 503 — create/rename won't work offline). SPA: three tabs
+> **Shared library | Collections (public browse + inline viewer) | My collections**
+> (split layout: gen/BYOK/create left, searchable viewer right) + child-friendly
+> policy copy. Same wave: Home nav link + merged **Explore** mega-menu, sectioned
+> footer, mobile api-grid overflow fix. 356 tests green. The checklist below is
+> unchanged — when doing item 1, also check the Collections tab shows the new
+> collection publicly and a denylisted name (e.g. "pikachu") is rejected with a
+> content-policy toast.
+
 > **2026-07-10 (later session): READ/WRITE SPLIT SHIPPED TO PROD** (main@a347c17,
 > worker `5aeb58e1`, 14 reviewed commits). The read endpoint is a pure closest-match
 > lookup (`cache_tolerance`/`generate_on_miss` REMOVED); creation is a new async,
