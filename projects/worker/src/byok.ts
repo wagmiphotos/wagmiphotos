@@ -75,6 +75,7 @@ export async function tryByokGenerate(
   let sourceUrl!: string;
   try {
     const provider = (cfg.providerFor ?? ((n: string) => realProviderFor(n, cfg.fetchFn ?? fetch)))(row.provider);
+    if (provider.mode !== "sync") throw new Error("async provider on the legacy sync path");
     img = await provider.generate(i.prompt, apiKey);
     const key = `byok/${id}/original.${EXT[img.mime] ?? "png"}`;
     await cfg.bucket.put(key, img.bytes, { httpMetadata: { contentType: img.mime } });

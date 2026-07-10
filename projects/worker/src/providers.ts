@@ -4,13 +4,23 @@ import contract from "../../../contract.json";
 // contract.json (byok_providers) — the public API has no model parameter.
 export interface GeneratedImage { bytes: ArrayBuffer; mime: string; }
 export class ProviderAuthError extends Error {}
-export interface ImageProvider {
+export type ProviderJobState =
+  | { state: "pending" }
+  | { state: "done"; image: GeneratedImage }
+  | { state: "failed"; error: string };
+export interface AsyncImageProvider {
+  mode: "async";
+  submit(prompt: string, apiKey: string): Promise<string>;   // provider job id
+  check(jobId: string, apiKey: string): Promise<ProviderJobState>; // ONE short status call (+download on success)
+  validateKey(apiKey: string): Promise<boolean>;
+}
+export interface SyncImageProvider {
+  mode: "sync";
   generate(prompt: string, apiKey: string): Promise<GeneratedImage>;
   validateKey(apiKey: string): Promise<boolean>;
 }
+export type ImageProvider = AsyncImageProvider | SyncImageProvider;
 
-type Sleep = (ms: number) => Promise<void>;
-const realSleep: Sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PINNED: Record<string, { model: string; price_per_image_usd: number }> = (contract as any).byok_providers;
 
 // Every BYOK outbound fetch is bounded so a hung provider/moderation call
@@ -66,6 +76,7 @@ async function readSseEvent(res: Response, wantType: string): Promise<any | null
 
 function makeOpenAiProvider(fetchFn: typeof fetch): ImageProvider {
   return {
+    mode: "sync" as const,
     async generate(prompt, apiKey) {
       const res = await fetchFn(`${OPENAI_API}/images/generations`, {
         method: "POST",
@@ -99,17 +110,18 @@ function makeOpenAiProvider(fetchFn: typeof fetch): ImageProvider {
 }
 
 // GMI Cloud's async request queue (same API genblaze_gmicloud wraps):
-// submit -> poll until a terminal status -> download the image URL.
+// submit -> poll until a terminal status -> download the image URL. Each
+// step below is one short HTTP call; the caller (poll-through GET / sweep)
+// owns the cadence between submit and check — no in-process polling loop.
 const GMI_QUEUE = "https://console.gmicloud.ai/api/v1/ie/requestqueue/apikey";
-const GMI_POLL_MS = 2500;
-const GMI_DEADLINE_MS = 55_000;
 
-function makeGmiProvider(fetchFn: typeof fetch, sleep: Sleep): ImageProvider {
+function makeGmiProvider(fetchFn: typeof fetch): AsyncImageProvider {
+  const headers = (apiKey: string) => ({ Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" });
   return {
-    async generate(prompt, apiKey) {
-      const headers = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
+    mode: "async",
+    async submit(prompt, apiKey) {
       const submit = await fetchFn(`${GMI_QUEUE}/requests`, {
-        method: "POST", headers,
+        method: "POST", headers: headers(apiKey),
         body: JSON.stringify({ model: PINNED.gmicloud.model, payload: { prompt, size: "1024x1024" } }),
         signal: AbortSignal.timeout(GMI_SUBMIT_TIMEOUT_MS),
       });
@@ -118,45 +130,40 @@ function makeGmiProvider(fetchFn: typeof fetch, sleep: Sleep): ImageProvider {
       const sub: any = await submit.json();
       const id = sub?.request_id ?? sub?.id;
       if (!id) throw new Error("gmicloud submit: no request id");
-
-      const deadline = Date.now() + GMI_DEADLINE_MS;
-      while (Date.now() < deadline) {
-        await sleep(GMI_POLL_MS);
-        const poll = await fetchFn(`${GMI_QUEUE}/requests/${id}`, { headers, signal: AbortSignal.timeout(GMI_POLL_TIMEOUT_MS) });
-        if (!poll.ok) throw new Error(`gmicloud poll ${poll.status}`);
-        const detail: any = await poll.json();
-        const status = String(detail?.status ?? "");
-        if (status === "failed" || status === "cancelled") {
-          throw new Error(`gmicloud generation ${status}: ${String(detail?.error ?? "")}`.slice(0, 300));
-        }
-        if (status === "success") {
-          const raw = detail?.outcome?.media_urls;
-          const first = Array.isArray(raw)
-            ? (typeof raw[0] === "string" ? raw[0] : raw[0]?.url)
-            : (detail?.outcome?.image_url ?? detail?.outcome?.url);
-          if (!first) throw new Error("gmicloud: success but no image url");
-          const img = await fetchFn(first, { signal: AbortSignal.timeout(GMI_DOWNLOAD_TIMEOUT_MS) });
-          if (!img.ok) throw new Error(`gmicloud image fetch ${img.status}`);
-
-          // Provider-controlled URL landing on a public bucket: pin the mime
-          // to an allowlist and cap the size before and after the download.
-          const rawType = img.headers.get("Content-Type");
-          const mime = rawType ? rawType.split(";")[0].trim() : "image/png";
-          if (rawType && !GMI_ALLOWED_MIME.has(mime)) {
-            throw new Error(`gmicloud: unexpected content type ${mime}`);
-          }
-          const declaredLen = img.headers.get("Content-Length");
-          if (declaredLen && Number(declaredLen) > GMI_MAX_IMAGE_BYTES) {
-            throw new Error(`gmicloud: image too large (${declaredLen} bytes)`);
-          }
-          const bytes = await img.arrayBuffer();
-          if (bytes.byteLength > GMI_MAX_IMAGE_BYTES) {
-            throw new Error(`gmicloud: image too large (${bytes.byteLength} bytes)`);
-          }
-          return { bytes, mime };
-        }
+      return String(id);
+    },
+    // ONE status call per invocation; the caller (poll-through GET / sweep)
+    // owns the cadence. Download only happens on the success transition.
+    async check(jobId, apiKey) {
+      const poll = await fetchFn(`${GMI_QUEUE}/requests/${jobId}`, {
+        headers: headers(apiKey), signal: AbortSignal.timeout(GMI_POLL_TIMEOUT_MS),
+      });
+      if (poll.status === 401 || poll.status === 403) throw new ProviderAuthError(`gmicloud ${poll.status}`);
+      if (!poll.ok) throw new Error(`gmicloud poll ${poll.status}`);
+      const detail: any = await poll.json();
+      const status = String(detail?.status ?? "");
+      if (status === "failed" || status === "cancelled") {
+        return { state: "failed", error: `gmicloud generation ${status}: ${String(detail?.error ?? "")}`.slice(0, 300) };
       }
-      throw new Error("gmicloud generation timed out");
+      if (status !== "success") return { state: "pending" };
+      const raw = detail?.outcome?.media_urls;
+      const first = Array.isArray(raw)
+        ? (typeof raw[0] === "string" ? raw[0] : raw[0]?.url)
+        : (detail?.outcome?.image_url ?? detail?.outcome?.url);
+      if (!first) throw new Error("gmicloud: success but no image url");
+      const img = await fetchFn(first, { signal: AbortSignal.timeout(GMI_DOWNLOAD_TIMEOUT_MS) });
+      if (!img.ok) throw new Error(`gmicloud image fetch ${img.status}`);
+
+      // Provider-controlled URL landing on a public bucket: pin the mime
+      // to an allowlist and cap the size before and after the download.
+      const rawType = img.headers.get("Content-Type");
+      const mime = rawType ? rawType.split(";")[0].trim() : "image/png";
+      if (rawType && !GMI_ALLOWED_MIME.has(mime)) throw new Error(`gmicloud: unexpected content type ${mime}`);
+      const declaredLen = img.headers.get("Content-Length");
+      if (declaredLen && Number(declaredLen) > GMI_MAX_IMAGE_BYTES) throw new Error(`gmicloud: image too large (${declaredLen} bytes)`);
+      const bytes = await img.arrayBuffer();
+      if (bytes.byteLength > GMI_MAX_IMAGE_BYTES) throw new Error(`gmicloud: image too large (${bytes.byteLength} bytes)`);
+      return { state: "done", image: { bytes, mime } };
     },
     async validateKey(apiKey) {
       const res = await fetchFn(`${GMI_QUEUE}/requests`, {
@@ -168,8 +175,8 @@ function makeGmiProvider(fetchFn: typeof fetch, sleep: Sleep): ImageProvider {
   };
 }
 
-export function providerFor(name: string, fetchFn: typeof fetch = fetch, sleep: Sleep = realSleep): ImageProvider {
+export function providerFor(name: string, fetchFn: typeof fetch = fetch): ImageProvider {
   if (name === "openai") return makeOpenAiProvider(fetchFn);
-  if (name === "gmicloud") return makeGmiProvider(fetchFn, sleep);
+  if (name === "gmicloud") return makeGmiProvider(fetchFn);
   throw new Error(`unknown provider ${name}`);
 }

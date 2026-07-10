@@ -13,7 +13,7 @@ const cleanModeration = (async () =>
 ) as unknown as typeof fetch;
 
 function okProvider(): ImageProvider {
-  return { generate: async () => ({ bytes: PNG, mime: "image/png" }), validateKey: async () => true };
+  return { mode: "sync", generate: async () => ({ bytes: PNG, mime: "image/png" }), validateKey: async () => true };
 }
 
 async function seededServices(over: Partial<{ enabled: boolean; cap: number; provider: string }> = {}) {
@@ -116,14 +116,14 @@ it("cap reached -> cap_reached, no provider call", async () => {
   const s = await seededServices({ cap: 1 });
   await s.byok.reserve("u1", "2026-07", 1); // spend the month
   const out = await tryByokGenerate({ userId: "u1", prompt: "x", vec: [] }, s,
-    cfg({ providerFor: () => ({ generate: async () => { throw new Error("must not generate"); }, validateKey: async () => true }) }));
+    cfg({ providerFor: () => ({ mode: "sync", generate: async () => { throw new Error("must not generate"); }, validateKey: async () => true }) }));
   expect(out.kind).toBe("cap_reached");
 });
 
 it("provider failure refunds the reservation", async () => {
   const s = await seededServices();
   const out = await tryByokGenerate({ userId: "u1", prompt: "x", vec: [] }, s,
-    cfg({ providerFor: () => ({ generate: async () => { throw new Error("boom"); }, validateKey: async () => true }) }));
+    cfg({ providerFor: () => ({ mode: "sync", generate: async () => { throw new Error("boom"); }, validateKey: async () => true }) }));
   expect(out.kind).toBe("provider_error");
   expect((await s.byok.getUsage("u1", "2026-07")).count).toBe(0);
   const row = (s as any)._byokRows.get("u1");
@@ -134,7 +134,7 @@ it("provider failure refunds the reservation", async () => {
 it("provider 401 refunds, disables the key, and records last_error", async () => {
   const s = await seededServices();
   const out = await tryByokGenerate({ userId: "u1", prompt: "x", vec: [] }, s,
-    cfg({ providerFor: () => ({ generate: async () => { throw new ProviderAuthError("401"); }, validateKey: async () => true }) }));
+    cfg({ providerFor: () => ({ mode: "sync", generate: async () => { throw new ProviderAuthError("401"); }, validateKey: async () => true }) }));
   expect(out.kind).toBe("provider_error");
   const row = (s as any)._byokRows.get("u1");
   expect(row.enabled).toBe(0);

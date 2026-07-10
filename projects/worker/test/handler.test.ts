@@ -262,7 +262,7 @@ async function byokCtx(s: any, over: Partial<ByokCfg> = {}) {
       publicUrlBase: "https://byok.example", now: () => 1783468800, // 2026-07-08 UTC
 
       fetchFn: cleanModeration,
-      providerFor: () => ({ generate: async () => ({ bytes: new Uint8Array([1]).buffer, mime: "image/png" }), validateKey: async () => true }),
+      providerFor: () => ({ mode: "sync", generate: async () => ({ bytes: new Uint8Array([1]).buffer, mime: "image/png" }), validateKey: async () => true }),
       uuid: () => "gen-1",
       ...over,
     } as ByokCfg,
@@ -331,7 +331,7 @@ it("cap reached -> approximate fallback with byok status", async () => {
 
 it("provider failure on empty pool -> 202 pending with byok status", async () => {
   const s = fakeServices();
-  const ctx = await byokCtx(s, { providerFor: () => ({ generate: async () => { throw new Error("boom"); }, validateKey: async () => true }) });
+  const ctx = await byokCtx(s, { providerFor: () => ({ mode: "sync", generate: async () => { throw new Error("boom"); }, validateKey: async () => true }) });
   const res = await handleGenerate({ prompt: "a red fox" }, s, cfg, ctx);
   expect(res.status).toBe(202);
   const body: any = await res.json();
