@@ -46,8 +46,9 @@ library) while collection management hides in the account page.
 ### `POST /v1/images/generations` (read — URL unchanged, simplified)
 
 - Body: `{prompt, n?, size?, collection?}`.
-- `cache_tolerance` and `generate_on_miss` are **accepted and ignored**
-  (deprecation note in docs; existing paid callers must not break).
+- `cache_tolerance` and `generate_on_miss` are **removed outright** — no
+  deprecation shim, the product is pre-launch (unknown JSON fields are simply
+  ignored, as standard).
 - `collection` remains for scoped *search*; collections stay publicly readable.
 - All BYOK plumbing (`runByok`, `generatedResponse`, byok fallback statuses)
   leaves `handler.ts`.
@@ -128,8 +129,8 @@ Index `(status, updated_at)` for the sweep.
 
 ## 5. Deletions
 
-- `runByok` and all BYOK branches out of the read handler; `GenBody` loses
-  `cache_tolerance`/`generate_on_miss` semantics (fields parsed but unused).
+- `runByok` and all BYOK branches out of the read handler; `GenBody` drops
+  `cache_tolerance`/`generate_on_miss` entirely (validation included).
 - The SSE-streaming workaround in `src/providers.ts` once nothing references
   it (gpt-image-1 ducks the kill window without partials).
 - Playground page generation controls; account-card BYOK/slots UI.
@@ -154,16 +155,16 @@ Index `(status, updated_at)` for the sweep.
   schema; extend the discipline to the new table).
 - Fixture tests for provider poll payloads (GMI job states; OpenAI background
   response states if adopted).
-- Contract tests: old params ignored not rejected; approximate always carries
-  `similarity`; creation gates return the documented statuses in order.
+- Contract tests: approximate always carries `similarity`; creation gates
+  return the documented statuses in order.
 - Live browser smoke with a real key at the end (also still owed from the
   collections ship).
 
 ## 8. Rollout
 
 1. Migration 0016 local → remote.
-2. Worker deploy with both endpoints live; read endpoint simplification is
-   backward-compatible (ignored params).
+2. Worker deploy with both endpoints live (breaking change to the read
+   endpoint params is fine — pre-launch).
 3. SPA merge + docs update in the same deploy (the SPA is worker-served).
 4. Re-pin gpt-image-2 only after the background-mode research step and a live
    end-to-end generation on prod.
