@@ -246,3 +246,66 @@ it("14. get: failed job -> 200 status 'failed' with error string", async () => {
   expect(body.generation.status).toBe("failed");
   expect(body.generation.error).toBe("generation failed");
 });
+
+it("15. create: malformed JSON body -> 400 {error:'invalid JSON body'}", async () => {
+  const s = fakeServices();
+  const id = "col_malformed15";
+  await s.collections.create({ id, ownerUserId: DEV_USER_ID, name: "n", themePrompt: "" });
+  await giveByok(s, DEV_USER_ID, "gmicloud");
+
+  // Create request with intentionally malformed JSON
+  const malformedReq = new Request(`https://x/v1/collections/${id}/generations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{nope", // invalid JSON
+  });
+
+  const res = await handleCreateGeneration(id, malformedReq, DEV_ENV, s, jobCfg());
+  expect(res.status).toBe(400);
+  const body: any = await res.json();
+  expect(body.error).toBe("invalid JSON body");
+});
+
+it("16. create: rate limiter denies -> 429 {error:'Too many requests'}", async () => {
+  const s = fakeServices({
+    rateLimiter: { limit: async () => false },
+  });
+  const id = "col_ratelimit16";
+  await s.collections.create({ id, ownerUserId: DEV_USER_ID, name: "n", themePrompt: "" });
+  await giveByok(s, DEV_USER_ID, "gmicloud");
+
+  const res = await handleCreateGeneration(
+    id, req(`/v1/collections/${id}/generations`, "POST", { prompt: "a red fox" }), DEV_ENV, s, jobCfg()
+  );
+  expect(res.status).toBe(429);
+  const body: any = await res.json();
+  expect(body.error).toBe("Too many requests");
+});
+
+it("17. create: async provider submit throws -> 502 {error:'generation failed to start'}, refund usage", async () => {
+  const s = fakeServices();
+  const id = "col_provider_error17";
+  await s.collections.create({ id, ownerUserId: DEV_USER_ID, name: "n", themePrompt: "" });
+  await giveByok(s, DEV_USER_ID, "gmicloud");
+
+  // Override provider to throw on submit
+  const failingProvider: AsyncImageProvider = {
+    mode: "async",
+    submit: async () => { throw new Error("boom"); },
+    check: async () => ({ state: "pending" }),
+    validateKey: async () => true,
+  };
+
+  const res = await handleCreateGeneration(
+    id, req(`/v1/collections/${id}/generations`, "POST", { prompt: "a red fox" }), DEV_ENV, s,
+    jobCfg({ providerFor: () => failingProvider })
+  );
+
+  expect(res.status).toBe(502);
+  const body: any = await res.json();
+  expect(body.error).toBe("generation failed to start");
+
+  // Verify refund happened: usage count should be 0
+  const usage = await s.byok.getUsage(DEV_USER_ID, MONTH);
+  expect(usage.count).toBe(0);
+});
