@@ -1,12 +1,29 @@
 # wagmi.photos — Handoff / Resume Here
 
-> **2026-07-10:** Big day shipped and verified live: **collections + progressive slots**,
+> **2026-07-10 (later session): READ/WRITE SPLIT SHIPPED TO PROD** (main@a347c17,
+> worker `5aeb58e1`, 14 reviewed commits). The read endpoint is a pure closest-match
+> lookup (`cache_tolerance`/`generate_on_miss` REMOVED); creation is a new async,
+> BYOK-gated, collection-scoped flow (`POST /v1/collections/:id/generations` → 202
+> ticket → `GET /v1/generations/:id` poll-through; cron sweep every 2 min, migration
+> **0016** applied remote). **gpt-image-2 is BACK** (OpenAI Responses background mode,
+> probe-verified 70s, contract re-pinned @ $0.055); GMI decomposed to submit/check.
+> SPA: playground page deleted — `#/library` now has Library|Collections tabs with the
+> generate box + BYOK key management. Shared library is operator-backfill-only
+> (collection assets excluded from unscoped reads). New real-schema D1 test harness
+> (`test/real-d1.ts`) — it caught a would-be-shipped FK bug in review.
+> **REMAINING: prod browser smoke with a real key** (generate → poll → image lands in
+> collection; kill-tab mid-poll → sweep finishes it) + the deferred post-merge list at
+> the end of `.superpowers/sdd/progress.md`. Spec:
+> [`docs/superpowers/specs/2026-07-10-read-write-split-async-collection-gen-design.md`](docs/superpowers/specs/2026-07-10-read-write-split-async-collection-gen-design.md).
+
+> **2026-07-10 (morning):** Big day shipped and verified live: **collections + progressive slots**,
 > **library seeded to 11,005 images**, UI polish batch, and **BYOK generation proven
 > end-to-end in prod** (gpt-image-1 medium, webp, SSE streaming) after a long live debug —
 > two real bugs fixed (post-0007 `url` column in `insertGenerated`; OpenAI's ~20s idle-kill
 > of silent image connections, which also forced reverting a gpt-image-2 attempt).
-> **NEXT TASK: async BYOK generation** to bring gpt-image-2 back — resume from
-> [`docs/HANDOFF-2026-07-10-async-byok-gen.md`](docs/HANDOFF-2026-07-10-async-byok-gen.md).
+> ~~NEXT TASK: async BYOK generation~~ — **DONE in the later 2026-07-10 session above**
+> ([`docs/HANDOFF-2026-07-10-async-byok-gen.md`](docs/HANDOFF-2026-07-10-async-byok-gen.md)
+> is the context that motivated it).
 
 > **2026-07-09:** **BYOK (bring-your-own-key generation) is LIVE in production** — users can
 > store an OpenAI/GMI key and fresh-generate below-tolerance prompts into the shared library.
