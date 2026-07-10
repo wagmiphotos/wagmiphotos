@@ -9,4 +9,22 @@ declare module "node:fs" {
 declare module "node:path" {
   export function join(...paths: string[]): string;
 }
+declare module "node:url" {
+  export function fileURLToPath(url: URL | string): string;
+}
+declare module "node:module" {
+  export function createRequire(filename: string): NodeRequire;
+  interface NodeRequire {
+    (id: string): any;
+  }
+}
 declare const __dirname: string;
+
+declare module "node:sqlite" {
+  export class DatabaseSync {
+    constructor(path: string, opts?: { enableForeignKeyConstraints?: boolean });
+    exec(sql: string): void;
+    prepare(sql: string): { get(...a: any[]): any; run(...a: any[]): any; all(...a: any[]): any[] };
+  }
+}
+
