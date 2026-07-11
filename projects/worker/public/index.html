@@ -1942,6 +1942,18 @@
       padding: 1px 5px;
     }
 
+    /* Language tabs on the docs quickstart */
+    .docs-tabs { margin: 16px 0 4px; }
+    .docs-tabbar { display: flex; gap: 6px; margin-bottom: 10px; }
+    .docs-tab {
+      border: 1px solid var(--line); background: transparent; color: var(--muted);
+      font-family: var(--font-display); font-weight: 700; font-size: 0.75rem;
+      padding: 6px 13px; border-radius: 999px; cursor: pointer;
+      transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    }
+    .docs-tab:hover { color: var(--ink); }
+    .docs-tab.active { color: var(--red-deep); border-color: rgba(237, 20, 30, 0.35); background: var(--red-tint); }
+
     /* ---- Docs extras ---- */
     .docs-content > h2:first-child { margin-top: 0; }
 
@@ -2078,9 +2090,10 @@
       gap: 8px;
     }
     .dev-list ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-    .dev-list li { display: flex; align-items: flex-start; gap: 9px; font-size: 0.875rem; color: var(--ink-soft); line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }
-    .dev-list li svg { flex: none; margin-top: 3px; }
-    .dev-list li svg { flex-shrink: 0; margin-top: 3px; color: var(--red); }
+    /* Block flow, not flex: flex would split inline <code> chips and the text
+       around them into separate flex items that wrap independently. */
+    .dev-list li { position: relative; padding-left: 23px; font-size: 0.875rem; color: var(--ink-soft); line-height: 1.5; overflow-wrap: anywhere; }
+    .dev-list li svg { position: absolute; left: 0; top: 3px; color: var(--red); }
 
     /* copy-to-clipboard code block */
     .copy-wrap { position: relative; }
@@ -3050,103 +3063,78 @@
     </div>
 
     <!-- VIEW 4: LEGAL & POLICY -->
-    <!-- VIEW: DOCS -->
+    <!-- VIEW: DOCS (quickstart + reference; absorbed the old /openai drop-in page) -->
     <div id="view-docs" class="spa-view">
       <div class="view-pad">
         <div class="page-head">
-          <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>Docs</div>
-          <h1 class="section-title">API reference</h1>
-          <p class="section-sub">One OpenAI-compatible endpoint, a shared image library in front of it. Everything below is the whole API.</p>
+          <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>Developers</div>
+          <h1 class="section-title">A drop-in for the OpenAI Images API</h1>
+          <p class="section-sub">Keep the official OpenAI SDK. Change one line — the base URL — and every request is answered cache-first, with a <code style="font-family: var(--font-mono); font-size: 0.9em;">shared_cache</code> block riding along in the response.</p>
         </div>
 
         <div class="glass-card">
           <div class="docs-content">
 
-            <h2 id="docs-auth">Authentication</h2>
-            <p>
-              All generation requests need a Bearer key, and keys belong to your account.
-              <a href="#/login" style="color: var(--red);">Log in</a> with a magic link (we email
-              it to you — no password), then create a key on the
-              <a href="#/account" style="color: var(--red);">Account</a> page. Or call the
-              endpoint directly with your logged-in session cookie:
-            </p>
-            <div class="docs-endpoint"><span class="method">POST</span> /v1/keys/generate</div>
-            <pre class="docs-pre"><span class="tk-flag"># requires a logged-in session — unauthenticated calls return 401</span>
-<span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://api.wagmi.photos/v1/keys/generate <span class="tk-flag">\</span>
-  <span class="tk-flag">-H</span> <span class="tk-str">"Cookie: wagmi_session=…"</span> <span class="tk-flag">\</span>
-  <span class="tk-flag">-H</span> <span class="tk-str">"Content-Type: application/json"</span> <span class="tk-flag">\</span>
-  <span class="tk-flag">-d</span> <span class="tk-str">'{ "label": "my-laptop" }'</span>
-
-{ <span class="tk-key">"key"</span>: <span class="tk-str">"sc-nA93…"</span>, <span class="tk-key">"created_at"</span>: <span class="tk-num">1783468800</span> }</pre>
-            <p>
-              Key minting is rate-limited (10 per minute per IP). Store the key yourself — it is
-              hashed (SHA-256) before it touches our database, so it cannot be shown again. Send
-              it on every request as <code>Authorization: Bearer sc-your-key</code>.
-            </p>
-
-            <h2 id="docs-generations">Generate or fetch an image</h2>
-            <div class="docs-endpoint"><span class="method">POST</span> /v1/images/generations</div>
-            <p>
-              The request shape matches the OpenAI Images API, so the official SDKs work by
-              pointing <code>base_url</code> at <code>https://api.wagmi.photos/v1</code>.
-              Your prompt is embedded with BGE and matched against the stored prompt of every
-              image in the shared library. The API always returns the closest match with a
-              <code>similarity</code> score — threshold client-side if you need stricter
-              matching; there is no <code>cache_tolerance</code> or <code>generate_on_miss</code>
-              request parameter.
-            </p>
-
-            <h3>Request body</h3>
-            <div class="docs-table-wrap">
-              <table class="docs-table">
-                <thead>
-                  <tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>prompt</td><td>string</td><td>required</td>
-                    <td>What you want. Prompts are normalized (trimmed, lowercased, whitespace collapsed) before matching and queueing.</td>
-                  </tr>
-                  <tr>
-                    <td>collection</td><td>string</td><td>—</td>
-                    <td>Scope matching to a collection by ID (<code>col_…</code>). The collection's theme prompt is appended before matching. Scoped requests never queue background generation — to generate fresh into a collection with your own key, use <a href="#docs-collection-generations" style="color: var(--red);">POST /v1/collections/:id/generations</a> instead. Official SDKs pass it via <code>extra_body</code>. Additional collections unlock with lifetime generated images (10 for the 2nd, 100 for the 3rd, 1000 for the 4th, …).</td>
-                  </tr>
-                  <tr>
-                    <td>n</td><td>integer</td><td>1</td>
-                    <td>Only <code>1</code> is supported; anything else returns <code>422</code>.</td>
-                  </tr>
-                  <tr>
-                    <td>size</td><td>string</td><td>—</td>
-                    <td>Accepted for OpenAI compatibility. Every response already includes <code>thumb</code>, <code>medium</code> and <code>large</code> URLs.</td>
-                  </tr>
-                  <tr>
-                    <td>model</td><td>string</td><td>—</td>
-                    <td>Accepted for OpenAI compatibility. Matching is model-agnostic; <code>shared_cache.model_used</code> reports the model that created the served image.</td>
-                  </tr>
-                </tbody>
-              </table>
+            <h2>The only change</h2>
+            <div class="compare-grid">
+              <div class="compare-card was">
+                <div class="compare-tag">Before — OpenAI</div>
+                <code>base_url = "https://api.openai.com/v1"</code>
+              </div>
+              <div class="compare-card now">
+                <div class="compare-tag">After — wagmi.photos</div>
+                <code>base_url = "https://api.wagmi.photos/v1"</code>
+              </div>
             </div>
+            <p>Swap your key for a wagmi.photos key (<code>sc-…</code>). Method names, the prompt field, and the way you read <code>data[0].url</code> stay exactly the same.</p>
 
-            <h3>Example</h3>
-            <pre class="docs-pre"><span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://api.wagmi.photos/v1/images/generations <span class="tk-flag">\</span>
-  <span class="tk-flag">-H</span> <span class="tk-str">"Authorization: Bearer $WAGMI_KEY"</span> <span class="tk-flag">-H</span> <span class="tk-str">"Content-Type: application/json"</span> <span class="tk-flag">\</span>
-  <span class="tk-flag">-d</span> <span class="tk-str">'{"prompt": "a lighthouse in a storm"}'</span></pre>
+            <h2 id="docs-generations">Call it</h2>
+            <div class="docs-endpoint"><span class="method">POST</span> /v1/images/generations</div>
+            <div class="docs-tabs">
+              <div class="docs-tabbar" role="tablist" aria-label="Language">
+                <button class="docs-tab active" role="tab" aria-selected="true" data-panel="docs-tab-python" type="button">Python</button>
+                <button class="docs-tab" role="tab" aria-selected="false" data-panel="docs-tab-js" type="button">JavaScript</button>
+                <button class="docs-tab" role="tab" aria-selected="false" data-panel="docs-tab-curl" type="button">cURL</button>
+              </div>
+              <div class="docs-tab-panel" id="docs-tab-python" role="tabpanel">
+                <pre class="docs-pre"><span class="tk-flag">from</span> openai <span class="tk-flag">import</span> OpenAI
 
-            <h3>Example — scoped to a collection</h3>
-            <p>
-              Pass <code>collection</code> to search inside one collection instead of the whole
-              shared library. Official SDKs pass it via <code>extra_body</code>:
-            </p>
-            <pre class="docs-pre"><span class="tk-flag">from</span> openai <span class="tk-flag">import</span> OpenAI
-
-client = OpenAI(base_url=<span class="tk-str">"https://api.wagmi.photos/v1"</span>, api_key=<span class="tk-str">"YOUR_WAGMI_KEY"</span>)
+client = OpenAI(
+    base_url=<span class="tk-str">"https://api.wagmi.photos/v1"</span>,
+    api_key=<span class="tk-str">"sc-your-key"</span>,
+)
 
 img = client.images.generate(
-    prompt=<span class="tk-str">"a watercolor fox in morning fog"</span>,
-    extra_body={<span class="tk-str">"collection"</span>: <span class="tk-str">"col_abc123"</span>},
-)</pre>
+    prompt=<span class="tk-str">"a lighthouse in a storm"</span>,
+)
 
-            <h3>Response — served from the library (200)</h3>
+<span class="tk-cmd">print</span>(img.data[<span class="tk-num">0</span>].url)
+<span class="tk-flag"># shared_cache always carries the closest match + a similarity score.</span>
+<span class="tk-flag"># Scope to a collection with extra_body={"collection": "col_..."}.</span></pre>
+              </div>
+              <div class="docs-tab-panel" id="docs-tab-js" role="tabpanel" hidden>
+                <pre class="docs-pre"><span class="tk-flag">import</span> OpenAI <span class="tk-flag">from</span> <span class="tk-str">"openai"</span>;
+
+<span class="tk-flag">const</span> client = <span class="tk-flag">new</span> OpenAI({
+  baseURL: <span class="tk-str">"https://api.wagmi.photos/v1"</span>,
+  apiKey: <span class="tk-str">"sc-your-key"</span>,
+});
+
+<span class="tk-flag">const</span> img = <span class="tk-flag">await</span> client.images.generate({
+  prompt: <span class="tk-str">"a lighthouse in a storm"</span>,
+});
+
+console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].url);</pre>
+              </div>
+              <div class="docs-tab-panel" id="docs-tab-curl" role="tabpanel" hidden>
+                <pre class="docs-pre"><span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://api.wagmi.photos/v1/images/generations <span class="tk-flag">\</span>
+  <span class="tk-flag">-H</span> <span class="tk-str">"Authorization: Bearer $WAGMI_KEY"</span> <span class="tk-flag">\</span>
+  <span class="tk-flag">-H</span> <span class="tk-str">"Content-Type: application/json"</span> <span class="tk-flag">\</span>
+  <span class="tk-flag">-d</span> <span class="tk-str">'{ "prompt": "a lighthouse in a storm" }'</span></pre>
+              </div>
+            </div>
+
+            <h2>What you get back</h2>
             <pre class="docs-pre">{
   <span class="tk-key">"created"</span>: <span class="tk-num">1783468800</span>,
   <span class="tk-key">"data"</span>: [{ <span class="tk-key">"url"</span>: <span class="tk-str">"https://cdn.wagmi.photos/assets/pd12m-8f31…/image.webp"</span> }],
@@ -3160,24 +3148,7 @@ img = client.images.generate(
     <span class="tk-key">"original_url"</span>: <span class="tk-str">"https://pd12m.s3.us-west-2.amazonaws.com/…"</span>
   }
 }</pre>
-            <p>
-              <code>original_url</code> is the external source image when one exists, and
-              <code>null</code> for generated images.
-            </p>
-
-            <h3>Response — nothing close enough yet (202)</h3>
-            <pre class="docs-pre">{
-  <span class="tk-key">"created"</span>: <span class="tk-num">1783468800</span>,
-  <span class="tk-key">"data"</span>: [],
-  <span class="tk-key">"shared_cache"</span>: {
-    <span class="tk-key">"result"</span>: <span class="tk-str">"pending"</span>,
-    <span class="tk-key">"similarity"</span>: <span class="tk-num">0</span>,
-    <span class="tk-key">"cost_saved_usd"</span>: <span class="tk-num">0</span>,
-    <span class="tk-key">"generation_queued"</span>: <span class="tk-num">true</span>
-  }
-}</pre>
-
-            <h3>Result values</h3>
+            <p><code>original_url</code> is the external source image when one exists, and <code>null</code> for generated images. <code>result</code> is one of three values:</p>
             <div class="docs-table-wrap">
               <table class="docs-table">
                 <thead>
@@ -3186,49 +3157,106 @@ img = client.images.generate(
                 <tbody>
                   <tr>
                     <td>hit</td><td>200</td>
-                    <td>Similarity is at or above the match floor. The image is served; nothing is queued.</td>
+                    <td>At or above the match floor. Served; nothing is queued.</td>
                   </tr>
                   <tr>
                     <td>approximate</td><td>200</td>
-                    <td>The best image falls below the floor. It is served anyway so you have something to show, and the prompt is queued for demand-ranked background generation. <code>generation_queued</code> is included and <code>cost_saved_usd</code> is <code>0</code> — only true hits count as savings.</td>
+                    <td>The best image is below the floor. Served anyway so you have something to show; the prompt is queued and <code>cost_saved_usd</code> is <code>0</code>.</td>
                   </tr>
                   <tr>
                     <td>pending</td><td>202</td>
-                    <td>The library has nothing to serve. <code>data</code> is empty and the prompt is queued for demand-ranked background generation. Retry the same prompt later — once built, it is a hit for everyone.</td>
+                    <td><code>data</code> is empty — nothing close exists yet. The prompt is queued; retry the same prompt later and it is a hit for everyone.</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <p style="font-size:0.875rem;color:var(--muted);">Want a fresh image on your own schedule instead of waiting on demand-ranked backfill? Generate into a collection with your own BYOK provider key on the <a href="#/library" style="color: var(--red);">Collections tab</a> — see <a href="#docs-collection-generations" style="color: var(--red);">Create images in your collections</a> below.</p>
+            <p id="docs-matching" style="font-size:0.875rem;color:var(--muted);">Matching is prompt-to-prompt: BGE cosine similarity against a fixed server-side floor (≈0.85). There is no <code>cache_tolerance</code> or <code>generate_on_miss</code> — threshold on <code>similarity</code> client-side. See <a href="#/matching" style="color: var(--red);">how semantic matching works</a>.</p>
+            <p id="docs-backfill" style="font-size:0.875rem;color:var(--muted);">Every miss records demand: the most-requested prompts are built by the shared backfill and become hits for everyone. <code>shared_cache.generation_queued</code> tells you whether yours is in that queue.</p>
 
-            <h2 id="docs-matching">How matching works</h2>
-            <p>
-              Matching is prompt-to-prompt: your prompt's BGE text embedding
-              (<code>bge-base-en-v1.5</code> on Workers AI) is compared by cosine similarity
-              against the stored prompt embedding of every library image. The single nearest
-              library prompt is compared against a fixed similarity floor (≈0.85, server-side —
-              not a request parameter) — at or above it you get a <code>hit</code>, below it an
-              <code>approximate</code>. Realistic scores live in the ~0.7–0.95 band. The API
-              always returns the closest match with its <code>similarity</code> score in
-              <code>shared_cache</code>; threshold client-side if you need stricter matching. See
-              <a href="#/matching" style="color: var(--red);">how semantic matching works</a> for
-              the full picture.
-            </p>
-
-            <h2 id="docs-backfill">Background generation semantics</h2>
-            <p>
-              Every miss (<code>approximate</code> or <code>pending</code>) records the prompt's
-              demand. There is no per-request opt-out — generation is decided centrally by
-              demand-ranking, so the most-requested misses get built first by the shared backfill
-              and become hits for everyone. <code>shared_cache.generation_queued</code> tells you
-              whether this specific request's prompt is in that queue.
-            </p>
-            <div class="docs-note">
-              Want a fresh image right now instead of waiting on demand-ranked backfill? Generate
-              into a collection with your own provider key — see
-              <a href="#docs-collection-generations" style="color: var(--red);">Create images in
-              your collections</a> below.
+            <h2>What stays the same, what you gain</h2>
+            <div class="dev-cols">
+              <div class="dev-list">
+                <h4>Unchanged</h4>
+                <ul>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>The official OpenAI SDKs and method names</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>The <code>prompt</code> field and request flow</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Reading the image from <code>data[0].url</code></li>
+                </ul>
+              </div>
+              <div class="dev-list">
+                <h4>Added by wagmi.photos</h4>
+                <ul>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>A <code>shared_cache</code> block: result, similarity, cost saved</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>~0.1&nbsp;s cache hits at $0 per image</li>
+                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>Always the closest match, with a <code>similarity</code> score to threshold client-side</li>
+                </ul>
+              </div>
             </div>
+
+            <h2>Request fields</h2>
+            <div class="docs-table-wrap">
+              <table class="docs-table">
+                <thead>
+                  <tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>prompt</td><td>string</td><td>required</td>
+                    <td>What you want. Prompts are normalized (trimmed, lowercased, whitespace collapsed) before matching and queueing.</td>
+                  </tr>
+                  <tr>
+                    <td>collection</td><td>string</td><td>—</td>
+                    <td>Scope matching to one collection by ID (<code>col_…</code>) — official SDKs pass it via <code>extra_body</code>. The collection's theme prompt is appended before matching, and scoped requests never queue background generation; to generate with your own key, see <a href="#docs-collection-generations" style="color: var(--red);">below</a>.</td>
+                  </tr>
+                  <tr>
+                    <td>n</td><td>integer</td><td>1</td>
+                    <td>Only <code>1</code> is supported; anything else returns <code>422</code>.</td>
+                  </tr>
+                  <tr>
+                    <td>size</td><td>string</td><td>—</td>
+                    <td>Accepted for OpenAI compatibility; every response already includes <code>thumb</code>, <code>medium</code> and <code>large</code> URLs.</td>
+                  </tr>
+                  <tr>
+                    <td>model</td><td>string</td><td>—</td>
+                    <td>Accepted for OpenAI compatibility; <code>shared_cache.model_used</code> reports the model that created the served image.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h2 id="docs-collection-generations">Create images in your collections</h2>
+            <p>
+              The one path that always spends: generate your exact prompt now, with your own
+              provider key, straight into a collection you own (set up on the
+              <a href="#/library" style="color: var(--red);">Collections tab</a>). It starts a
+              background job and hands back a ticket.
+            </p>
+            <div class="docs-endpoint"><span class="method">POST</span> /v1/collections/:id/generations</div>
+            <div class="docs-endpoint"><span class="method">GET</span> /v1/generations/:id</div>
+            <pre class="docs-pre"><span class="tk-flag"># Start a generation (requires your own provider key + a collection you own)</span>
+<span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://api.wagmi.photos/v1/collections/col_abc123/generations <span class="tk-flag">\</span>
+  <span class="tk-flag">-H</span> <span class="tk-str">"Authorization: Bearer sc-..."</span> <span class="tk-flag">-H</span> <span class="tk-str">"Content-Type: application/json"</span> <span class="tk-flag">\</span>
+  <span class="tk-flag">-d</span> <span class="tk-str">'{"prompt": "a watercolor fox in morning fog"}'</span>
+<span class="tk-flag"># -&gt; 202 {"generation": {"id": "gen_...", "status": "generating", ...}, "byok": {"used": 3, "cap": 50, ...}}</span>
+
+<span class="tk-flag"># Poll the ticket until it leaves queued/generating</span>
+<span class="tk-cmd">curl</span> https://api.wagmi.photos/v1/generations/gen_... <span class="tk-flag">-H</span> <span class="tk-str">"Authorization: Bearer sc-..."</span>
+<span class="tk-flag"># -&gt; {"generation": {"status": "succeeded", "image": {"url": "...", "thumb_url": "..."}}}</span></pre>
+            <ul>
+              <li>A ticket moves <code>queued</code> → <code>generating</code> → <code>succeeded</code> or <code>failed</code>; poll while it is in the first two.</li>
+              <li><code>failed</code> is auto-refunded — it never counts toward your monthly cap.</li>
+              <li>A collection you don't own, or an unknown generation id, returns <code>404</code>.</li>
+            </ul>
+
+            <h2 id="docs-auth">Auth &amp; keys</h2>
+            <p>
+              <a href="#/login" style="color: var(--red);">Log in</a> with a magic link (no
+              password), create a key on the
+              <a href="#/account" style="color: var(--red);">Account</a> page, and send it as
+              <code>Authorization: Bearer sc-your-key</code>. Keys are hashed before storage and
+              shown once — store them yourself. Minting is rate-limited (10 per minute per IP).
+            </p>
+            <p>Prefer the API? <code>POST /v1/keys/generate</code> also works with a logged-in session cookie — unauthenticated calls return <code>401</code>.</p>
 
             <h2 id="docs-errors">Errors</h2>
             <div class="docs-table-wrap">
@@ -3239,56 +3267,12 @@ img = client.images.generate(
                 <tbody>
                   <tr><td>400</td><td>Body is not valid JSON, or not a JSON object.</td></tr>
                   <tr><td>401</td><td>Missing or invalid API key.</td></tr>
-                  <tr><td>422</td><td><code>n</code> is set to anything but 1, <code>prompt</code> is missing/empty/too long, or <code>collection</code> is present but not a non-empty string.</td></tr>
-                  <tr><td>429</td><td>Rate limit exceeded — generation requests (per account) and key minting (per IP) are each limited to 10 per minute.</td></tr>
+                  <tr><td>422</td><td><code>n</code> is anything but 1, <code>prompt</code> is missing/empty/too long, or <code>collection</code> is not a non-empty string.</td></tr>
+                  <tr><td>429</td><td>Rate limit exceeded — generations (per account) and key minting (per IP) are each 10 per minute.</td></tr>
                   <tr><td>502</td><td>An upstream dependency failed; the body includes a <code>detail</code> string.</td></tr>
                 </tbody>
               </table>
             </div>
-
-            <h2 id="docs-collection-generations">Create images in your collections</h2>
-            <p>
-              Generate a fresh image straight into a collection you own, using your own
-              BYOK provider key set up on the <a href="#/library" style="color: var(--red);">Collections tab</a>. Unlike
-              <code>POST /v1/images/generations</code>, this endpoint always spends — it is the
-              deliberate, async escape hatch for when you want your exact prompt now instead of
-              waiting on demand-ranked backfill. It starts a background job and returns
-              immediately; poll the ticket it hands back until it leaves
-              <code>queued</code>/<code>generating</code>.
-            </p>
-
-            <h3>Start a generation</h3>
-            <div class="docs-endpoint"><span class="method">POST</span> /v1/collections/:id/generations</div>
-            <pre class="docs-pre"><span class="tk-flag"># Start a generation (requires your own provider key + a collection you own)</span>
-<span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://api.wagmi.photos/v1/collections/col_abc123/generations <span class="tk-flag">\</span>
-  <span class="tk-flag">-H</span> <span class="tk-str">"Authorization: Bearer sc-..."</span> <span class="tk-flag">-H</span> <span class="tk-str">"Content-Type: application/json"</span> <span class="tk-flag">\</span>
-  <span class="tk-flag">-d</span> <span class="tk-str">'{"prompt": "a watercolor fox in morning fog"}'</span>
-<span class="tk-flag"># -&gt; 202 {"generation": {"id": "gen_...", "status": "generating", ...}, "byok": {"used": 3, "cap": 50, ...}}</span></pre>
-
-            <h3>Poll the ticket</h3>
-            <div class="docs-endpoint"><span class="method">GET</span> /v1/generations/:id</div>
-            <pre class="docs-pre"><span class="tk-flag"># Poll the ticket until it leaves queued/generating</span>
-<span class="tk-cmd">curl</span> https://api.wagmi.photos/v1/generations/gen_... <span class="tk-flag">-H</span> <span class="tk-str">"Authorization: Bearer sc-..."</span>
-<span class="tk-flag"># -&gt; {"generation": {"status": "succeeded", "image": {"url": "...", "thumb_url": "..."}}}</span></pre>
-
-            <h3>Statuses, refunds &amp; ownership</h3>
-            <p>
-              A generation moves through <code>queued</code> → <code>generating</code> →
-              <code>succeeded</code> or <code>failed</code>. Keep polling
-              <code>GET /v1/generations/:id</code> while it is <code>queued</code> or
-              <code>generating</code>; once it reaches a terminal status the response carries the
-              image URLs (on <code>succeeded</code>) or an <code>error</code> string (on
-              <code>failed</code>).
-            </p>
-            <p>
-              A generation that ends in <code>failed</code> is automatically refunded against
-              your monthly cap — a failed attempt never counts toward <code>used</code>.
-            </p>
-            <p>
-              Collections are private capabilities: requesting a generation for a collection you
-              don't own, or fetching a generation id you didn't create, returns <code>404</code>
-              — the same as an unknown id.
-            </p>
 
             <h2 id="docs-health">Health</h2>
             <div class="docs-endpoint"><span class="method">GET</span> /healthz</div>
@@ -4096,6 +4080,21 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       pre.parentNode.insertBefore(wrap, pre);
       wrap.appendChild(pre);
       wrap.insertAdjacentHTML('afterbegin', '<button class="copy-btn" type="button" onclick="copyCode(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span class="copy-label">Copy</span></button>');
+    });
+
+    // Language tabs on the docs quickstart
+    document.querySelectorAll('.docs-tabbar').forEach((bar) => {
+      bar.addEventListener('click', (e) => {
+        const tab = e.target.closest('.docs-tab');
+        if (!tab) return;
+        bar.querySelectorAll('.docs-tab').forEach((t) => {
+          t.classList.toggle('active', t === tab);
+          t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+        });
+        tab.closest('.docs-tabs').querySelectorAll('.docs-tab-panel').forEach((p) => {
+          p.hidden = p.id !== tab.dataset.panel;
+        });
+      });
     });
 
     function copyCode(btn) {
