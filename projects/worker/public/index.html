@@ -2288,11 +2288,7 @@
                 <div class="nav-col-head">Developers</div>
                 <a href="#/docs" id="nav-docs" class="nav-drop-item">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg></span>
-                  <span><span class="nav-drop-title">API reference</span><span class="nav-drop-sub">Endpoints, params, responses.</span></span>
-                </a>
-                <a href="#/openai" id="nav-openai" class="nav-drop-item">
-                  <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m0 8v3a2 2 0 0 0 2 2h3m8-18h3a2 2 0 0 1 2 2v3m0 8v3a2 2 0 0 1-2 2h-3"/><path d="m9 15 6-6"/><path d="M15 15V9h-6"/></svg></span>
-                  <span><span class="nav-drop-title">OpenAI drop-in</span><span class="nav-drop-sub">Swap the base URL, nothing else.</span></span>
+                  <span><span class="nav-drop-title">Docs</span><span class="nav-drop-sub">Swap the base URL — that's the API.</span></span>
                 </a>
                 <a href="#/matching" id="nav-matching" class="nav-drop-item">
                   <span class="nav-drop-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="1.5"/><circle cx="17" cy="6" r="1.5"/><circle cx="10" cy="15" r="1.5"/><circle cx="18" cy="16" r="1.5"/><circle cx="5" cy="17" r="1.5"/></svg></span>
@@ -3283,101 +3279,6 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
       </div>
     </div>
 
-    <!-- VIEW: OPENAI DROP-IN -->
-    <div id="view-openai" class="spa-view">
-      <div class="view-pad">
-        <div class="page-head">
-          <div class="eyebrow"><span class="tick tick-red"></span><span class="tick tick-ink"></span>Developers</div>
-          <h1 class="section-title">A drop-in for the OpenAI Images API</h1>
-          <p class="section-sub">Keep the official OpenAI SDK. Change one line — the base URL — and every request is answered cache-first, with a <code style="font-family: var(--font-mono); font-size: 0.9em;">shared_cache</code> block riding along in the response.</p>
-        </div>
-
-        <div class="glass-card">
-          <div class="docs-content">
-            <h2>The only change</h2>
-            <div class="compare-grid">
-              <div class="compare-card was">
-                <div class="compare-tag">Before — OpenAI</div>
-                <code>base_url = "https://api.openai.com/v1"</code>
-              </div>
-              <div class="compare-card now">
-                <div class="compare-tag">After — wagmi.photos</div>
-                <code>base_url = "https://api.wagmi.photos/v1"</code>
-              </div>
-            </div>
-            <p>Swap your key for a wagmi.photos key (<code>sc-…</code>). Method names, the prompt field, and the way you read <code>data[0].url</code> stay exactly the same.</p>
-
-            <h2>Python</h2>
-            <div class="copy-wrap">
-              <button class="copy-btn" type="button" onclick="copyCode(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span class="copy-label">Copy</span></button>
-              <pre class="docs-pre"><span class="tk-flag">from</span> openai <span class="tk-flag">import</span> OpenAI
-
-client = OpenAI(
-    base_url=<span class="tk-str">"https://api.wagmi.photos/v1"</span>,
-    api_key=<span class="tk-str">"sc-your-key"</span>,
-)
-
-img = client.images.generate(
-    prompt=<span class="tk-str">"a lighthouse in a storm"</span>,
-)
-
-<span class="tk-cmd">print</span>(img.data[<span class="tk-num">0</span>].url)
-<span class="tk-flag"># shared_cache always carries the closest match + a similarity score.</span>
-<span class="tk-flag"># Scope to a collection with extra_body={"collection": "col_..."}.</span></pre>
-            </div>
-
-            <h2>JavaScript</h2>
-            <div class="copy-wrap">
-              <button class="copy-btn" type="button" onclick="copyCode(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span class="copy-label">Copy</span></button>
-              <pre class="docs-pre"><span class="tk-flag">import</span> OpenAI <span class="tk-flag">from</span> <span class="tk-str">"openai"</span>;
-
-<span class="tk-flag">const</span> client = <span class="tk-flag">new</span> OpenAI({
-  baseURL: <span class="tk-str">"https://api.wagmi.photos/v1"</span>,
-  apiKey: <span class="tk-str">"sc-your-key"</span>,
-});
-
-<span class="tk-flag">const</span> img = <span class="tk-flag">await</span> client.images.generate({
-  prompt: <span class="tk-str">"a lighthouse in a storm"</span>,
-});
-
-console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].url);</pre>
-            </div>
-
-            <h2>cURL</h2>
-            <div class="copy-wrap">
-              <button class="copy-btn" type="button" onclick="copyCode(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span class="copy-label">Copy</span></button>
-              <pre class="docs-pre"><span class="tk-cmd">curl</span> <span class="tk-flag">-X POST</span> https://api.wagmi.photos/v1/images/generations <span class="tk-flag">\</span>
-  <span class="tk-flag">-H</span> <span class="tk-str">"Authorization: Bearer $WAGMI_KEY"</span> <span class="tk-flag">\</span>
-  <span class="tk-flag">-H</span> <span class="tk-str">"Content-Type: application/json"</span> <span class="tk-flag">\</span>
-  <span class="tk-flag">-d</span> <span class="tk-str">'{ "prompt": "a lighthouse in a storm" }'</span></pre>
-            </div>
-
-            <h2>What stays the same, what you gain</h2>
-            <div class="dev-cols">
-              <div class="dev-list">
-                <h4>Unchanged</h4>
-                <ul>
-                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>The official OpenAI SDKs and method names</li>
-                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>The <code>prompt</code> field and request flow</li>
-                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Reading the image from <code>data[0].url</code></li>
-                </ul>
-              </div>
-              <div class="dev-list">
-                <h4>Added by wagmi.photos</h4>
-                <ul>
-                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>A <code>shared_cache</code> block: result, similarity, cost saved</li>
-                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>~0.1&nbsp;s cache hits at $0 per image</li>
-                  <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>Always the closest match, with a <code>similarity</code> score to threshold client-side</li>
-                </ul>
-              </div>
-            </div>
-
-            <div class="docs-note"><b>Response note:</b> a <code>202</code> means nothing close was cached yet — <code>data</code> is empty and the prompt was queued for demand-ranked background generation. Handle it like a soft miss: proceed without an image or retry later. Full details in the <a href="#/docs">API reference</a>.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- VIEW: SEMANTIC MATCHING -->
     <div id="view-matching" class="spa-view">
       <div class="view-pad">
@@ -3694,8 +3595,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         <div class="footer-col">
           <div class="footer-col-head">Developers</div>
           <ul>
-            <li><a href="#/docs">API reference</a></li>
-            <li><a href="#/openai">OpenAI drop-in</a></li>
+            <li><a href="#/docs">Docs</a></li>
             <li><a href="#/matching">Semantic matching</a></li>
             <li><a href="#/agents">Agents</a></li>
           </ul>
@@ -3850,7 +3750,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       '#/privacy':    { view: 'view-privacy' },
       '#/legal':      { view: 'view-terms' },   // legacy alias -> Terms
       '#/docs':       { view: 'view-docs', link: 'nav-docs' },
-      '#/openai':     { view: 'view-openai', link: 'nav-openai' },
+      '#/openai':     { view: 'view-docs', link: 'nav-docs' },
       '#/matching':   { view: 'view-matching', link: 'nav-matching' },
       '#/agents':     { view: 'view-agents', link: 'nav-agents' },
       '#/login':      { view: 'view-login', onShow: () => {
@@ -3864,7 +3764,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     };
     const PATH_TO_HASH = {
       '/playground': '#/library', '/docs': '#/docs', '/pricing': '#/pricing',
-      '/account': '#/account', '/terms': '#/terms', '/privacy': '#/privacy', '/legal': '#/terms', '/openai': '#/openai',
+      '/account': '#/account', '/terms': '#/terms', '/privacy': '#/privacy', '/legal': '#/terms', '/openai': '#/docs',
       '/matching': '#/matching', '/clip': '#/matching', '/agents': '#/agents',
       '/library': '#/library',
     };
