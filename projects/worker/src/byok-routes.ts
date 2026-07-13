@@ -30,13 +30,20 @@ export async function byokView(s: Services, userId: string, nowSec: number): Pro
 }
 
 const nowSec = () => Math.floor(Date.now() / 1000);
+const clientIp = (request: Request) => request.headers.get("CF-Connecting-IP") ?? "unknown";
+
+// Every session-authed BYOK mutation shares one per-IP bucket: PUT (key add),
+// PATCH (cap/enabled), DELETE (key removal). Keeps a stolen/replayed session
+// from hammering key management.
+async function byokRateLimited(request: Request, s: Services): Promise<boolean> {
+  return !(await s.rateLimiter.limit(`byok:ip:${clientIp(request)}`));
+}
 
 export async function handlePutByok(request: Request, env: Env, s: Services, validate: ValidateKey = defaultValidate): Promise<Response> {
   const principal = await resolveSession(request, env, s.sessions);
   if (!principal) return Response.json({ error: "not authenticated" }, { status: 401 });
   if (!env.BYOK_KEK) return Response.json({ error: "BYOK is not configured on this deployment" }, { status: 503 });
-  const ok = await s.rateLimiter.limit(`byok:ip:${request.headers.get("CF-Connecting-IP") ?? "unknown"}`);
-  if (!ok) return Response.json({ error: "Too many requests" }, { status: 429 });
+  if (await byokRateLimited(request, s)) return Response.json({ error: "Too many requests" }, { status: 429 });
 
   let body: any;
   try { body = await request.json(); } catch { return Response.json({ error: "invalid JSON body" }, { status: 400 }); }
@@ -73,6 +80,7 @@ export async function handlePutByok(request: Request, env: Env, s: Services, val
 export async function handlePatchByok(request: Request, env: Env, s: Services): Promise<Response> {
   const principal = await resolveSession(request, env, s.sessions);
   if (!principal) return Response.json({ error: "not authenticated" }, { status: 401 });
+  if (await byokRateLimited(request, s)) return Response.json({ error: "Too many requests" }, { status: 429 });
   let body: any;
   try { body = await request.json(); } catch { return Response.json({ error: "invalid JSON body" }, { status: 400 }); }
   const f: { enabled?: boolean; monthlyCap?: number } = {};
@@ -94,6 +102,7 @@ export async function handlePatchByok(request: Request, env: Env, s: Services): 
 export async function handleDeleteByok(request: Request, env: Env, s: Services): Promise<Response> {
   const principal = await resolveSession(request, env, s.sessions);
   if (!principal) return Response.json({ error: "not authenticated" }, { status: 401 });
+  if (await byokRateLimited(request, s)) return Response.json({ error: "Too many requests" }, { status: 429 });
   await s.byok.delete(principal.userId);
   return Response.json({ status: "ok" });
 }

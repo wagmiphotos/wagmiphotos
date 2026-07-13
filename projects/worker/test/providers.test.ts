@@ -208,6 +208,26 @@ it("gmi check rejects an image download over the size cap via Content-Length", a
   await expect((providerFor("gmicloud", fetchFn) as AsyncImageProvider).check("req-1", "k")).rejects.toThrow(/too large/);
 });
 
+it("gmi check refuses to download a non-https or internal image url (SSRF guard), without fetching it", async () => {
+  const make = (mediaUrl: string) => {
+    const attempted: string[] = [];
+    const fetchFn = (async (url: any) => {
+      const u = String(url);
+      attempted.push(u);
+      if (u.endsWith("/requests/req-1")) return okJson({ status: "success", outcome: { media_urls: [mediaUrl] } });
+      // Any attempt to actually fetch the guarded url is itself a failure.
+      return new Response(PNG, { status: 200, headers: { "Content-Type": "image/png" } });
+    }) as unknown as typeof fetch;
+    return { fetchFn, attempted };
+  };
+
+  for (const bad of ["http://cdn.gmi/img.png", "https://169.254.169.254/latest/meta-data", "https://localhost/x", "https://127.0.0.1/x"]) {
+    const { fetchFn, attempted } = make(bad);
+    await expect((providerFor("gmicloud", fetchFn) as AsyncImageProvider).check("req-1", "k")).rejects.toThrow();
+    expect(attempted).toEqual(["https://console.gmicloud.ai/api/v1/ie/requestqueue/apikey/requests/req-1"]); // never fetched the bad url
+  }
+});
+
 it("unknown provider throws", () => {
   expect(() => providerFor("google")).toThrow(/unknown provider/);
 });

@@ -707,7 +707,6 @@ async function startPollFor(genId, collId, startTime) {
     if (gen && gen.status === 'failed') { errorPending(genId, collId, gen.error || 'Generation failed'); return; }
     if (!gen && status === 404) { missing++; if (missing >= 4) { errorPending(genId, collId, 'Generation not found'); return; } }
     else { missing = 0; }
-    if (pendingGens.has(genId) && selectedCollId === collId) refreshPendingTileTimers();
   }
   errorPending(genId, collId, 'Timed out waiting for the image');
 }
@@ -765,12 +764,6 @@ function collTile(img) {
       <button type="button" class="tile-del" aria-label="Delete image" title="Delete image" onclick="event.stopPropagation();deleteCollectionImage('${selectedCollId}', '${img.id}')">✕</button>
     </div>`;
 }
-```
-
-Add a no-op-safe `refreshPendingTileTimers()` (a light re-render of the elapsed label, or simply call `loadCollectionViewer(selectedCollId)` throttled). Minimal acceptable body:
-
-```js
-function refreshPendingTileTimers() { /* elapsed label is cosmetic; grid re-renders on state change. */ }
 ```
 
 - [ ] **Step 5: Add tile CSS**

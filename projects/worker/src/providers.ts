@@ -39,6 +39,33 @@ const GMI_VALIDATE_TIMEOUT_MS = 10_000;
 const GMI_ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
 const GMI_MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 
+// The success payload's image URL is provider-controlled and gets fetched by
+// the worker, so treat it as an SSRF vector: require https and reject targets
+// that resolve as a literal internal/loopback/link-local address. (Full
+// DNS-rebinding defense isn't reachable from the Workers fetch API — this
+// blocks the direct cases before we ever open the connection.)
+function isInternalHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, ""); // strip IPv6 brackets
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal") || h.endsWith(".local")) return true;
+  const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const a = Number(v4[1]), b = Number(v4[2]);
+    return a === 0 || a === 10 || a === 127 ||
+      (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  }
+  if (h.includes(":")) { // IPv6 literal: loopback, link-local fe80::/10, unique-local fc00::/7
+    return h === "::1" || h.startsWith("fe8") || h.startsWith("fe9") || h.startsWith("fea") ||
+      h.startsWith("feb") || h.startsWith("fc") || h.startsWith("fd");
+  }
+  return false;
+}
+function assertPublicHttpsUrl(raw: string): void {
+  let u: URL;
+  try { u = new URL(raw); } catch { throw new Error("gmicloud: malformed image url"); }
+  if (u.protocol !== "https:") throw new Error(`gmicloud: image url must be https (got ${u.protocol})`);
+  if (isInternalHost(u.hostname)) throw new Error("gmicloud: image url targets a non-public host");
+}
+
 const OPENAI_API = "https://api.openai.com/v1";
 
 function makeOpenAiProvider(fetchFn: typeof fetch): AsyncImageProvider {
@@ -137,6 +164,7 @@ function makeGmiProvider(fetchFn: typeof fetch): AsyncImageProvider {
         ? (typeof raw[0] === "string" ? raw[0] : raw[0]?.url)
         : (detail?.outcome?.image_url ?? detail?.outcome?.url);
       if (!first) throw new Error("gmicloud: success but no image url");
+      assertPublicHttpsUrl(first);
       const img = await fetchFn(first, { signal: AbortSignal.timeout(GMI_DOWNLOAD_TIMEOUT_MS) });
       if (!img.ok) throw new Error(`gmicloud image fetch ${img.status}`);
 

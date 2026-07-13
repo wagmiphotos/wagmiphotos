@@ -93,6 +93,37 @@ it("PATCH updates cap/enabled; 404 without a key", async () => {
   expect(row.enabled).toBe(0);
 });
 
+it("PATCH is rate-limited by IP: 429 when the limiter denies, and the key is untouched", async () => {
+  const s = sessionServices();
+  await handlePutByok(put({ provider: "openai", api_key: "sk-user-12345" }), env, s, async () => true);
+  const keys: string[] = [];
+  s.rateLimiter.limit = async (k: string) => { keys.push(k); return false; };
+  const patch = new Request("https://x/v1/byok", {
+    method: "PATCH",
+    headers: { Cookie: "wagmi_session=tok", "CF-Connecting-IP": "9.9.9.9" },
+    body: JSON.stringify({ monthly_cap: 10 }),
+  });
+  const res = await handlePatchByok(patch, env, s);
+  expect(res.status).toBe(429);
+  expect(keys).toContain("byok:ip:9.9.9.9");
+  expect((s as any)._byokRows.get("u1").monthly_cap).toBe(50); // unchanged
+});
+
+it("DELETE is rate-limited by IP: 429 when the limiter denies, and the key survives", async () => {
+  const s = sessionServices();
+  await handlePutByok(put({ provider: "openai", api_key: "sk-user-12345" }), env, s, async () => true);
+  const keys: string[] = [];
+  s.rateLimiter.limit = async (k: string) => { keys.push(k); return false; };
+  const del = new Request("https://x/v1/byok", {
+    method: "DELETE",
+    headers: { Cookie: "wagmi_session=tok", "CF-Connecting-IP": "9.9.9.9" },
+  });
+  const res = await handleDeleteByok(del, env, s);
+  expect(res.status).toBe(429);
+  expect(keys).toContain("byok:ip:9.9.9.9");
+  expect((s as any)._byokRows.size).toBe(1); // not deleted
+});
+
 it("DELETE removes the key; usage rows survive", async () => {
   const s = sessionServices();
   await handlePutByok(put({ provider: "openai", api_key: "sk-user-12345" }), env, s, async () => true);
