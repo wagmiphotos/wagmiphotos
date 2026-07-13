@@ -4844,7 +4844,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         try {
           const r = await fetch(`/v1/generations/${encodeURIComponent(genId)}`, { credentials: 'same-origin' });
           status = r.status;
-          if (r.status === 401) { if (location.hash.startsWith('#/library')) location.hash = '#/login'; return; }
+          if (r.status === 401) { pendingGens.delete(genId); if (location.hash.startsWith('#/library')) location.hash = '#/login'; return; }
           data = await r.json().catch(() => ({}));
         } catch { continue; }                                 // transient network — keep polling
         const gen = data && data.generation;
@@ -4903,6 +4903,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       selectedCollId = collId;
       const viewSel = document.getElementById('coll-view-select');
       if (viewSel && viewSel.value !== collId) { viewSel.value = collId; collViewQuery = ''; }
+      renderCollMeta();
       loadCollectionViewer(collViewQuery);                     // re-renders grid incl. the new pending tile
       startPollFor(genId, collId, startTime);
     }
