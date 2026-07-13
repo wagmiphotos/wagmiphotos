@@ -70,6 +70,9 @@ export interface User {
   tos_version: string | null; tos_accepted_at: string | null;
   stripe_customer_id: string | null; stripe_subscription_id: string | null;
   plan_status: string | null; plan_current_period_end: string | null;
+  // 1 when the active subscription is set to cancel at period end (still paid
+  // until plan_current_period_end, but not renewing). Optional: absent/0 => renewing.
+  plan_cancel_at_period_end?: number | null;
 }
 export interface UserStore {
   upsertByEmail(id: string, email: string): Promise<{ id: string; email: string }>;
@@ -77,7 +80,7 @@ export interface UserStore {
   acceptTos(userId: string, version: string, ip: string | null, userAgent: string | null): Promise<void>;
   getByStripeCustomerId(customerId: string): Promise<User | null>;
   setStripeCustomer(userId: string, customerId: string): Promise<void>;
-  setSubscriptionByCustomer(customerId: string, f: { subscriptionId: string | null; planStatus: string; currentPeriodEnd: string | null }): Promise<void>;
+  setSubscriptionByCustomer(customerId: string, f: { subscriptionId: string | null; planStatus: string; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean }): Promise<void>;
 }
 export interface SessionStore {
   create(userId: string, tokenHash: string): Promise<void>;

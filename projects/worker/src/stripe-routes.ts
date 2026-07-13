@@ -49,7 +49,7 @@ export async function handleStripeWebhook(request: Request, env: Env, s: Service
   if (ent?.kind === "link") {
     await s.users.setStripeCustomer(ent.userId, ent.customerId);
   } else if (ent?.kind === "subscription") {
-    await s.users.setSubscriptionByCustomer(ent.customerId, { subscriptionId: ent.subscriptionId, planStatus: ent.planStatus, currentPeriodEnd: ent.currentPeriodEnd });
+    await s.users.setSubscriptionByCustomer(ent.customerId, { subscriptionId: ent.subscriptionId, planStatus: ent.planStatus, currentPeriodEnd: ent.currentPeriodEnd, cancelAtPeriodEnd: ent.cancelAtPeriodEnd });
   }
   return Response.json({ received: true });
 }

@@ -149,13 +149,13 @@ export function makeD1Stores(db: D1Database): {
     },
     async getById(id) {
       const row = await db.prepare(
-        "SELECT id, email, created_at, last_login, tos_version, tos_accepted_at, stripe_customer_id, stripe_subscription_id, plan_status, plan_current_period_end FROM users WHERE id = ?"
+        "SELECT id, email, created_at, last_login, tos_version, tos_accepted_at, stripe_customer_id, stripe_subscription_id, plan_status, plan_current_period_end, plan_cancel_at_period_end FROM users WHERE id = ?"
       ).bind(id).first<User>();
       return row ?? null;
     },
     async getByStripeCustomerId(customerId) {
       const row = await db.prepare(
-        "SELECT id, email, created_at, last_login, tos_version, tos_accepted_at, stripe_customer_id, stripe_subscription_id, plan_status, plan_current_period_end FROM users WHERE stripe_customer_id = ?"
+        "SELECT id, email, created_at, last_login, tos_version, tos_accepted_at, stripe_customer_id, stripe_subscription_id, plan_status, plan_current_period_end, plan_cancel_at_period_end FROM users WHERE stripe_customer_id = ?"
       ).bind(customerId).first<User>();
       return row ?? null;
     },
@@ -166,8 +166,8 @@ export function makeD1Stores(db: D1Database): {
       // Keyed by customer id (what the webhook carries). A 0-row update (customer
       // not yet linked) is a silent no-op — the checkout 'link' event sets it.
       await db.prepare(
-        "UPDATE users SET stripe_subscription_id = ?, plan_status = ?, plan_current_period_end = ? WHERE stripe_customer_id = ?"
-      ).bind(f.subscriptionId, f.planStatus, f.currentPeriodEnd, customerId).run();
+        "UPDATE users SET stripe_subscription_id = ?, plan_status = ?, plan_current_period_end = ?, plan_cancel_at_period_end = ? WHERE stripe_customer_id = ?"
+      ).bind(f.subscriptionId, f.planStatus, f.currentPeriodEnd, f.cancelAtPeriodEnd ? 1 : 0, customerId).run();
     },
     async acceptTos(userId, version, ip, userAgent) {
       // Append the immutable audit row and refresh the current-status columns together.

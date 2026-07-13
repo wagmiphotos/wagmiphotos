@@ -216,7 +216,7 @@ it("me includes the plan projection", async () => {
   const req = new Request("https://x/v1/me", { headers: { Cookie: `${SESSION_COOKIE}=s` } });
   const res = await handleMe(req, {} as any, paid);
   const j: any = await res.json();
-  expect(j.plan).toEqual({ active: true, status: "active", current_period_end: "2027-07-08T00:00:00.000Z" });
+  expect(j.plan).toEqual({ active: true, status: "active", current_period_end: "2027-07-08T00:00:00.000Z", cancel_at_period_end: false });
 });
 
 it("me: byok is null without a key", async () => {

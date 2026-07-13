@@ -268,9 +268,10 @@ it("setStripeCustomer updates the customer id for a user", async () => {
 it("setSubscriptionByCustomer writes status keyed by customer id", async () => {
   const { db, calls } = fakeDb();
   const { users } = makeD1Stores(db);
-  await users.setSubscriptionByCustomer("cus_1", { subscriptionId: "sub_2", planStatus: "active", currentPeriodEnd: "2027-01-01T00:00:00.000Z" });
+  await users.setSubscriptionByCustomer("cus_1", { subscriptionId: "sub_2", planStatus: "active", currentPeriodEnd: "2027-01-01T00:00:00.000Z", cancelAtPeriodEnd: true });
   expect(calls[0].sql).toContain("WHERE stripe_customer_id = ?");
-  expect(calls[0].args).toEqual(["sub_2", "active", "2027-01-01T00:00:00.000Z", "cus_1"]);
+  expect(calls[0].sql).toContain("plan_cancel_at_period_end = ?");
+  expect(calls[0].args).toEqual(["sub_2", "active", "2027-01-01T00:00:00.000Z", 1, "cus_1"]);
 });
 
 // ---- collections (migration 0015) ----

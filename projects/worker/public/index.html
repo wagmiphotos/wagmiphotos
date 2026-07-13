@@ -4482,8 +4482,12 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       if (active) {
         const until = currentPlan.current_period_end ? new Date(currentPlan.current_period_end) : null;
         const when = until && !isNaN(until.getTime()) ? until.toLocaleDateString() : null;
+        const canceling = !!currentPlan.cancel_at_period_end;
+        const period = when
+          ? ` · ${canceling ? 'cancels' : 'renews'} ${escapeHtml(when)}`
+          : (canceling ? ' · cancelling at period end' : '');
         el.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-          <div><b style="color:var(--ink);">Unlimited</b>${when ? ` · renews ${escapeHtml(when)}` : ''}</div>
+          <div><b style="color:var(--ink);">Unlimited</b>${period}</div>
           <button class="btn" style="height:38px;width:auto;padding:0 16px;background:var(--paper);border:1px solid var(--line);color:var(--ink);" onclick="openPortal(this)">Manage billing</button>
         </div>`;
       } else {

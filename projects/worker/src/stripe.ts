@@ -49,7 +49,7 @@ export async function verifyStripeSignature(opts: {
 
 export type Entitlement =
   | { kind: "link"; userId: string; customerId: string }
-  | { kind: "subscription"; customerId: string; subscriptionId: string | null; planStatus: string; currentPeriodEnd: string | null }
+  | { kind: "subscription"; customerId: string; subscriptionId: string | null; planStatus: string; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean }
   | null;
 
 function customerId(obj: any): string | null {
@@ -72,11 +72,12 @@ export function entitlementFromEvent(event: any): Entitlement {
     case "customer.subscription.created":
     case "customer.subscription.updated": {
       if (!cus) return null;
-      return { kind: "subscription", customerId: cus, subscriptionId: obj.id ?? null, planStatus: String(obj.status ?? "incomplete"), currentPeriodEnd: isoFromUnix(obj.current_period_end) };
+      return { kind: "subscription", customerId: cus, subscriptionId: obj.id ?? null, planStatus: String(obj.status ?? "incomplete"), currentPeriodEnd: isoFromUnix(obj.current_period_end), cancelAtPeriodEnd: !!obj.cancel_at_period_end };
     }
     case "customer.subscription.deleted": {
       if (!cus) return null;
-      return { kind: "subscription", customerId: cus, subscriptionId: obj.id ?? null, planStatus: "canceled", currentPeriodEnd: isoFromUnix(obj.current_period_end) };
+      // Fully canceled — no longer "cancelling at period end".
+      return { kind: "subscription", customerId: cus, subscriptionId: obj.id ?? null, planStatus: "canceled", currentPeriodEnd: isoFromUnix(obj.current_period_end), cancelAtPeriodEnd: false };
     }
     default:
       return null;

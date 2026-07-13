@@ -14,8 +14,11 @@ it("isPaid true for active and trialing only", () => {
 
 it("planView projects the public plan shape", () => {
   const u: any = { plan_status: "active", plan_current_period_end: "2027-07-08T00:00:00.000Z" };
-  expect(planView(u)).toEqual({ active: true, status: "active", current_period_end: "2027-07-08T00:00:00.000Z" });
-  expect(planView({ plan_status: null, plan_current_period_end: null } as any)).toEqual({ active: false, status: null, current_period_end: null });
+  expect(planView(u)).toEqual({ active: true, status: "active", current_period_end: "2027-07-08T00:00:00.000Z", cancel_at_period_end: false });
+  expect(planView({ plan_status: null, plan_current_period_end: null } as any)).toEqual({ active: false, status: null, current_period_end: null, cancel_at_period_end: false });
+  // A subscription set to cancel at period end is still active, but flagged.
+  expect(planView({ plan_status: "active", plan_current_period_end: "2027-07-08T00:00:00.000Z", plan_cancel_at_period_end: 1 } as any))
+    .toMatchObject({ active: true, cancel_at_period_end: true });
 });
 
 it("formEncode encodes nested arrays/objects the Stripe way", () => {
@@ -70,7 +73,12 @@ it("entitlementFromEvent maps checkout.session.completed to a link", () => {
 
 it("entitlementFromEvent maps subscription.updated to active", () => {
   const ent = entitlementFromEvent({ type: "customer.subscription.updated", data: { object: { id: "sub_1", customer: "cus_1", status: "active", current_period_end: 1893456000 } } });
-  expect(ent).toEqual({ kind: "subscription", customerId: "cus_1", subscriptionId: "sub_1", planStatus: "active", currentPeriodEnd: new Date(1893456000 * 1000).toISOString() });
+  expect(ent).toEqual({ kind: "subscription", customerId: "cus_1", subscriptionId: "sub_1", planStatus: "active", currentPeriodEnd: new Date(1893456000 * 1000).toISOString(), cancelAtPeriodEnd: false });
+});
+
+it("entitlementFromEvent captures cancel_at_period_end (active, not renewing)", () => {
+  const ent = entitlementFromEvent({ type: "customer.subscription.updated", data: { object: { id: "sub_1", customer: "cus_1", status: "active", current_period_end: 1893456000, cancel_at_period_end: true } } });
+  expect(ent).toMatchObject({ kind: "subscription", planStatus: "active", cancelAtPeriodEnd: true });
 });
 
 it("entitlementFromEvent maps subscription.deleted to canceled", () => {
