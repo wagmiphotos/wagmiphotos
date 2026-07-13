@@ -2202,6 +2202,9 @@
       backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
     }
     .modal-overlay[hidden] { display: none; }
+    /* Generic confirm modal can be opened while another modal (e.g. #image-modal) is still
+       open behind it — it must always paint (and hit-test) on top of any sibling overlay. */
+    #confirm-modal { z-index: 1100; }
     .modal-card {
       width: 100%; max-width: 440px;
       background: var(--card); border: 1px solid var(--line); border-radius: 16px;
@@ -2935,7 +2938,10 @@
             <!-- Right: browse & search the collection -->
             <div>
               <div class="glass-card">
-                <h2 class="card-title"><span>Your collections</span><button type="button" class="btn-ghost" style="height:34px;width:auto;padding:0 12px;font-size:0.8125rem;margin-left:auto;" onclick="openNewCollModal()">+ New collection</button></h2>
+                <div class="card-title-row" style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
+                  <h2 class="card-title" style="margin:0;">Your collections</h2>
+                  <button type="button" class="btn-ghost" style="height:34px;width:auto;padding:0 12px;font-size:0.8125rem;margin-left:auto;" onclick="openNewCollModal()">+ New collection</button>
+                </div>
                 <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
                   Every collection is public: anyone can find it on the <b>Collections</b> tab or scope API searches to its ID (<code style="font-family: var(--font-mono);">"collection": "col_…"</code>). Its images stay out of the shared library.
                 </p>
@@ -4391,10 +4397,14 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
+      // Close only the top-most open modal. #confirm-modal stacks above every other
+      // overlay (see #confirm-modal z-index) and can be opened on top of another modal
+      // (e.g. the image-detail delete flow), so it must be checked first and exclusively —
+      // otherwise one Escape press would close both the confirm dialog and the modal behind it.
       if (!document.getElementById('confirm-modal').hidden) closeConfirm(false);
-      if (!document.getElementById('theme-modal').hidden) closeThemeModal();
-      if (!document.getElementById('newcoll-modal').hidden) closeNewCollModal();
-      if (!document.getElementById('image-modal').hidden) closeImageModal();
+      else if (!document.getElementById('theme-modal').hidden) closeThemeModal();
+      else if (!document.getElementById('newcoll-modal').hidden) closeNewCollModal();
+      else if (!document.getElementById('image-modal').hidden) closeImageModal();
     });
 
     // API key creation modal
