@@ -4787,6 +4787,21 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         const { images } = await r.json();
         if (seq !== collViewSeq) return;
         collViewerImages = images;   // module-scope: modal reads from memory, no fetch
+        // re-attach to in-flight generations for this collection (survives refresh)
+        try {
+          const pr = await fetch(`/v1/collections/${encodeURIComponent(selectedCollId)}/generations?status=pending`, { credentials: 'same-origin' });
+          if (pr.ok) {
+            const pd = await pr.json().catch(() => ({}));
+            for (const g of (pd.generations || [])) {
+              if (!pendingGens.has(g.id)) {
+                const startTime = performance.now();            // 6-min cap restarts from now; server sweep is the real backstop
+                pendingGens.set(g.id, { collId: selectedCollId, prompt: g.prompt, createdAt: Date.now(), startTime });
+                startPollFor(g.id, selectedCollId, startTime);
+              }
+            }
+          }
+        } catch { /* offline / non-owner: skip re-attach */ }
+        if (seq !== collViewSeq) return;
         const pend = [...pendingGens.entries()]
           .filter(([, v]) => v.collId === selectedCollId)
           .map(([id, v]) => v._error
