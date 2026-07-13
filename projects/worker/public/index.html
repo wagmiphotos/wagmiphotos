@@ -2910,21 +2910,12 @@
                 </p>
                 <div id="byok-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
               </div>
-
-              <!-- New Collection Card -->
-              <div class="glass-card">
-                <h2 class="card-title">New collection</h2>
-                <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
-                  A themed set of images generated with your own key. The theme prompt is appended to every image you generate into it. Collections are public — the name and theme are checked automatically, so keep them family-friendly.
-                </p>
-                <div id="coll-create-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
-              </div>
             </div>
 
             <!-- Right: browse & search the collection -->
             <div>
               <div class="glass-card">
-                <h2 class="card-title">Your collections</h2>
+                <h2 class="card-title">Your collections<button type="button" class="btn-ghost" style="height:34px;width:auto;padding:0 12px;font-size:0.8125rem;margin-left:auto;" onclick="openNewCollModal()">+ New collection</button></h2>
                 <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
                   Every collection is public: anyone can find it on the <b>Collections</b> tab or scope API searches to its ID (<code style="font-family: var(--font-mono);">"collection": "col_…"</code>). Its images stay out of the shared library.
                 </p>
@@ -3639,6 +3630,16 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     </div>
   </div>
 
+  <!-- New collection modal -->
+  <div id="newcoll-modal" class="modal-overlay" hidden onclick="if(event.target===this)closeNewCollModal()">
+    <div class="modal-card">
+      <div class="modal-title">New collection</div>
+      <p class="modal-sub">A themed set of images generated with your own key. The theme prompt is appended to every image you generate into it. Collections are public — the name and theme are checked automatically, so keep them family-friendly.</p>
+      <div id="newcoll-body"></div>
+      <div class="modal-actions"><button type="button" class="btn-ghost" onclick="closeNewCollModal()">Close</button></div>
+    </div>
+  </div>
+
   <!-- Create API key modal -->
   <div id="key-modal" class="modal-overlay" hidden onclick="if(event.target===this)closeCreateKey()">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="key-modal-title">
@@ -4331,6 +4332,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       if (e.key !== 'Escape') return;
       if (!document.getElementById('confirm-modal').hidden) closeConfirm(false);
       if (!document.getElementById('theme-modal').hidden) closeThemeModal();
+      if (!document.getElementById('newcoll-modal').hidden) closeNewCollModal();
     });
 
     // API key creation modal
@@ -4527,12 +4529,11 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
     async function loadCollections() {
       const viewer = document.getElementById('coll-viewer-body');
-      const create = document.getElementById('coll-create-body');
-      if (!viewer || !create) return;
-      if (!currentUser) { viewer.textContent = 'Log in to manage collections.'; create.textContent = 'Log in to create collections.'; return; }
+      if (!viewer) return;
+      if (!currentUser) { viewer.textContent = 'Log in to manage collections.'; return; }
       try {
         const r = await fetch('/v1/collections', { credentials: 'same-origin' });
-        if (r.status === 401) { viewer.textContent = 'Log in to manage collections.'; create.textContent = 'Log in to create collections.'; return; }
+        if (r.status === 401) { viewer.textContent = 'Log in to manage collections.'; return; }
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const data = await r.json();
         myCollections = data.collections;
@@ -4540,14 +4541,12 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         renderCollections();
       } catch {
         viewer.textContent = 'Could not load collections.';
-        create.textContent = 'Could not load collections.';
       }
       populateGenCollections();
       renderGenKeyStatus();
     }
 
     function renderCollections() {
-      renderCollCreateForm();
       const sel = document.getElementById('coll-view-select');
       const meta = document.getElementById('coll-meta');
       const viewer = document.getElementById('coll-viewer-body');
@@ -4557,7 +4556,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         sel.innerHTML = '<option value="">— no collections yet —</option>';
         sel.disabled = true;
         meta.innerHTML = '';
-        viewer.innerHTML = '<div style="font-size:0.8125rem;">No collections yet — create one on the left, then generate images into it.</div>';
+        viewer.innerHTML = '<div style="font-size:0.8125rem;">No collections yet — create one, then generate images into it.<div style="margin-top:12px;"><button class="btn btn-primary" onclick="openNewCollModal()">Create your first collection</button></div></div>';
         return;
       }
       sel.disabled = false;
@@ -4567,16 +4566,21 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       loadCollectionViewer(collViewQuery);
     }
 
-    function renderCollCreateForm() {
-      const el = document.getElementById('coll-create-body');
+    function renderNewCollBody() {
+      const el = document.getElementById('newcoll-body');
       if (!el) return;
       const canCreate = !!(currentByok && currentByok.enabled);
       const slotLocked = !!(mySlots && mySlots.used < 20 && mySlots.generated < mySlots.next_required);
-      el.innerHTML = !canCreate
-        ? `<div style="font-size:0.8125rem;">Add an enabled provider key above to create collections.</div>`
-        : slotLocked
-        ? `<div style="font-size:0.8125rem;">Generate ${mySlots.next_required - mySlots.generated} more image${mySlots.next_required - mySlots.generated === 1 ? '' : 's'} to unlock collection #${mySlots.used + 1} (${mySlots.generated}/${mySlots.next_required} lifetime images).</div>`
-        : `
+      if (!canCreate) {
+        el.innerHTML = `<div style="font-size:0.8125rem;color:var(--muted);">Add an enabled provider key first (Account → keys, or the key panel) to create collections.</div>`;
+        return;
+      }
+      if (slotLocked) {
+        const need = mySlots.next_required - mySlots.generated;
+        el.innerHTML = `<div style="font-size:0.8125rem;color:var(--muted);">Generate ${need} more image${need === 1 ? '' : 's'} to unlock collection #${mySlots.used + 1} (${mySlots.generated}/${mySlots.next_required} lifetime images).</div>`;
+        return;
+      }
+      el.innerHTML = `
         <div class="form-group">
           <label>Name</label>
           <input id="coll-name" placeholder="e.g. Retro posters" maxlength="80" class="field-input">
@@ -4585,6 +4589,8 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
           <button class="btn btn-primary" style="height:40px;width:auto;padding:0 18px;margin-top:12px;" onclick="createCollection(this)">Create collection</button>
         </div>`;
     }
+    function openNewCollModal() { renderNewCollBody(); document.getElementById('newcoll-modal').hidden = false; }
+    function closeNewCollModal() { document.getElementById('newcoll-modal').hidden = true; }
 
     function renderCollMeta() {
       const meta = document.getElementById('coll-meta');
@@ -4637,6 +4643,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         if (!r.ok) { showToast(data.error || 'Could not create the collection', 'error'); return; }
         showToast('Collection created', 'success');
         await loadCollections();
+        closeNewCollModal();
       } catch { showToast('Could not create the collection', 'error'); }
       finally { if (btn) btn.disabled = false; }
     }
