@@ -173,4 +173,8 @@ it("generations: countOpenByUser + listPendingByCollection are owner+status scop
   expect(await generations.countOpenByUser("usr_1")).toBe(3); // g1,g2 open + g4 open; g3 succeeded, g5 other user
   const pend = await generations.listPendingByCollection("col_a", "usr_1", 20);
   expect(pend.map((r) => r.id).sort()).toEqual(["g1", "g2"]); // col_a + usr_1 + open only
+  // order (newest first): force g1 older so the DESC sort is deterministic (created_at is second-resolution)
+  db._raw.exec(`UPDATE generations SET created_at = datetime('now','-1 minute') WHERE id = 'g1'`);
+  const ordered = await generations.listPendingByCollection("col_a", "usr_1", 20);
+  expect(ordered.map((r) => r.id)).toEqual(["g2", "g1"]);
 });

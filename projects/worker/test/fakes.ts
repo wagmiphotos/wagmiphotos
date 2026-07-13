@@ -169,6 +169,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
       listPendingByCollection: async (collectionId, userId, limit) =>
         [...generationRows.values()]
           .filter((r) => r.collection_id === collectionId && r.user_id === userId && (r.status === "queued" || r.status === "generating"))
+          .reverse()
           .slice(0, limit),
     },
   };
