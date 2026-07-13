@@ -2909,6 +2909,15 @@
           <div class="coll-split">
             <!-- Left: prompt + key entry + create form -->
             <div>
+              <!-- BYOK Card (first: adding a key is the prerequisite for everything else on this tab) -->
+              <div class="glass-card">
+                <h2 class="card-title">Bring your own key</h2>
+                <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
+                  Add your own OpenAI or GMI Cloud API key so it can generate images on demand into collections you own. Generated images live only in your collections — they never join the shared library. Spend shown is an <b>estimate</b> (images &times; list price) &mdash; actual billing can differ per image. Check your provider for real costs: <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" style="color:var(--red);">OpenAI usage</a> &middot; <a href="https://console.gmicloud.ai" target="_blank" rel="noopener" style="color:var(--red);">GMI Cloud console</a>.
+                </p>
+                <div id="byok-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
+              </div>
+
               <!-- Generate Card -->
               <div class="glass-card">
                 <h3>Create an image</h3>
@@ -2923,15 +2932,6 @@
                   <textarea id="gen-prompt" class="field-input" rows="3" placeholder="A watercolor fox in morning fog"></textarea>
                 </div>
                 <button id="btn-generate" class="btn btn-primary" onclick="createInCollection()">Generate</button>
-              </div>
-
-              <!-- BYOK Card -->
-              <div class="glass-card">
-                <h2 class="card-title">Bring your own key</h2>
-                <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
-                  Add your own OpenAI or GMI Cloud API key so it can generate images on demand into collections you own. Generated images live only in your collections — they never join the shared library. Spend shown is an <b>estimate</b> (images &times; list price) &mdash; actual billing can differ per image. Check your provider for real costs: <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" style="color:var(--red);">OpenAI usage</a> &middot; <a href="https://console.gmicloud.ai" target="_blank" rel="noopener" style="color:var(--red);">GMI Cloud console</a>.
-                </p>
-                <div id="byok-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
               </div>
             </div>
 
@@ -4659,7 +4659,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       const canCreate = !!(currentByok && currentByok.enabled);
       const slotLocked = !!(mySlots && mySlots.used < 20 && mySlots.generated < mySlots.next_required);
       if (!canCreate) {
-        el.innerHTML = `<div style="font-size:0.8125rem;color:var(--muted);">Add an enabled provider key first (Account → keys, or the key panel) to create collections.</div>`;
+        el.innerHTML = `<div style="font-size:0.8125rem;color:var(--muted);">Add an enabled provider key in the “Bring your own key” card on this tab first, then you can create collections.</div>`;
         return;
       }
       if (slotLocked) {
@@ -4925,7 +4925,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       const el = document.getElementById('gen-key-status');
       if (!el) return;
       if (currentByok && currentByok.enabled) el.innerHTML = `<span class="muted">Using your ${escapeHtml(currentByok.provider)} key.</span>`;
-      else el.innerHTML = '<strong>Add an enabled provider key below to generate.</strong>';
+      else el.innerHTML = '<strong>Add an enabled provider key above to generate.</strong>';
     }
 
     async function startPollFor(genId, collId, startTime) {
