@@ -452,6 +452,16 @@
     .coll-split { display: grid; grid-template-columns: 1fr; gap: 0 24px; align-items: start; }
     @media (min-width: 960px) { .coll-split { grid-template-columns: 1fr 1.15fr; } }
     .coll-split > * { min-width: 0; }
+    /* BYOK bar: minimal full-width card above the two columns */
+    .byok-head { display: flex; align-items: baseline; gap: 4px 14px; flex-wrap: wrap; }
+    .byok-note { flex: 1 1 320px; min-width: 0; font-size: 0.8125rem; color: var(--muted); line-height: 1.5; }
+    .byok-note a { color: var(--red); text-decoration: none; }
+    .byok-note a:hover { text-decoration: underline; }
+    .byok-body { margin-top: 12px; font-size: 0.9375rem; color: var(--muted); }
+    .byok-form { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+    .byok-form .byok-field { display: flex; flex-direction: column; gap: 4px; }
+    .byok-form .byok-field label { font-size: 0.75rem; color: var(--muted); }
+    .byok-form .byok-key { flex: 1 1 240px; }
     .coll-viewer-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
     .coll-viewer-bar .input-field { flex: 1 1 160px; min-width: 0; }
     .coll-viewer-bar select.input-field { flex: 0 1 auto; width: auto; max-width: 45%; }
@@ -2910,17 +2920,17 @@
         </div>
         <div id="tab-collections" role="tabpanel" aria-labelledby="ptab-collections" hidden>
           <div class="coll-split">
-            <!-- Left: prompt + key entry + create form -->
-            <div>
-              <!-- BYOK Card (first: adding a key is the prerequisite for everything else on this tab) -->
-              <div class="glass-card">
-                <h2 class="card-title">Bring your own key</h2>
-                <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
-                  Add your own OpenAI or GMI Cloud API key so it can generate images on demand into collections you own. Generated images live only in your collections — they never join the shared library. Spend shown is an <b>estimate</b> (images &times; list price) &mdash; actual billing can differ per image. Check your provider for real costs: <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" style="color:var(--red);">OpenAI usage</a> &middot; <a href="https://console.gmicloud.ai" target="_blank" rel="noopener" style="color:var(--red);">GMI Cloud console</a>.
-                </p>
-                <div id="byok-body" style="font-size: 0.9375rem; color: var(--muted);">Loading…</div>
+            <!-- BYOK: compact full-width bar spanning both columns; a key unlocks everything else on this tab -->
+            <div class="glass-card byok-card" style="grid-column: 1 / -1;">
+              <div class="byok-head">
+                <h2 class="card-title" style="margin:0;">Bring your own key</h2>
+                <span class="byok-note">Your OpenAI or GMI Cloud key generates images into collections you own — they never join the shared library. <a href="https://platform.openai.com/usage" target="_blank" rel="noopener">OpenAI usage</a> &middot; <a href="https://console.gmicloud.ai" target="_blank" rel="noopener">GMI Cloud console</a>. Spend shown is an estimate.</span>
               </div>
+              <div id="byok-body" class="byok-body">Loading…</div>
+            </div>
 
+            <!-- Left: prompt + create form -->
+            <div>
               <!-- Generate Card -->
               <div class="glass-card">
                 <h3>Create an image</h3>
@@ -4543,17 +4553,23 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       if (!el) return;
       renderGenKeyStatus(); // key changes (added/removed/enabled toggle) update the generate-card hint
       if (!currentByok) {
-        el.innerHTML = `<div class="form-group">
-          <label>Provider</label>
-          <select id="byok-provider" class="field-input" style="width:auto;">
-            <option value="openai">OpenAI</option>
-            <option value="gmicloud">GMI Cloud</option>
-          </select>
-          <label style="margin-top:10px;">API key</label>
-          <input id="byok-key" type="password" autocomplete="off" placeholder="sk-…" class="api-key-input">
-          <label style="margin-top:10px;">Monthly image cap</label>
-          <input id="byok-cap" type="number" min="1" max="10000" value="50" class="field-input" style="width:120px;">
-          <button class="btn btn-primary" style="height:40px;width:auto;padding:0 18px;margin-top:14px;" onclick="saveByok(this)">Save key</button>
+        el.innerHTML = `<div class="byok-form">
+          <div class="byok-field">
+            <label for="byok-provider">Provider</label>
+            <select id="byok-provider" class="field-input" style="width:auto;">
+              <option value="openai">OpenAI</option>
+              <option value="gmicloud">GMI Cloud</option>
+            </select>
+          </div>
+          <div class="byok-field byok-key">
+            <label for="byok-key">API key</label>
+            <input id="byok-key" type="password" autocomplete="off" placeholder="sk-…" class="api-key-input" style="width:100%;">
+          </div>
+          <div class="byok-field">
+            <label for="byok-cap">Monthly cap</label>
+            <input id="byok-cap" type="number" min="1" max="10000" value="50" class="field-input" style="width:110px;">
+          </div>
+          <button class="btn btn-primary" style="height:40px;width:auto;padding:0 18px;" onclick="saveByok(this)">Save key</button>
         </div>`;
         return;
       }
