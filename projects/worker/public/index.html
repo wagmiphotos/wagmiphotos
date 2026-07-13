@@ -463,6 +463,12 @@
       font-size: 0.9375rem; line-height: 1; cursor: pointer;
     }
     .tile-del:hover { background: var(--danger); }
+    .coll-tile-pending, .coll-tile-error { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; background:var(--surface,#f5f4f2); border:1px dashed var(--line); padding:8px; text-align:center; }
+    .coll-tile-error { border-color:var(--danger); }
+    .tile-spinner { width:22px; height:22px; border:2px solid var(--line); border-top-color:var(--muted); border-radius:50%; animation:spin 0.8s linear infinite; }
+    .tile-error-mark { width:22px; height:22px; border-radius:50%; background:var(--danger); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; }
+    .tile-pending-label { font-size:0.6875rem; color:var(--muted); line-height:1.3; word-break:break-word; }
+    @keyframes spin { to { transform:rotate(360deg); } }
 
     /* compact page heading for views without a hero-style page-head */
     .page-h1 { font-family: var(--font-display); font-size: 1.75rem; font-weight: 800; color: var(--ink); margin: 0 0 20px; }
@@ -4735,6 +4741,19 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     }
 
     function collTile(img) {
+      if (img._pending) {
+        return `<div class="coll-tile coll-tile-pending" title="${escapeHtml(img.prompt)}">
+          <div class="tile-spinner"></div>
+          <div class="tile-pending-label">${escapeHtml((img.prompt || '').slice(0, 40))}</div>
+        </div>`;
+      }
+      if (img._error) {
+        return `<div class="coll-tile coll-tile-error" title="${escapeHtml(img._reason)}">
+          <div class="tile-error-mark">!</div>
+          <div class="tile-pending-label">${escapeHtml(img._reason)}</div>
+          <button type="button" class="tile-del" aria-label="Dismiss" title="Dismiss" onclick="dismissPending('${img._id}', selectedCollId)">✕</button>
+        </div>`;
+      }
       const thumb = img.thumb_url || img.medium_url || img.url;
       const serves = img.serve_count != null
         ? `<span class="tile-badge" title="Times returned by the API">${img.serve_count}×</span>`
@@ -4768,13 +4787,18 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         const { images } = await r.json();
         if (seq !== collViewSeq) return;
         collViewerImages = images;   // module-scope: modal reads from memory, no fetch
-        if (!images.length) {
+        const pend = [...pendingGens.entries()]
+          .filter(([, v]) => v.collId === selectedCollId)
+          .map(([id, v]) => v._error
+            ? { _error: true, _reason: v._error, _id: id, prompt: v.prompt }
+            : { _pending: true, _id: id, prompt: v.prompt, startTime: v.startTime });
+        if (!images.length && !pend.length) {
           el.innerHTML = '<span style="font-size:0.8125rem;">' + (collViewQuery
             ? 'No images in this collection match “' + escapeHtml(collViewQuery) + '”.'
             : 'No images yet — generate one on the left.') + '</span>';
           return;
         }
-        el.innerHTML = '<div class="coll-viewer-grid">' + images.map(collTile).join('') + '</div>';
+        el.innerHTML = '<div class="coll-viewer-grid">' + pend.map(collTile).join('') + images.map(collTile).join('') + '</div>';
       } catch {
         if (seq === collViewSeq) el.innerHTML = '<span style="font-size:0.75rem;">Could not load images.</span>';
       }
@@ -4793,7 +4817,8 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
     const GEN_POLL_MS = 2500;
     const GEN_POLL_MAX_MS = 6 * 60 * 1000;
-    let genBusy = false;
+    const MAX_CONCURRENT_GENERATIONS = 3;   // mirrors src/generations-routes.ts (server-authoritative)
+    const pendingGens = new Map();          // genId -> { collId, prompt, createdAt, startTime }
 
     function populateGenCollections() {
       const sel = document.getElementById('gen-coll-select');
@@ -4810,60 +4835,51 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       else el.innerHTML = '<strong>Add an enabled provider key below to generate.</strong>';
     }
 
-    function setGenResult(html) { const el = document.getElementById('gen-result'); if (!el) return; el.innerHTML = html; }
-
-    function genLoaderHtml(startTime) {
-      const secs = Math.round((performance.now() - startTime) / 1000);
-      return `<p class="muted">Generating… ${secs}s. Long generations can take a minute or two; if it never lands, the reservation is refunded automatically.</p>`;
-    }
-
-    async function pollGeneration(genId, startTime) {
+    async function startPollFor(genId, collId, startTime) {
       let missing = 0;
       while (performance.now() - startTime < GEN_POLL_MAX_MS) {
         await new Promise((r) => setTimeout(r, GEN_POLL_MS));
-        let data = null;
-        let status = null;
+        if (!pendingGens.has(genId)) return;                  // dismissed/replaced elsewhere
+        let data, status;
         try {
           const r = await fetch(`/v1/generations/${encodeURIComponent(genId)}`, { credentials: 'same-origin' });
           status = r.status;
-          if (r.status === 401) {
-            // Session died mid-poll: stop quietly; only yank to login if the
-            // user is still on the page that started the generation.
-            if (location.hash.startsWith('#/library')) location.hash = '#/login';
-            return null;
-          }
-          data = await r.json();
-        } catch (e) { /* transient network error: keep polling */ }
+          if (r.status === 401) { if (location.hash.startsWith('#/library')) location.hash = '#/login'; return; }
+          data = await r.json().catch(() => ({}));
+        } catch { continue; }                                 // transient network — keep polling
         const gen = data && data.generation;
-        if (gen && gen.status === 'succeeded') return { gen, byok: data.byok };
-        if (gen && gen.status === 'failed') throw new Error(gen.error || 'Generation failed');
-        if (!gen) {
-          // Only a definitive 404 means the ticket itself is gone — other
-          // non-401 statuses (5xx, a body without .generation) are treated
-          // as transient and just keep polling; the 6-min cap bounds it.
-          if (status === 404) {
-            missing++;
-            if (missing >= 4) throw new Error('Generation not found — it may have failed to start. If anything was reserved, it is refunded automatically.');
-          }
-        } else {
-          missing = 0;
-        }
-        setGenResult(genLoaderHtml(startTime));
+        if (gen && gen.status === 'succeeded') { finishPending(genId, collId); return; }
+        if (gen && gen.status === 'failed') { errorPending(genId, collId, gen.error || 'Generation failed'); return; }
+        if (!gen && status === 404) { missing++; if (missing >= 4) { errorPending(genId, collId, 'Generation not found'); return; } }
+        else { missing = 0; }
       }
-      throw new Error('Timed out waiting for the image. If it never completes, the reservation is refunded automatically.');
+      errorPending(genId, collId, 'Timed out waiting for the image');
+    }
+    function finishPending(genId, collId) {
+      pendingGens.delete(genId);
+      loadCollections();                                      // refresh counts
+      if (selectedCollId === collId) loadCollectionViewer(collViewQuery); // pulls the new image; dedupe is automatic (server lists it)
+    }
+    function errorPending(genId, collId, reason) {
+      const p = pendingGens.get(genId);
+      if (p) p._error = reason;                               // keep in map so the tile renders as error until dismissed
+      if (selectedCollId === collId) loadCollectionViewer(collViewQuery);
+    }
+    function dismissPending(genId, collId) {
+      pendingGens.delete(genId);
+      if (selectedCollId === collId) loadCollectionViewer(collViewQuery);
     }
 
     async function createInCollection() {
-      if (genBusy) return;
       const prompt = document.getElementById('gen-prompt').value.trim();
       const collId = document.getElementById('gen-coll-select').value;
       if (!prompt) { showToast('Enter a prompt first', 'error'); return; }
       if (!collId) { showToast('Create a collection first', 'error'); return; }
-      genBusy = true;
-      const btn = document.getElementById('btn-generate');
-      btn.disabled = true;
-      const startTime = performance.now();
-      setGenResult(genLoaderHtml(startTime));
+      if (pendingGens.size >= MAX_CONCURRENT_GENERATIONS) {
+        showToast(`You can run up to ${MAX_CONCURRENT_GENERATIONS} generations at once — wait for one to finish`, 'error');
+        return;
+      }
+      let data;
       try {
         const r = await fetch(`/v1/collections/${encodeURIComponent(collId)}/generations`, {
           method: 'POST', credentials: 'same-origin',
@@ -4871,33 +4887,24 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
           body: JSON.stringify({ prompt }),
         });
         if (r.status === 401) { location.hash = '#/login'; return; }
-        const data = await r.json().catch(() => ({}));
-        if (r.status === 400 && data.error === 'content_policy') throw new Error(`Blocked by content policy (${data.category || 'flagged'})`);
-        if (r.status === 403) throw new Error('Add an enabled provider key first (below)');
-        if (r.status === 429) throw new Error(data.error === 'monthly cap reached' ? `Monthly cap reached (${data.used}/${data.cap})` : 'Too many requests — slow down');
+        data = await r.json().catch(() => ({}));
+        if (r.status === 429 && data.error === 'concurrent_limit') { showToast(`You can run up to ${data.limit} generations at once`, 'error'); return; }
+        if (r.status === 429) { showToast('Monthly cap reached for your key', 'error'); return; }
+        if (r.status === 400 && data.error === 'content_policy') { showToast('That prompt was rejected by the content policy', 'error'); return; }
+        if (r.status === 403) { showToast('Add an enabled provider key first', 'error'); return; }
         if (!r.ok || !data.generation) throw new Error(data.error || `Error ${r.status}`);
-        const done = await pollGeneration(data.generation.id, startTime);
-        if (!done) return;
-        const img = done.gen.image || {};
-        // Prefer the poll result's byok block (post-spend) over the 202
-        // snapshot (pre-spend); fall back if the GET response omitted it.
-        const usage = done.byok || data.byok;
-        setGenResult(
-          `<img src="${escapeHtml(img.medium_url || img.url || '')}" alt="${escapeHtml(prompt)}" style="max-width:100%;border-radius:12px;margin-top:12px;" />` +
-          (usage ? `<p class="muted">${Number(usage.used) || 0}/${Number(usage.cap) || 0} this month · ~$${(Number(usage.est_spend_usd) || 0).toFixed(2)} est. spend</p>` : '')
-        );
-        showToast('Image added to your collection', 'success');
-        selectedCollId = collId; collViewQuery = ''; // show the image landing in its collection
-        const searchInput = document.getElementById('coll-view-search');
-        if (searchInput) searchInput.value = '';
-        loadCollections(); // refresh counts + grids
-      } catch (e) {
-        setGenResult(`<p class="muted">⚠️ ${escapeHtml(e.message || String(e))}</p>`);
-        showToast(e.message || 'Generation failed', 'error');
-      } finally {
-        genBusy = false;
-        btn.disabled = false;
-      }
+      } catch (e) { showToast(e.message || 'Generation failed', 'error'); return; }
+
+      const genId = data.generation.id;
+      const startTime = performance.now();
+      pendingGens.set(genId, { collId, prompt, createdAt: Date.now(), startTime });
+      document.getElementById('gen-prompt').value = '';       // clear so the next prompt can be typed
+      // focus the viewer on the target collection so the pending tile is visible
+      selectedCollId = collId;
+      const viewSel = document.getElementById('coll-view-select');
+      if (viewSel && viewSel.value !== collId) { viewSel.value = collId; collViewQuery = ''; }
+      loadCollectionViewer(collViewQuery);                     // re-renders grid incl. the new pending tile
+      startPollFor(genId, collId, startTime);
     }
 
     async function startCheckout(btn) {
