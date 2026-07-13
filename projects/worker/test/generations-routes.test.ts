@@ -313,3 +313,35 @@ it("17. create: async provider submit throws -> 502 {error:'generation failed to
   const usage = await s.byok.getUsage(DEV_USER_ID, MONTH);
   expect(usage.count).toBe(0);
 });
+
+it("18. create: 3 already open -> 429 {error:'concurrent_limit', limit:3}", async () => {
+  const s = fakeServices();
+  const id = "col_conc18";
+  await s.collections.create({ id, ownerUserId: DEV_USER_ID, name: "n", themePrompt: "" });
+  await giveByok(s, DEV_USER_ID, "gmicloud");
+  // three open generations already in flight for this user
+  for (const gid of ["o1", "o2", "o3"]) {
+    await s.generations.create({ id: gid, userId: DEV_USER_ID, collectionId: id, prompt: "x", provider: "gmicloud", month: MONTH });
+  }
+  const res = await handleCreateGeneration(
+    id, req(`/v1/collections/${id}/generations`, "POST", { prompt: "a red fox" }), DEV_ENV, s, jobCfg()
+  );
+  expect(res.status).toBe(429);
+  const body: any = await res.json();
+  expect(body.error).toBe("concurrent_limit");
+  expect(body.limit).toBe(3);
+});
+
+it("19. create: 2 open still allows a 3rd -> 202", async () => {
+  const s = fakeServices();
+  const id = "col_conc19";
+  await s.collections.create({ id, ownerUserId: DEV_USER_ID, name: "n", themePrompt: "" });
+  await giveByok(s, DEV_USER_ID, "gmicloud");
+  for (const gid of ["p1", "p2"]) {
+    await s.generations.create({ id: gid, userId: DEV_USER_ID, collectionId: id, prompt: "x", provider: "gmicloud", month: MONTH });
+  }
+  const res = await handleCreateGeneration(
+    id, req(`/v1/collections/${id}/generations`, "POST", { prompt: "a red fox" }), DEV_ENV, s, jobCfg()
+  );
+  expect(res.status).toBe(202);
+});
