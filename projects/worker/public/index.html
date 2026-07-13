@@ -2905,7 +2905,6 @@
                   <textarea id="gen-prompt" class="field-input" rows="3" placeholder="A watercolor fox in morning fog"></textarea>
                 </div>
                 <button id="btn-generate" class="btn btn-primary" onclick="createInCollection()">Generate</button>
-                <div id="gen-result"></div>
               </div>
 
               <!-- BYOK Card -->
@@ -2921,7 +2920,7 @@
             <!-- Right: browse & search the collection -->
             <div>
               <div class="glass-card">
-                <h2 class="card-title">Your collections<button type="button" class="btn-ghost" style="height:34px;width:auto;padding:0 12px;font-size:0.8125rem;margin-left:auto;" onclick="openNewCollModal()">+ New collection</button></h2>
+                <h2 class="card-title"><span>Your collections</span><button type="button" class="btn-ghost" style="height:34px;width:auto;padding:0 12px;font-size:0.8125rem;margin-left:auto;" onclick="openNewCollModal()">+ New collection</button></h2>
                 <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 14px;">
                   Every collection is public: anyone can find it on the <b>Collections</b> tab or scope API searches to its ID (<code style="font-family: var(--font-mono);">"collection": "col_…"</code>). Its images stay out of the shared library.
                 </p>
@@ -4357,7 +4356,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         <div>Created: ${escapeHtml(img.created_at || '—')}</div>`;
       const dl = `<a class="btn-ghost" style="height:34px;display:inline-flex;align-items:center;padding:0 12px;text-decoration:none;" href="/v1/library/${encodeURIComponent(img.id)}/download">Download</a>`;
       const orig = img.original_url ? `<a class="btn-ghost" style="height:34px;display:inline-flex;align-items:center;padding:0 12px;text-decoration:none;" href="${escapeHtml(img.original_url)}" target="_blank" rel="noopener">View original ↗</a>` : '';
-      const del = `<button type="button" class="btn-ghost" style="height:34px;padding:0 12px;color:var(--danger);" onclick="closeImageModal();deleteCollectionImage('${selectedCollId}', '${img.id}')">Delete</button>`;
+      const del = `<button type="button" class="btn-ghost" style="height:34px;padding:0 12px;color:var(--danger);" onclick="deleteFromImageModal('${escapeHtml(selectedCollId)}', '${escapeHtml(img.id)}')">Delete</button>`;
       document.getElementById('imgmodal-actions').innerHTML = dl + orig + del +
         `<button type="button" class="btn-ghost" style="height:34px;padding:0 12px;" onclick="closeImageModal()">Close</button>`;
       document.getElementById('image-modal').hidden = false;
@@ -4751,18 +4750,20 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         return `<div class="coll-tile coll-tile-error" title="${escapeHtml(img._reason)}">
           <div class="tile-error-mark">!</div>
           <div class="tile-pending-label">${escapeHtml(img._reason)}</div>
-          <button type="button" class="tile-del" aria-label="Dismiss" title="Dismiss" onclick="dismissPending('${img._id}', selectedCollId)">✕</button>
+          <button type="button" class="tile-del" aria-label="Dismiss" title="Dismiss" onclick="dismissPending('${escapeHtml(img._id)}', '${escapeHtml(selectedCollId)}')">✕</button>
         </div>`;
       }
       const thumb = img.thumb_url || img.medium_url || img.url;
       const serves = img.serve_count != null
         ? `<span class="tile-badge" title="Times returned by the API">${img.serve_count}×</span>`
         : '';
+      const imgId = escapeHtml(img.id);
+      const collId = escapeHtml(selectedCollId);
       return `
-        <div class="coll-tile" onclick="openImageModal('${img.id}')" style="cursor:pointer;">
+        <div class="coll-tile" onclick="openImageModal('${imgId}')" style="cursor:pointer;">
           <img src="${escapeHtml(thumb)}" alt="${escapeHtml(img.prompt)}" title="${escapeHtml(img.prompt)}">
           ${serves}
-          <button type="button" class="tile-del" aria-label="Delete image" title="Delete image" onclick="event.stopPropagation();deleteCollectionImage('${selectedCollId}', '${img.id}')">✕</button>
+          <button type="button" class="tile-del" aria-label="Delete image" title="Delete image" onclick="event.stopPropagation();deleteCollectionImage('${collId}', '${imgId}')">✕</button>
         </div>`;
     }
 
@@ -4820,8 +4821,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       }
     }
 
-    async function deleteCollectionImage(collId, assetId) {
-      if (!(await askConfirm({ title: 'Delete this image?', body: 'It is removed from the collection permanently.', action: 'Delete image' }))) return;
+    async function _performImageDelete(collId, assetId) {
       try {
         const r = await fetch('/v1/collections/' + encodeURIComponent(collId) + '/images/' + encodeURIComponent(assetId), { method: 'DELETE', credentials: 'same-origin' });
         if (r.status === 401) { location.hash = '#/login'; return; }
@@ -4829,6 +4829,17 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         showToast('Image deleted', 'success');
         await loadCollections();
       } catch { showToast('Could not delete the image', 'error'); }
+    }
+    async function deleteCollectionImage(collId, assetId) {
+      if (!(await askConfirm({ title: 'Delete this image?', body: 'It is removed from the collection permanently.', action: 'Delete image' }))) return;
+      await _performImageDelete(collId, assetId);
+    }
+    // Same as deleteCollectionImage but for the image-detail modal: the confirm must be
+    // resolved BEFORE the modal closes, so it appears over the modal rather than the grid.
+    async function deleteFromImageModal(collId, assetId) {
+      if (!(await askConfirm({ title: 'Delete this image?', body: 'It is removed from the collection permanently.', action: 'Delete image' }))) return;
+      closeImageModal();
+      await _performImageDelete(collId, assetId);
     }
 
     const GEN_POLL_MS = 2500;
@@ -4891,7 +4902,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       const collId = document.getElementById('gen-coll-select').value;
       if (!prompt) { showToast('Enter a prompt first', 'error'); return; }
       if (!collId) { showToast('Create a collection first', 'error'); return; }
-      if (pendingGens.size >= MAX_CONCURRENT_GENERATIONS) {
+      if ([...pendingGens.values()].filter((v) => !v._error).length >= MAX_CONCURRENT_GENERATIONS) {
         showToast(`You can run up to ${MAX_CONCURRENT_GENERATIONS} generations at once — wait for one to finish`, 'error');
         return;
       }
