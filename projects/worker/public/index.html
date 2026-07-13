@@ -4455,7 +4455,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
               <input type="checkbox" ${b.enabled ? 'checked' : ''} onchange="patchByok({ enabled: this.checked })"> Enabled
             </label>
             <input type="number" min="1" max="10000" value="${b.monthly_cap}" title="Monthly image cap" class="field-input" style="width:90px;padding:6px 10px;" onchange="patchByok({ monthly_cap: parseInt(this.value, 10) || ${b.monthly_cap} })">
-            <button class="btn" style="height:34px;width:auto;padding:0 12px;" onclick="deleteByok(this)">Delete</button>
+            <button class="btn-ghost" style="height:34px;width:auto;padding:0 12px;" onclick="deleteByok(this)">Delete</button>
           </div>
         </div>`;
     }
@@ -4599,8 +4599,8 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
             <div style="margin-top:4px;">${collStatsLine(c)} · theme: ${c.theme_prompt ? escapeHtml(c.theme_prompt) : '<i>none</i>'}</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn" style="height:38px;width:auto;padding:0 14px;font-size:0.8125rem;" onclick="editCollectionTheme('${c.id}')">Edit theme</button>
-            <button class="btn" style="height:38px;width:auto;padding:0 14px;font-size:0.8125rem;color:var(--danger);" onclick="deleteCollection('${c.id}', this)">Delete</button>
+            <button class="btn-ghost" style="height:38px;width:auto;padding:0 14px;font-size:0.8125rem;" onclick="editCollectionTheme('${c.id}')">Edit theme</button>
+            <button class="btn-ghost" style="height:38px;width:auto;padding:0 14px;font-size:0.8125rem;color:var(--danger);" onclick="deleteCollection('${c.id}', this)">Delete</button>
           </div>
         </div>`;
     }
