@@ -3640,6 +3640,15 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     </div>
   </div>
 
+  <!-- Image detail modal -->
+  <div id="image-modal" class="modal-overlay" hidden onclick="if(event.target===this)closeImageModal()">
+    <div class="modal-card" style="max-width:640px;">
+      <img id="imgmodal-img" alt="" style="width:100%;border-radius:10px;margin-bottom:12px;">
+      <div id="imgmodal-meta" style="font-size:0.8125rem;color:var(--muted);line-height:1.7;"></div>
+      <div class="modal-actions" id="imgmodal-actions"></div>
+    </div>
+  </div>
+
   <!-- Create API key modal -->
   <div id="key-modal" class="modal-overlay" hidden onclick="if(event.target===this)closeCreateKey()">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="key-modal-title">
@@ -4328,11 +4337,33 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       _themeCollId = null;
     }
 
+    // Image detail modal — reads from collViewerImages (in-memory), no fetch.
+    function openImageModal(assetId) {
+      const img = (collViewerImages || []).find((i) => i.id === assetId);
+      if (!img) return;
+      document.getElementById('imgmodal-img').src = img.medium_url || img.url || img.thumb_url;
+      const dims = (img.width && img.height) ? `${img.width}×${img.height}` : '—';
+      const served = img.serve_count != null ? `${img.serve_count}×` : '—';
+      document.getElementById('imgmodal-meta').innerHTML = `
+        <div style="margin-bottom:8px;"><b style="color:var(--ink);">Prompt</b><br>${escapeHtml(img.prompt || '')}</div>
+        <div>Served <b style="color:var(--ink);">${served}</b> by the API</div>
+        <div>Model: ${escapeHtml(img.model_used || '—')} · ${dims}</div>
+        <div>Created: ${escapeHtml(img.created_at || '—')}</div>`;
+      const dl = `<a class="btn-ghost" style="height:34px;display:inline-flex;align-items:center;padding:0 12px;text-decoration:none;" href="/v1/library/${encodeURIComponent(img.id)}/download">Download</a>`;
+      const orig = img.original_url ? `<a class="btn-ghost" style="height:34px;display:inline-flex;align-items:center;padding:0 12px;text-decoration:none;" href="${escapeHtml(img.original_url)}" target="_blank" rel="noopener">View original ↗</a>` : '';
+      const del = `<button type="button" class="btn-ghost" style="height:34px;padding:0 12px;color:var(--danger);" onclick="closeImageModal();deleteCollectionImage('${selectedCollId}', '${img.id}')">Delete</button>`;
+      document.getElementById('imgmodal-actions').innerHTML = dl + orig + del +
+        `<button type="button" class="btn-ghost" style="height:34px;padding:0 12px;" onclick="closeImageModal()">Close</button>`;
+      document.getElementById('image-modal').hidden = false;
+    }
+    function closeImageModal() { document.getElementById('image-modal').hidden = true; }
+
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
       if (!document.getElementById('confirm-modal').hidden) closeConfirm(false);
       if (!document.getElementById('theme-modal').hidden) closeThemeModal();
       if (!document.getElementById('newcoll-modal').hidden) closeNewCollModal();
+      if (!document.getElementById('image-modal').hidden) closeImageModal();
     });
 
     // API key creation modal
@@ -4526,6 +4557,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     let collViewQuery = '';
     let collViewSeq = 0;
     let collViewDebounce = null;
+    let collViewerImages = [];
 
     async function loadCollections() {
       const viewer = document.getElementById('coll-viewer-body');
@@ -4708,10 +4740,10 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         ? `<span class="tile-badge" title="Times returned by the API">${img.serve_count}×</span>`
         : '';
       return `
-        <div class="coll-tile">
+        <div class="coll-tile" onclick="openImageModal('${img.id}')" style="cursor:pointer;">
           <img src="${escapeHtml(thumb)}" alt="${escapeHtml(img.prompt)}" title="${escapeHtml(img.prompt)}">
           ${serves}
-          <button type="button" class="tile-del" aria-label="Delete image" title="Delete image" onclick="deleteCollectionImage('${selectedCollId}', '${img.id}')">✕</button>
+          <button type="button" class="tile-del" aria-label="Delete image" title="Delete image" onclick="event.stopPropagation();deleteCollectionImage('${selectedCollId}', '${img.id}')">✕</button>
         </div>`;
     }
 
@@ -4735,6 +4767,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const { images } = await r.json();
         if (seq !== collViewSeq) return;
+        collViewerImages = images;   // module-scope: modal reads from memory, no fetch
         if (!images.length) {
           el.innerHTML = '<span style="font-size:0.8125rem;">' + (collViewQuery
             ? 'No images in this collection match “' + escapeHtml(collViewQuery) + '”.'
