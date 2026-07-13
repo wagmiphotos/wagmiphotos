@@ -157,3 +157,20 @@ it("browse + bumpSearchCount + previews work on the real schema (0017; window fn
   // owner list now carries search_count too
   expect((await collections.listByOwner("usr_1"))[0].search_count).toBe(1);
 });
+
+it("generations: countOpenByUser + listPendingByCollection are owner+status scoped (real schema)", async () => {
+  const db = realDb();
+  seedUser(db, "usr_1");
+  seedUser(db, "usr_2");
+  const { generations } = makeD1Stores(db);
+  await generations.create({ id: "g1", userId: "usr_1", collectionId: "col_a", prompt: "p1", provider: "gmicloud", month: "2026-07" });
+  await generations.create({ id: "g2", userId: "usr_1", collectionId: "col_a", prompt: "p2", provider: "gmicloud", month: "2026-07" });
+  await generations.create({ id: "g3", userId: "usr_1", collectionId: "col_a", prompt: "p3", provider: "gmicloud", month: "2026-07" });
+  await generations.succeed("g3", "asset-3");                 // terminal — excluded
+  await generations.create({ id: "g4", userId: "usr_1", collectionId: "col_b", prompt: "p4", provider: "gmicloud", month: "2026-07" });
+  await generations.create({ id: "g5", userId: "usr_2", collectionId: "col_a", prompt: "p5", provider: "gmicloud", month: "2026-07" });
+
+  expect(await generations.countOpenByUser("usr_1")).toBe(3); // g1,g2 open + g4 open; g3 succeeded, g5 other user
+  const pend = await generations.listPendingByCollection("col_a", "usr_1", 20);
+  expect(pend.map((r) => r.id).sort()).toEqual(["g1", "g2"]); // col_a + usr_1 + open only
+});

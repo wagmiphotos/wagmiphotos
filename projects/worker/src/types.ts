@@ -141,6 +141,10 @@ export interface GenerationStore {
   fail(id: string, error: string): Promise<boolean>;
   /** Open jobs whose updated_at is older than olderThanSec — sweep targets. */
   listStale(olderThanSec: number, limit: number): Promise<GenerationRow[]>;
+  /** Count of the user's still-open (queued|generating) generations — the concurrency gate. */
+  countOpenByUser(userId: string): Promise<number>;
+  /** Owner-scoped open generations in one collection, newest first — powers refresh re-attach. */
+  listPendingByCollection(collectionId: string, userId: string, limit: number): Promise<GenerationRow[]>;
 }
 export interface RateLimiter { limit(key: string): Promise<boolean>; }
 /** Minimal structural type for the unsafe `ratelimit` binding (no exported type in workers-types). */

@@ -397,6 +397,18 @@ export function makeD1Stores(db: D1Database): {
       ).bind(`-${olderThanSec} seconds`, limit).all<GenerationRow>();
       return results ?? [];
     },
+    async countOpenByUser(userId) {
+      const row = await db.prepare(
+        "SELECT COUNT(*) AS n FROM generations WHERE user_id = ? AND status IN ('queued','generating')"
+      ).bind(userId).first<{ n: number }>();
+      return row?.n ?? 0;
+    },
+    async listPendingByCollection(collectionId, userId, limit) {
+      const { results } = await db.prepare(
+        `SELECT ${GEN_COLS} FROM generations WHERE collection_id = ? AND user_id = ? AND status IN ('queued','generating') ORDER BY created_at DESC LIMIT ?`
+      ).bind(collectionId, userId, limit).all<GenerationRow>();
+      return results ?? [];
+    },
   };
 
   return { assets, queries, keys, users, sessions, loginTokens, byok, collections, generations };

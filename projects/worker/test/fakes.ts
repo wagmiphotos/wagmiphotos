@@ -164,6 +164,12 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
       },
       listStale: async (_olderThanSec, limit) =>
         [...generationRows.values()].filter((r) => r.status === "queued" || r.status === "generating").slice(0, limit),
+      countOpenByUser: async (userId) =>
+        [...generationRows.values()].filter((r) => r.user_id === userId && (r.status === "queued" || r.status === "generating")).length,
+      listPendingByCollection: async (collectionId, userId, limit) =>
+        [...generationRows.values()]
+          .filter((r) => r.collection_id === collectionId && r.user_id === userId && (r.status === "queued" || r.status === "generating"))
+          .slice(0, limit),
     },
   };
   // expose internals for assertions
