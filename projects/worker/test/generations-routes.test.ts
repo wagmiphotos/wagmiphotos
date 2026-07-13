@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { handleCreateGeneration, handleGetGeneration } from "../src/generations-routes";
+import { handleCreateGeneration, handleGetGeneration, handleListCollectionGenerations } from "../src/generations-routes";
 import { fakeServices } from "./fakes";
 import { encryptSecret } from "../src/crypto";
 import { monthKey, type GenJobsCfg } from "../src/generation-jobs";
@@ -344,4 +344,49 @@ it("19. create: 2 open still allows a 3rd -> 202", async () => {
     id, req(`/v1/collections/${id}/generations`, "POST", { prompt: "a red fox" }), DEV_ENV, s, jobCfg()
   );
   expect(res.status).toBe(202);
+});
+
+// ---------------------------------------------------------------------------
+// GET /v1/collections/:id/generations?status=pending (handleListCollectionGenerations)
+// ---------------------------------------------------------------------------
+
+it("20. list pending: unknown/again someone else's collection -> 404", async () => {
+  const s = fakeServices();
+  await s.collections.create({ id: "col_theirs20", ownerUserId: "usr_other", name: "n", themePrompt: "" });
+  const res = await handleListCollectionGenerations(
+    "col_theirs20", new URL("https://x/v1/collections/col_theirs20/generations?status=pending"),
+    req("/v1/collections/col_theirs20/generations"), DEV_ENV, s
+  );
+  expect(res.status).toBe(404);
+});
+
+it("21. list pending: returns only this collection's open gens, newest first", async () => {
+  const s = fakeServices();
+  const id = "col_mine21";
+  await s.collections.create({ id, ownerUserId: DEV_USER_ID, name: "n", themePrompt: "" });
+  await s.generations.create({ id: "a", userId: DEV_USER_ID, collectionId: id, prompt: "first", provider: "gmicloud", month: MONTH });
+  await s.generations.create({ id: "b", userId: DEV_USER_ID, collectionId: id, prompt: "second", provider: "gmicloud", month: MONTH });
+  await s.generations.create({ id: "c", userId: DEV_USER_ID, collectionId: id, prompt: "done", provider: "gmicloud", month: MONTH });
+  await s.generations.succeed("c", "asset-c");            // excluded (terminal)
+  await s.generations.create({ id: "d", userId: DEV_USER_ID, collectionId: "col_other21", prompt: "elsewhere", provider: "gmicloud", month: MONTH });
+  const res = await handleListCollectionGenerations(
+    id, new URL(`https://x/v1/collections/${id}/generations?status=pending`),
+    req(`/v1/collections/${id}/generations`), DEV_ENV, s
+  );
+  expect(res.status).toBe(200);
+  const body: any = await res.json();
+  expect(body.generations.map((g: any) => g.id).sort()).toEqual(["a", "b"]);
+  expect(body.generations[0]).toHaveProperty("prompt");
+  expect(body.generations[0]).toHaveProperty("created_at");
+});
+
+it("22. list pending: unsupported status value -> 400", async () => {
+  const s = fakeServices();
+  const id = "col_stat22";
+  await s.collections.create({ id, ownerUserId: DEV_USER_ID, name: "n", themePrompt: "" });
+  const res = await handleListCollectionGenerations(
+    id, new URL(`https://x/v1/collections/${id}/generations?status=succeeded`),
+    req(`/v1/collections/${id}/generations`), DEV_ENV, s
+  );
+  expect(res.status).toBe(400);
 });

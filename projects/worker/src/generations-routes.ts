@@ -69,6 +69,21 @@ export async function handleCreateGeneration(
   }
 }
 
+export async function handleListCollectionGenerations(
+  collectionId: string, url: URL, request: Request, env: Env, s: Services
+): Promise<Response> {
+  const p = await resolveApiPrincipal(request, env, s);
+  if (!p) return Response.json({ error: "login required" }, { status: 401 });
+  const coll = await s.collections.get(collectionId);
+  if (!coll || coll.owner_user_id !== p.userId) return Response.json({ error: "unknown collection" }, { status: 404 });
+  const status = url.searchParams.get("status") ?? "pending";
+  if (status !== "pending") return Response.json({ error: "unsupported status" }, { status: 400 });
+  const rows = await s.generations.listPendingByCollection(collectionId, p.userId, 20);
+  return Response.json({
+    generations: rows.map((r) => ({ id: r.id, prompt: r.prompt, status: r.status, created_at: r.created_at })),
+  });
+}
+
 export async function handleGetGeneration(
   id: string, request: Request, env: Env, s: Services, cfg: GenJobsCfg, assetBaseUrl?: string
 ): Promise<Response> {

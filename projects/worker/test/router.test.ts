@@ -278,3 +278,13 @@ it("webhook route: 400 on an unsigned body", async () => {
     fakeEnv({ STRIPE_WEBHOOK_SECRET: "whsec_test" }), { waitUntil: () => {} } as any);
   expect(res.status).toBe(400);
 });
+
+it("GET /v1/collections/:id/generations dispatches to the pending-list handler (not the catch-all)", async () => {
+  const res = await worker.fetch(
+    new Request("https://x/v1/collections/col_x/generations?status=pending"),
+    fakeEnv(), { waitUntil: () => {} } as any
+  );
+  expect(res.status).toBe(404);
+  const body: any = await res.json();
+  expect(body.error).toBe("unknown collection"); // handler ran; DB stub has no such collection
+});

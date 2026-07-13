@@ -19,7 +19,7 @@ import {
   handleListCollectionImages, handleDeleteCollectionImage, handleDeleteCollection,
   handleBrowseCollections, type CollModCfg,
 } from "./collections-routes";
-import { handleCreateGeneration, handleGetGeneration } from "./generations-routes";
+import { handleCreateGeneration, handleGetGeneration, handleListCollectionGenerations } from "./generations-routes";
 import { sweepGenerations, type GenJobsCfg } from "./generation-jobs";
 
 function buildServices(env: Env): Services {
@@ -154,6 +154,11 @@ export default {
         let id: string;
         try { id = decodeURIComponent(genCreate[1]); } catch { return new Response("Not found", { status: 404 }); }
         return await handleCreateGeneration(id, request, env, services, genJobsCfg(env, (p) => ctx.waitUntil(p)), env.ASSET_BASE_URL);
+      }
+      if (genCreate && request.method === "GET") {
+        let id: string;
+        try { id = decodeURIComponent(genCreate[1]); } catch { return new Response("Not found", { status: 404 }); }
+        return await handleListCollectionGenerations(id, url, request, env, services);
       }
       const genGet = url.pathname.match(/^\/v1\/generations\/([^/]+)$/);
       if (genGet && request.method === "GET") {
