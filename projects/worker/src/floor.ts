@@ -7,6 +7,14 @@
 export const FLOOR_SIM_MAX = 0.84;
 export const FLOOR_SIM_MIN = 0.75;
 
+// Library/collection SEARCH cutoff — a SEPARATE, lower floor than the generation
+// hit-threshold above. Semantic search should surface relevant images even for
+// short bare queries: 'car' scores ~0.65 against the verbose "The image shows…"
+// PD12M captions (well under the generation floor), while unrelated queries still
+// score ~0.52 and stay out. Split off the shared 0.75 on 2026-07-14 after the
+// 261k seed left simple one-word searches returning nothing.
+export const LIBRARY_FLOOR_SIM = 0.6;
+
 export function similarityFloor(cacheTolerance: number, simMax = FLOOR_SIM_MAX, simMin = FLOOR_SIM_MIN): number {
   const t = Math.min(1, Math.max(0, cacheTolerance));
   return simMax - t * (simMax - simMin);

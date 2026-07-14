@@ -2,6 +2,7 @@
   "_comment": "Cross-language contract shared by the edge worker (TypeScript) and the backfill (Python). Both test suites pin their constants against this file (projects/worker/test/contract.test.ts, projects/common/tests/test_contract.py). Change values HERE first; a mismatch on either side must fail tests. The two BGE ids must name the same base model so edge queries and backfill upserts live in one embedding space. Vectorize shard routing uses fnv1a32(id) % vectorize_shards; shard_fixtures pins the hash on both sides. byok_providers pins the fixed model + price estimate per BYOK provider; denylist_terms is the shared prompt denylist (worker + backfill).",
   "floor_sim_max": 0.84,
   "floor_sim_min": 0.75,
+  "library_floor_sim": 0.6,
   "default_cache_tolerance": 0.15,
   "bge_model_workers_ai": "@cf/baai/bge-base-en-v1.5",
   "bge_model_sentence_transformers": "BAAI/bge-base-en-v1.5",

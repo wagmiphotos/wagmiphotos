@@ -5,13 +5,14 @@ import { join } from "node:path";
 // pins its side in projects/common/tests/test_contract.py; a drift on either
 // side must fail tests.
 import contract from "../../../contract.json";
-import { FLOOR_SIM_MAX, FLOOR_SIM_MIN } from "../src/floor";
+import { FLOOR_SIM_MAX, FLOOR_SIM_MIN, LIBRARY_FLOOR_SIM } from "../src/floor";
 import { DEFAULT_CACHE_TOLERANCE } from "../src/handler";
 import { BGE_MODEL } from "../src/embed";
 
 it("floor constants match contract.json", () => {
   expect(FLOOR_SIM_MAX).toBe(contract.floor_sim_max);
   expect(FLOOR_SIM_MIN).toBe(contract.floor_sim_min);
+  expect(LIBRARY_FLOOR_SIM).toBe(contract.library_floor_sim);
 });
 
 it("default cache tolerance matches contract.json", () => {

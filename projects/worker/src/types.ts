@@ -174,7 +174,7 @@ export interface Env {
   MASTER_API_KEY?: string;
   /** "true"/"1" opens dev-only lanes (dev API principal, console magic links). NEVER set in production. */
   DEV_MODE?: string;
-  IMAGE_PRICE_USD?: string; FLOOR_SIM_MAX?: string; FLOOR_SIM_MIN?: string;
+  IMAGE_PRICE_USD?: string; FLOOR_SIM_MAX?: string; FLOOR_SIM_MIN?: string; LIBRARY_FLOOR_SIM?: string;
   GITHUB_REPO?: string;
   RESEND_API_KEY?: string; EMAIL_FROM?: string;
   PUBLIC_SITE_URL?: string; PUBLIC_API_BASE_URL?: string;
