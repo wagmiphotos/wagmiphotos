@@ -9,7 +9,11 @@ from wagmiphotos.backfill import seed_pd12m
 
 
 class FakeEmbedder:
+    def __init__(self): self.many_calls = []
     def text_embed(self, text): return [float(len(text) % 7)] * 8
+    def text_embed_many(self, texts):
+        self.many_calls.append(len(texts))       # record per-page batch sizes
+        return [self.text_embed(t) for t in texts]
 
 
 class _Resp:
@@ -177,6 +181,93 @@ def test_seed_from_parquet_raises_on_empty_dir(tmp_path):
     (tmp_path / "empty").mkdir()
     with pytest.raises(RuntimeError, match="parquet"):
         seed_pd12m.seed_from_parquet(tmp_path / "empty", 1, FakeD1(), FakeVectorize(), FakeEmbedder())
+
+
+# --- Batched fast path ---------------------------------------------------
+
+def test_seed_rows_bulk_writes_via_bulk_insert_and_one_vectorize_batch():
+    d1, vec = FakeD1(), FakeVectorize()
+    rows = [{"id": str(i), "prompt": f"p{i}", "url": f"https://ext/{i}.jpg",
+             "width": 10, "height": 10, "mime": "image/jpeg", "embedding": [0.1] * 8}
+            for i in range(3)]
+    n = seed_pd12m.seed_rows_bulk(rows, d1, vec)
+    assert n == 3
+    assert {r.source_id for r in d1.inserted} == {"0", "1", "2"}
+    assert all(r.source == "pd12m" and r.locally_cached is False for r in d1.inserted)
+    assert len(vec.vectors) == 3 and vec.insert_calls == 1     # one batched vectorize write
+    # every asset id is present as a vector with the source tag
+    assert {r.id for r in d1.inserted} == set(vec.vectors)
+    assert all(v["metadata"] == {"source": "pd12m"} for v in vec.vectors.values())
+
+
+def test_seed_rows_bulk_writes_vectorize_first_no_d1_orphan_on_failure():
+    """Vectorize is written before D1, so a Vectorize crash leaves NO D1 row for
+    that page (a benign orphan vector at worst, which the Worker tolerates) —
+    never an orphan D1 row that is served but missing from similarity search."""
+    class BoomVectorize(FakeVectorize):
+        def insert_many(self, vectors): raise RuntimeError("vectorize down")
+    d1, vec = FakeD1(), BoomVectorize()
+    rows = [{"id": "1", "prompt": "p", "url": "https://ext/1.jpg", "width": 1,
+             "height": 1, "mime": "image/jpeg", "embedding": [0.1] * 8}]
+    with pytest.raises(RuntimeError, match="vectorize down"):
+        seed_pd12m.seed_rows_bulk(rows, d1, vec)
+    assert d1.inserted == []                    # D1 untouched when Vectorize fails
+
+
+def test_seed_from_parquet_fast_seeds_up_to_limit_across_files(tmp_path):
+    d1, vec = FakeD1(), FakeVectorize()
+    meta = _write_parquet_dir(tmp_path, [[_prow(i) for i in range(3)],
+                                         [_prow(i) for i in range(3, 6)]])
+    n = seed_pd12m.seed_from_parquet_fast(meta, 5, d1, vec, FakeEmbedder(), page_size=2)
+    assert n == 5
+    assert {r.source_id for r in d1.inserted} == {"p0", "p1", "p2", "p3", "p4"}
+
+
+def test_seed_from_parquet_fast_dedupes_existing_source_ids(tmp_path):
+    d1, vec = FakeD1(), FakeVectorize()
+    d1.insert_asset(AssetRecord(
+        id="old", prompt="p", model_used=None, source="pd12m", source_id="p1",
+        content_hash="h", width=1, height=1, mime="image/jpeg", created_at=""))
+    meta = _write_parquet_dir(tmp_path, [[_prow(i) for i in range(3)]])
+    n = seed_pd12m.seed_from_parquet_fast(meta, 10, d1, vec, FakeEmbedder())
+    assert n == 2
+    assert {r.source_id for r in d1.inserted if r.id != "old"} == {"p0", "p2"}
+
+
+def test_seed_from_parquet_fast_batch_embeds_once_per_page(tmp_path):
+    d1, vec, emb = FakeD1(), FakeVectorize(), FakeEmbedder()
+    meta = _write_parquet_dir(tmp_path, [[_prow(i) for i in range(4)]])
+    seed_pd12m.seed_from_parquet_fast(meta, 4, d1, vec, emb, page_size=2)
+    assert emb.many_calls == [2, 2]        # 2 pages, each embedded in one batched call
+
+
+def test_seed_from_parquet_fast_skip_fast_forwards_candidates(tmp_path):
+    """`skip` fast-forwards past the first N candidates WITHOUT deduping them
+    (the expensive existing_source_ids reads), so a top-up doesn't re-scan the
+    whole already-seeded prefix. It only affects speed — never correctness."""
+    d1, vec, emb = FakeD1(), FakeVectorize(), FakeEmbedder()
+    meta = _write_parquet_dir(tmp_path, [[_prow(i) for i in range(6)]])
+    n = seed_pd12m.seed_from_parquet_fast(meta, 10, d1, vec, emb, page_size=2, skip=4)
+    assert n == 2
+    assert {r.source_id for r in d1.inserted} == {"p4", "p5"}    # p0..p3 skipped, not seeded
+
+
+def test_seed_from_parquet_fast_skip_beyond_data_seeds_nothing(tmp_path):
+    d1, vec, emb = FakeD1(), FakeVectorize(), FakeEmbedder()
+    meta = _write_parquet_dir(tmp_path, [[_prow(i) for i in range(3)]])
+    n = seed_pd12m.seed_from_parquet_fast(meta, 10, d1, vec, emb, skip=99)
+    assert n == 0 and d1.inserted == []
+
+
+def test_seed_from_parquet_fast_skips_embedding_fully_deduped_page(tmp_path):
+    d1, vec, emb = FakeD1(), FakeVectorize(), FakeEmbedder()
+    for i in range(2):                      # pre-seed the whole first page
+        d1.insert_asset(AssetRecord(
+            id=f"old{i}", prompt="p", model_used=None, source="pd12m", source_id=f"p{i}",
+            content_hash="h", width=1, height=1, mime="image/jpeg", created_at=""))
+    meta = _write_parquet_dir(tmp_path, [[_prow(i) for i in range(4)]])
+    seed_pd12m.seed_from_parquet_fast(meta, 4, d1, vec, emb, page_size=2)
+    assert emb.many_calls == [2]            # page1 fully deduped -> no embed; page2 embeds p2,p3
 
 
 def test_main_metadata_dir_routes_to_parquet(monkeypatch, tmp_path):

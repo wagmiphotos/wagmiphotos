@@ -7,6 +7,7 @@ import sqlite3
 import pytest
 
 from wagmiphotos.common import d1_client
+from wagmiphotos.common.models import AssetRecord
 
 MIGRATIONS_DIR = (pathlib.Path(__file__).resolve().parents[3]
                   / "projects" / "worker" / "migrations")
@@ -266,3 +267,91 @@ def test_mark_asset_dead_idempotent_first_reason_wins(conn):
     conn.execute(d1_client.MARK_ASSET_DEAD_SQL, ["retries exhausted", "a1"])
     assert conn.execute(
         "SELECT dead_reason FROM assets WHERE id='a1'").fetchone()[0] == "http 404"
+
+
+# --- Bulk insert (batched fast-seed) -------------------------------------
+
+def _bulk_asset(aid, prompt="a fox", source="pd12m", source_id=None,
+                model_used="gpt-image-1", locally_cached=False,
+                price_usd=None, provider=None):
+    return AssetRecord(
+        id=aid, prompt=prompt, model_used=model_used, source=source,
+        source_id=source_id, content_hash=f"h-{aid}", width=1024, height=768,
+        mime="image/jpeg", created_at="", source_url=f"https://ext/{aid}.jpg",
+        locally_cached=locally_cached, price_usd=price_usd, provider=provider)
+
+
+def test_build_bulk_insert_sql_roundtrips_multiple_rows_through_real_schema(conn):
+    recs = [_bulk_asset("b1", source_id="1"), _bulk_asset("b2", source_id="2"),
+            _bulk_asset("b3", source_id="3")]
+    conn.execute(d1_client.build_bulk_insert_sql(recs))
+    rows = conn.execute(
+        "SELECT id, source_id, source, locally_cached, model_used FROM assets "
+        "ORDER BY id").fetchall()
+    assert rows == [("b1", "1", "pd12m", 0, "gpt-image-1"),
+                    ("b2", "2", "pd12m", 0, "gpt-image-1"),
+                    ("b3", "3", "pd12m", 0, "gpt-image-1")]
+
+
+def test_build_bulk_insert_sql_escapes_quotes_and_resists_injection(conn):
+    nasty = "a cat's toy'); DROP TABLE assets;--"
+    conn.execute(d1_client.build_bulk_insert_sql([_bulk_asset("b1", prompt=nasty, source_id="1")]))
+    assert conn.execute("SELECT prompt FROM assets WHERE id='b1'").fetchone()[0] == nasty
+    # the injection attempt did not run: table intact, exactly one row
+    assert conn.execute("SELECT COUNT(*) FROM assets").fetchone()[0] == 1
+
+
+def test_build_bulk_insert_sql_nulls_and_unicode_roundtrip(conn):
+    rec = _bulk_asset("b1", prompt="ünïcodé 🦊 café\nline2", model_used=None,
+                      source_id=None, price_usd=None, provider=None)
+    conn.execute(d1_client.build_bulk_insert_sql([rec]))
+    row = conn.execute(
+        "SELECT prompt, model_used, source_id, price_usd, provider FROM assets "
+        "WHERE id='b1'").fetchone()
+    assert row == ("ünïcodé 🦊 café\nline2", None, None, None, None)
+
+
+def test_build_bulk_insert_sql_types_match_single_insert(conn):
+    rec = _bulk_asset("b1", source_id="7", price_usd=0.055, provider="gmicloud",
+                      locally_cached=True)
+    conn.execute(d1_client.build_bulk_insert_sql([rec]))
+    assert conn.execute(
+        "SELECT width, height, locally_cached, price_usd, provider FROM assets "
+        "WHERE id='b1'").fetchone() == (1024, 768, 1, 0.055, "gmicloud")
+
+
+def test_bulk_and_single_insert_agree_on_columns(conn):
+    """A bulk-inserted row is indistinguishable from one written by the proven
+    per-row INSERT_ASSET_SQL (same 13 columns, same values)."""
+    single = list(ASSET_PARAMS)          # id a1, generated, ...
+    conn.execute(d1_client.INSERT_ASSET_SQL, single)
+    rec = AssetRecord(
+        id="a2", prompt=single[1], model_used=single[4], source=single[2],
+        source_id=single[3], content_hash=single[5], width=single[6],
+        height=single[7], mime=single[8], created_at="", source_url=single[9],
+        locally_cached=bool(single[10]), price_usd=single[11], provider=single[12])
+    conn.execute(d1_client.build_bulk_insert_sql([rec]))
+    cols = ("prompt, source, source_id, model_used, content_hash, width, height, "
+            "mime, source_url, locally_cached, price_usd, provider")
+    a1 = conn.execute(f"SELECT {cols} FROM assets WHERE id='a1'").fetchone()
+    a2 = conn.execute(f"SELECT {cols} FROM assets WHERE id='a2'").fetchone()
+    assert a1 == a2
+
+
+def test_insert_assets_many_chunks_into_multiple_requests(monkeypatch):
+    d1 = d1_client.D1Client("acct", "db", "token")
+    calls = []
+    monkeypatch.setattr(d1, "_exec",
+                        lambda sql, params=None: calls.append(sql) or {"result": [{"meta": {}}]})
+    recs = [_bulk_asset(f"b{i}", source_id=str(i)) for i in range(5)]
+    n = d1.insert_assets_many(recs, chunk=2)
+    assert n == 5
+    assert len(calls) == 3                     # 2 + 2 + 1
+    assert all(c.startswith("INSERT INTO assets") for c in calls)
+
+
+def test_insert_assets_many_noop_on_empty(monkeypatch):
+    d1 = d1_client.D1Client("acct", "db", "token")
+    monkeypatch.setattr(d1, "_exec",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not call")))
+    assert d1.insert_assets_many([]) == 0

@@ -21,6 +21,34 @@ def test_text_embed_passes_raw_text_no_prefix():
     BgeEmbedder(E()).text_embed("hello world")
     assert seen["texts"] == ["hello world"]   # exact text, no instruction prefix
 
+def test_text_embed_many_batches_into_one_encode_call():
+    seen = {"calls": 0}
+    class E:
+        def encode(self, texts):
+            seen["calls"] += 1; seen["texts"] = texts
+            return [[3.0, 4.0] for _ in texts]
+    out = BgeEmbedder(E()).text_embed_many(["a", "bb", "ccc"])
+    assert seen["calls"] == 1                      # one batched encode, not per-text
+    assert seen["texts"] == ["a", "bb", "ccc"]     # raw text, in order, no prefix
+    assert len(out) == 3
+    for v in out:
+        assert math.isclose(v[0], 0.6, abs_tol=1e-6) and math.isclose(v[1], 0.8, abs_tol=1e-6)
+
+
+def test_text_embed_many_parity_with_text_embed():
+    class E:
+        def encode(self, texts): return [[float(len(t)), 1.0] for t in texts]
+    e = BgeEmbedder(E())
+    texts = ["x", "yy", "zzz"]
+    assert e.text_embed_many(texts) == [e.text_embed(t) for t in texts]
+
+
+def test_text_embed_many_empty_returns_empty_without_encoding():
+    class E:
+        def encode(self, texts): raise AssertionError("should not encode empty")
+    assert BgeEmbedder(E()).text_embed_many([]) == []
+
+
 def test_from_pretrained_missing_dependency_names_the_extra(monkeypatch):
     monkeypatch.setitem(sys.modules, "sentence_transformers", None)  # simulate not installed
     with pytest.raises(ImportError) as e:

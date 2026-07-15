@@ -58,6 +58,11 @@ class FakeD1:
     def insert_asset(self, rec):
         self.inserted.append(rec); self.assets[rec.id] = rec
 
+    def insert_assets_many(self, recs, chunk=200):
+        for rec in recs:
+            self.inserted.append(rec); self.assets[rec.id] = rec
+        return len(recs)
+
     def asset_exists(self, asset_id):
         return asset_id in self.assets and asset_id not in self.dead
 

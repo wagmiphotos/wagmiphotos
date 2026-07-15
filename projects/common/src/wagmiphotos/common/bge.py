@@ -29,6 +29,13 @@ class BgeEmbedder:
         vec = [float(x) for x in self._enc.encode([text])[0]]
         return _l2(vec)  # idempotent; guarantees the L2-normalized contract
 
+    def text_embed_many(self, texts: list[str]) -> list[list[float]]:
+        """Batched text_embed: one encode() call for the whole list (much faster
+        than per-text on CPU). Same per-vector L2-normalized contract."""
+        if not texts:
+            return []
+        return [_l2([float(x) for x in vec]) for vec in self._enc.encode(texts)]
+
     @classmethod
     def from_pretrained(cls, model_name: str = BGE_MODEL) -> "BgeEmbedder":
         try:

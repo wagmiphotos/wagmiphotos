@@ -58,6 +58,46 @@ INSERT_ASSET_SQL = (
     "height, mime, source_url, locally_cached, price_usd, provider) "
     "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
 
+# Columns and per-record value order for bulk seeding, kept in lockstep with
+# INSERT_ASSET_SQL above so a bulk-inserted row is identical to a single insert.
+_BULK_ASSET_COLS = ("id", "prompt", "source", "source_id", "model_used", "content_hash",
+                    "width", "height", "mime", "source_url", "locally_cached",
+                    "price_usd", "provider")
+
+
+def _asset_bulk_values(rec) -> tuple:
+    return (rec.id, rec.prompt, rec.source, rec.source_id, rec.model_used,
+            rec.content_hash, rec.width, rec.height, rec.mime, rec.source_url,
+            1 if rec.locally_cached else 0, rec.price_usd, rec.provider)
+
+
+def _sql_literal(v) -> str:
+    """Encode a Python value as a SQLite literal. D1 caps bound params at 100/
+    statement, so bulk inserts inline values instead. SQLite string literals only
+    need single-quote doubling (backslash is not special), which also neutralises
+    injection from dataset captions."""
+    if v is None:
+        return "NULL"
+    if isinstance(v, bool):
+        return "1" if v else "0"
+    if isinstance(v, int):
+        return str(v)
+    if isinstance(v, float):
+        return repr(v)
+    return "'" + str(v).replace("'", "''") + "'"
+
+
+def build_bulk_insert_sql(recs) -> str:
+    """One multi-row `INSERT INTO assets ... VALUES (...),(...),...` with inlined,
+    escaped literals (bypasses D1's 100-bound-param cap). Same columns/semantics as
+    INSERT_ASSET_SQL. Caller must keep each statement within D1's size limits."""
+    cols = ", ".join(_BULK_ASSET_COLS)
+    rows = ",".join(
+        "(" + ",".join(_sql_literal(x) for x in _asset_bulk_values(r)) + ")"
+        for r in recs)
+    return f"INSERT INTO assets ({cols}) VALUES {rows}"
+
+
 ASSET_EXISTS_SQL = "SELECT 1 FROM live_assets WHERE id=? LIMIT 1"
 
 _REHOST_COLS = ("id, prompt, source, source_id, model_used, content_hash, width, height, "
@@ -157,6 +197,17 @@ class D1Client:
             [rec.id, rec.prompt, rec.source, rec.source_id, rec.model_used, rec.content_hash,
              rec.width, rec.height, rec.mime, rec.source_url, 1 if rec.locally_cached else 0,
              rec.price_usd, rec.provider])
+
+    # Bulk seed writes: one HTTP round-trip per `chunk` rows instead of per row.
+    # 200 rows * 13 cols stays well under D1's ~2000-row inlined-VALUES envelope.
+    def insert_assets_many(self, recs: list[AssetRecord], chunk: int = 200) -> int:
+        """Insert many assets via chunked multi-row INSERTs. Returns rows inserted."""
+        total = 0
+        for i in range(0, len(recs), chunk):
+            part = recs[i:i + chunk]
+            self._exec(build_bulk_insert_sql(part))
+            total += len(part)
+        return total
 
     def asset_exists(self, asset_id: str) -> bool:
         return bool(self._query(ASSET_EXISTS_SQL, [asset_id]))

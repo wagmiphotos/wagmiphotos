@@ -61,6 +61,33 @@ def seed_rows(rows, d1, vectorize, *, source=SOURCE) -> int:
     return n
 
 
+def seed_rows_bulk(rows, d1, vectorize, *, source=SOURCE) -> int:
+    """Batched twin of seed_rows: D1 rows land in one chunked multi-row INSERT
+    (insert_assets_many) and the vectors in one Vectorize batch, instead of one
+    D1 round-trip per row. Same records/semantics as seed_rows."""
+    recs = []
+    batch = []
+    for i, row in enumerate(rows):
+        asset_id = str(uuid.uuid4())
+        recs.append(AssetRecord(
+            id=asset_id, prompt=row["prompt"], model_used=None, source=source,
+            source_id=str(row.get("id", i)),
+            content_hash=row.get("hash") or f"{source}-{row.get('id', i)}",
+            width=int(row.get("width", 0)), height=int(row.get("height", 0)),
+            mime=row.get("mime", "image/jpeg"), created_at="", source_url=row["url"],
+            locally_cached=False))
+        batch.append({"id": asset_id, "values": list(row["embedding"]),
+                      "metadata": {"source": source}})
+    if recs:
+        # Vectorize FIRST: if it fails, D1 stays untouched and the page retries
+        # cleanly. A crash can only ever leave an orphan VECTOR (id never lands
+        # in D1), which the Worker tolerates — never an orphan D1 row that is
+        # served from the library but invisible to similarity search.
+        vectorize.insert_many(batch)
+        d1.insert_assets_many(recs)
+    return len(recs)
+
+
 def fetch_hf_page(client, repo_id: str, offset: int, length: int, headers: dict) -> list[dict]:
     """Fetch one page from the HF dataset-viewer /rows endpoint."""
     resp = client.get(HF_ROWS_ENDPOINT,
@@ -169,6 +196,49 @@ def seed_from_parquet(metadata_dir, limit: int, d1, vectorize, embedder, *,
             logger.info("seeded %d/%d", seeded, limit)
     if page and seeded < limit:
         seeded += _seed_candidate_page(page, d1, vectorize, embedder, source=source)
+    return seeded
+
+
+def _seed_candidate_page_fast(page, d1, vectorize, embedder, *, source) -> int:
+    """Batched twin of _seed_candidate_page: dedupe against D1, embed all fresh
+    captions in ONE batched call, then write via seed_rows_bulk."""
+    existing = d1.existing_source_ids(source, [c["id"] for c in page])
+    fresh = [c for c in page if c["id"] not in existing]
+    if not fresh:
+        return 0
+    embeddings = embedder.text_embed_many([c["prompt"] for c in fresh])
+    for c, emb in zip(fresh, embeddings):
+        c["embedding"] = emb
+    return seed_rows_bulk(fresh, d1, vectorize, source=source)
+
+
+def seed_from_parquet_fast(metadata_dir, limit: int, d1, vectorize, embedder, *,
+                           source: str = SOURCE, page_size: int = 500,
+                           skip: int = 0) -> int:
+    """Batched twin of seed_from_parquet: same dedup-safe resume, but each page
+    is embedded in one batched call and written with batched D1 + Vectorize
+    inserts. ~1 HTTP round-trip per `page_size` rows instead of per row.
+
+    `skip` fast-forwards past the first N parquet candidates locally, WITHOUT the
+    per-page existing_source_ids dedup reads, so a top-up doesn't re-scan the whole
+    already-seeded prefix (the dominant cost at scale). Purely a speed knob: every
+    page that IS processed is still deduped, so skip can never seed a duplicate."""
+    candidates = iter_parquet_candidates(metadata_dir)
+    for _ in range(skip):
+        if next(candidates, None) is None:
+            break
+    seeded = 0
+    page: list[dict] = []
+    for c in candidates:
+        page.append(c)
+        if len(page) >= min(page_size, limit - seeded):
+            seeded += _seed_candidate_page_fast(page, d1, vectorize, embedder, source=source)
+            page = []
+            if seeded >= limit:
+                break
+            logger.info("seeded %d/%d", seeded, limit)
+    if page and seeded < limit:
+        seeded += _seed_candidate_page_fast(page, d1, vectorize, embedder, source=source)
     return seeded
 
 
