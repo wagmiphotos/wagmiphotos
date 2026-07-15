@@ -13,6 +13,7 @@ Usage:
 import argparse
 import logging
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -272,21 +273,121 @@ def build_clients(settings: Settings) -> tuple:
     return d1, vectorize, embedder
 
 
+def build_http_clients(settings: Settings) -> tuple:
+    """Fresh (D1Client, VectorizeClient) — no BGE. Used to drop poisoned httpx
+    connections between attempts (an SSL bad_record_mac poisons the reused pool),
+    without paying the BGE reload the full build_clients would."""
+    from wagmiphotos.common.d1_client import D1Client
+    from wagmiphotos.common.vectorize_client import VectorizeClient
+
+    d1 = D1Client(account_id=settings.cf_account_id, database_id=settings.d1_database_id,
+                  api_token=settings.cf_api_token)
+    vectorize = VectorizeClient(
+        account_id=settings.cf_account_id, index_prefix=settings.vectorize_index_prefix,
+        shards=settings.vectorize_shards, api_token=settings.cf_api_token,
+        dims=settings.embedding_dims)
+    return d1, vectorize
+
+
+def build_embedder(settings: Settings):
+    from wagmiphotos.common.bge import BgeEmbedder
+    return BgeEmbedder.from_pretrained(settings.bge_model_name)
+
+
+def pd12m_count(d1, source: str = SOURCE) -> int:
+    return int(d1._query(
+        "SELECT COUNT(*) AS c FROM assets WHERE source=?", [source])[0]["c"])
+
+
+def seed_to_target(metadata_dir, target: int, clients, embedder, *, source: str = SOURCE,
+                   count_fn=pd12m_count, page_size: int = 500, skip_margin: int = 5000,
+                   max_stall: int = 8, cooldown_secs: float = 8.0,
+                   sleep_fn=time.sleep, log_fn=None) -> int:
+    """Resilient, overshoot-proof seed to an ABSOLUTE `source` count.
+
+    `clients()` returns a fresh (d1, vectorize) pair; it is called once up front
+    and again after every transient failure (an SSL bad_record_mac poisons the
+    reused connection, so retrying on the same socket keeps failing). Each attempt
+    recomputes `remaining` and `skip` from the live count, so it never overshoots
+    the target and resumes cleanly after a crash. `skip` fast-forwards past the
+    already-seeded parquet prefix (avoids the O(existing) dedup re-scan).
+
+    Returns the final live count; raises RuntimeError if it makes no progress for
+    `max_stall` consecutive attempts (parquet exhausted or a persistent failure).
+    """
+    log = log_fn or logger.info
+    d1, vectorize = clients()
+    stall = 0
+    while True:
+        current = count_fn(d1)
+        if current >= target:
+            return current
+        remaining = target - current
+        skip = max(0, current - skip_margin)
+        log("seed_to_target: live=%d remaining=%d skip=%d stall=%d/%d",
+            current, remaining, skip, stall, max_stall)
+        try:
+            seed_from_parquet_fast(metadata_dir, remaining, d1, vectorize, embedder,
+                                   source=source, page_size=page_size, skip=skip)
+        except Exception:
+            logger.exception("transient failure; rebuilding clients and retrying")
+            try:
+                d1.close(); vectorize.close()
+            except Exception:
+                pass
+            d1, vectorize = clients()
+            sleep_fn(cooldown_secs)
+        after = count_fn(d1)
+        if after > current:
+            stall = 0
+        else:
+            stall += 1
+            if stall >= max_stall:
+                raise RuntimeError(
+                    f"seed_to_target stalled at {after} (target {target}) "
+                    f"after {max_stall} attempts with no progress")
+
+
 def main() -> None:
-    """Fetch PD12M rows+embeddings from HF and seed into D1/Vectorize."""
+    """Seed PD12M rows into D1/Vectorize (local parquet, HF fallback, or the
+    batched fast path). Routing:
+      --metadata-dir --target N   -> seed_to_target (batched, resilient, to an
+                                     absolute count; overshoot-proof + SSL-resilient)
+      --metadata-dir --limit N --fast -> seed_from_parquet_fast (single batched pass)
+      --metadata-dir --limit N    -> seed_from_parquet (slow, one D1 write per row)
+      (no --metadata-dir)         -> seed_from_hf
+    """
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     parser = argparse.ArgumentParser(description="Seed PD12M rows into D1 and Vectorize.")
     parser.add_argument("--metadata-dir", type=Path, default=None,
                         help="Local PD12M metadata dir (*.parquet); preferred over HF")
     parser.add_argument("--repo-id", default=DEFAULT_HF_REPO_ID, help="HF Dataset Repository ID")
-    parser.add_argument("--limit", type=int, default=5, help="Number of items to seed")
+    parser.add_argument("--limit", type=int, default=5, help="Number of NEW items to seed")
+    parser.add_argument("--target", type=int, default=None,
+                        help="Absolute pd12m count to drive up to (implies the resilient "
+                             "batched path); overshoot-proof, recomputes remaining each attempt")
+    parser.add_argument("--fast", action="store_true",
+                        help="Use the batched fast path (bulk D1 insert + batched embeds)")
+    parser.add_argument("--page-size", type=int, default=500, help="Rows per batched page (fast)")
+    parser.add_argument("--skip", type=int, default=0,
+                        help="Fast-forward past the first N parquet candidates (fast, single pass)")
     args = parser.parse_args()
 
     settings = Settings()
-    d1, vectorize, embedder = build_clients(settings)
     try:
-        if args.metadata_dir is not None:
+        if args.metadata_dir is not None and args.target is not None:
+            embedder = build_embedder(settings)
+            final = seed_to_target(args.metadata_dir, args.target,
+                                   lambda: build_http_clients(settings), embedder,
+                                   page_size=args.page_size)
+            print(f"Reached pd12m={final} (target {args.target}).")
+            return
+        d1, vectorize, embedder = build_clients(settings)
+        if args.metadata_dir is not None and args.fast:
+            seeded = seed_from_parquet_fast(args.metadata_dir, args.limit, d1, vectorize,
+                                            embedder, page_size=args.page_size, skip=args.skip)
+        elif args.metadata_dir is not None:
             seeded = seed_from_parquet(args.metadata_dir, args.limit, d1, vectorize, embedder)
         else:
             seeded = seed_from_hf(args.repo_id, args.limit, d1, vectorize, embedder,

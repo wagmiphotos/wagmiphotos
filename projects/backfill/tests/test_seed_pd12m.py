@@ -4,8 +4,13 @@ import pytest
 
 from wagmiphotos.common.config import Settings
 from wagmiphotos.common.models import AssetRecord
+from wagmiphotos.common.bge import BgeEmbedder
 from fakes import FakeD1, FakeVectorize
 from wagmiphotos.backfill import seed_pd12m
+
+
+def _pd12m_count(client):
+    return sum(1 for r in client.inserted if r.source == "pd12m")
 
 
 class FakeEmbedder:
@@ -268,6 +273,91 @@ def test_seed_from_parquet_fast_skips_embedding_fully_deduped_page(tmp_path):
     meta = _write_parquet_dir(tmp_path, [[_prow(i) for i in range(4)]])
     seed_pd12m.seed_from_parquet_fast(meta, 4, d1, vec, emb, page_size=2)
     assert emb.many_calls == [2]            # page1 fully deduped -> no embed; page2 embeds p2,p3
+
+
+def test_seed_to_target_converges_and_is_overshoot_proof(tmp_path):
+    d1, vec = FakeD1(), FakeVectorize()
+    meta = _write_parquet_dir(tmp_path, [[_prow(i) for i in range(10)]])
+    final = seed_pd12m.seed_to_target(
+        meta, 4, lambda: (d1, vec), FakeEmbedder(), count_fn=_pd12m_count,
+        page_size=2, skip_margin=100, sleep_fn=lambda s: None)
+    assert final == 4                       # stops exactly at target, not 10
+    assert _pd12m_count(d1) == 4
+
+
+def test_seed_to_target_rebuilds_clients_and_resumes_after_failure(tmp_path):
+    d1, vec = FakeD1(), FakeVectorize()
+    meta = _write_parquet_dir(tmp_path, [[_prow(i) for i in range(10)]])
+    calls = {"insert": 0, "rebuilds": 0}
+
+    def clients():
+        calls["rebuilds"] += 1
+        return d1, vec
+
+    real_insert = vec.insert_many
+    def flaky(vectors):
+        calls["insert"] += 1
+        if calls["insert"] == 1:
+            raise RuntimeError("SSL bad_record_mac")   # first page's vectorize write fails
+        return real_insert(vectors)
+    vec.insert_many = flaky
+
+    final = seed_pd12m.seed_to_target(
+        meta, 6, clients, FakeEmbedder(), count_fn=_pd12m_count,
+        page_size=3, skip_margin=1000, sleep_fn=lambda s: None)
+    assert final == 6
+    assert calls["rebuilds"] >= 2           # initial build + >=1 rebuild after the failure
+    # Vectorize-first: the failed page left NO D1 rows (no orphan), so the count is exact
+    assert _pd12m_count(d1) == 6
+
+
+def test_seed_to_target_raises_when_stalled(tmp_path):
+    d1, vec = FakeD1(), FakeVectorize()
+    meta = _write_parquet_dir(tmp_path, [[_prow(i) for i in range(2)]])   # only 2 rows
+    with pytest.raises(RuntimeError, match="stall"):
+        seed_pd12m.seed_to_target(
+            meta, 100, lambda: (d1, vec), FakeEmbedder(), count_fn=_pd12m_count,
+            page_size=5, skip_margin=1000, max_stall=3, sleep_fn=lambda s: None)
+
+
+def test_seed_to_target_noop_when_already_at_target(tmp_path):
+    d1, vec = FakeD1(), FakeVectorize()
+    for i in range(3):
+        d1.insert_asset(AssetRecord(
+            id=f"x{i}", prompt="p", model_used=None, source="pd12m", source_id=f"s{i}",
+            content_hash="h", width=1, height=1, mime="image/jpeg", created_at=""))
+    meta = _write_parquet_dir(tmp_path, [[_prow(i) for i in range(5)]])
+    final = seed_pd12m.seed_to_target(
+        meta, 3, lambda: (d1, vec), FakeEmbedder(), count_fn=_pd12m_count,
+        sleep_fn=lambda s: None)
+    assert final == 3 and _pd12m_count(d1) == 3   # nothing new seeded
+
+
+def test_main_fast_routes_to_seed_from_parquet_fast(monkeypatch, tmp_path):
+    seen = {}
+    monkeypatch.setattr(seed_pd12m, "build_clients", lambda s: (None, None, None))
+    monkeypatch.setattr(seed_pd12m, "seed_from_parquet_fast",
+                        lambda path, limit, *a, **kw:
+                        seen.update(path=str(path), limit=limit, skip=kw.get("skip")) or 5)
+    monkeypatch.setattr(sys, "argv",
+                        ["seed_pd12m", "--metadata-dir", str(tmp_path), "--limit", "9",
+                         "--fast", "--skip", "3"])
+    seed_pd12m.main()
+    assert seen == {"path": str(tmp_path), "limit": 9, "skip": 3}
+
+
+def test_main_target_routes_to_seed_to_target(monkeypatch, tmp_path):
+    seen = {}
+    monkeypatch.setattr(seed_pd12m, "build_http_clients", lambda s: (None, None))
+    monkeypatch.setattr(BgeEmbedder, "from_pretrained",
+                        classmethod(lambda cls, *a, **k: FakeEmbedder()))
+    monkeypatch.setattr(seed_pd12m, "seed_to_target",
+                        lambda path, target, clients, embedder, **kw:
+                        seen.update(path=str(path), target=target) or target)
+    monkeypatch.setattr(sys, "argv",
+                        ["seed_pd12m", "--metadata-dir", str(tmp_path), "--target", "500"])
+    seed_pd12m.main()
+    assert seen == {"path": str(tmp_path), "target": 500}
 
 
 def test_main_metadata_dir_routes_to_parquet(monkeypatch, tmp_path):
