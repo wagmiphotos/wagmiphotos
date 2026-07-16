@@ -1,5 +1,61 @@
 # wagmi.photos — Handoff / Resume Here
 
+> **2026-07-17: HANDOFF REFRESHED.** Everything below this block is history;
+> this block is the current state + the whole open list. Sessions since the
+> 2026-07-10 waves (all shipped, pushed, and deployed):
+>
+> - **2026-07-13 — My Collections async-gen UX** (main@3dab5ef, worker
+>   `c942c559`, migration **0018** remote, PR #1): in-grid pending/error tiles
+>   replace the old genBusy button lock, server-side **3-concurrent cap**
+>   (`429 concurrent_limit` — a distinct code from the monthly `cap_reached`),
+>   `GET /v1/collections/:id/generations?status=pending` + refresh re-attach,
+>   image-detail + New-collection modals, a11y pass. Same day: an auth+BYOK
+>   security review came back clean (5 accepted low/info notes).
+> - **2026-07-13 — billing follow-ups**: cancel-at-period-end display
+>   ("Unlimited · cancels <date>" vs "renews", migration **0019**),
+>   checkout-success now polls `/v1/me` for the async webhook instead of
+>   toasting a false success, Manage-billing button styling, and the **live
+>   Stripe price id is set** (`4243a7f`). **Live Stripe config is DONE** — the
+>   2026-07-09/10 "Upgrade button errors" item is closed, and the OpenAI
+>   refund-ticket item is closed too (both removed 2026-07-17).
+> - **2026-07-14/15 — library scale-up 11k → 511.5k** (PD12M seed):
+>   `FLOOR_SIM_MAX` 0.87→0.84 (Vectorize's ANN compresses scores at scale;
+>   it plateaued — 0.84 still holds at 511k, exact self-match ~0.877–0.894),
+>   a dedicated library-search floor (0.60, decoupled from generation), and a
+>   **batched fast-seed** (PR #2, c080fee+5f582c0: bulk inlined D1 INSERT,
+>   batched embeds, parquet `skip` fast-forward — minutes per 250k, not hours).
+>   Next batch: `projects/backfill/scripts/seed_to_target.sh <N>` (resilient,
+>   dedup-safe, overshoot-proof). 2,512 D1-only orphan rows from the old
+>   D1-first ordering were reconciled to 0
+>   (`python -m wagmiphotos.backfill.reconcile_orphans --apply`). Seeding needs
+>   a CF API token (D1+Vectorize Edit) in root `.env` — wrangler OAuth is not
+>   used by the Python REST clients.
+> - **Verified 2026-07-17:** remote D1 reports no pending migrations
+>   (0001–0019 all applied); latest worker deploy `b336ee33` (2026-07-14) is
+>   exactly main@547fa00, and the only commits since are Python-side seed
+>   tooling — no worker deploy owed.
+>
+> **OPEN — the whole list:**
+>
+> 1. **Real-key prod smoke** (carried from 2026-07-10/13, still the top item):
+>    wagmi.photos → log in → BYOK key → pick/create a collection → generate.
+>    The pending tile polls (~70s on gpt-image-2); the image must land in the
+>    collection grid, must **NOT** appear in shared-library search, and must
+>    survive a mid-flight page refresh (re-attach). Usage/spend should read
+>    real numbers (no $0.00 after success, no NaN). Also: the Collections tab
+>    shows the new collection publicly, and a denylisted name (e.g. "pikachu")
+>    is rejected with a content-policy toast. **Sweep check:** start a
+>    generation, close the tab, reopen after ~4 min — the cron sweep should
+>    have finished (or refunded) it.
+> 2. **GMI backfill box** (`DEPLOY.md` step 4) — still the only missing organ:
+>    demand queries never generate and nothing rehosts until it runs.
+> 3. **Hackathon deliverables** (deadline **Aug 3**): demo video, Devpost
+>    write-up, submit — see `TODO.md`.
+> 4. Deferred post-merge polish (non-blocking): the list at the end of
+>    `.superpowers/sdd/progress.md` (item 5 in the 2026-07-10 note below),
+>    plus the parked rehost items in "Next steps" §2 (demand-only rehost mode
+>    + the `WORKER_BATCH_SIZE` NOT-IN guard).
+
 > **2026-07-10 (evening wave): PUBLIC COLLECTIONS + UI WAVE DEPLOYED** (main@1dd7dc1,
 > worker `8a3f306a`, migration **0017** applied remote). Collections are now
 > **public by design** (supersedes unlisted-by-ID): `GET /v1/collections/browse`
@@ -36,10 +92,12 @@
 > 2. **Sweep check:** start a generation, close the tab, wait ~4 min, reopen the
 >    ticket-holding collection — the cron sweep should have finished (or refunded)
 >    it. Optionally watch one generation via `npx wrangler tail`.
-> 3. **OpenAI refund ticket** for the pre-split billed-undelivered generations
->    (~$1.50, user action — unchanged from the morning handoff).
-> 4. **Live Stripe config** still pending (Upgrade button errors until done; see
->    HANDOFF-2026-07-09).
+> 3. ~~**OpenAI refund ticket** for the pre-split billed-undelivered generations
+>    (~$1.50, user action — unchanged from the morning handoff).~~ CLOSED
+>    2026-07-17.
+> 4. ~~**Live Stripe config** still pending (Upgrade button errors until done; see
+>    HANDOFF-2026-07-09).~~ DONE — live price id set 2026-07-13 (`4243a7f`),
+>    migrations applied; closed 2026-07-17.
 > 5. Deferred post-merge polish (non-blocking, list at the end of
 >    `.superpowers/sdd/progress.md`): `bpoll:` limiter on the ticket GET,
 >    org-verification hint in the generate-card error path, provider test gaps
@@ -208,12 +266,13 @@ Verify) proves the CDN path. Also confirms the non-root Docker image builds end-
 (never built here). Stopgap if the box is delayed: one local `uv run wagmiphotos-backfill`
 run with `deploy/gmi/.env` sourced drains the 1k pool in a couple of hours.
 
-### 2. Full-scale seed (1k → 12.5M) — needs batching work first
-Current seeding inserts D1 rows one REST call each — fine for thousands, days for millions.
-Before the big run: batch D1 inserts (D1 REST accepts multi-statement bodies), consider running
-the seed on the GMI box, and re-probe the floors after each big batch (coincidental similarity
-creeps up with scale). D1 headroom is fine (~4.4GB slim rows at 12.5M vs 10GB cap).
-Also parked for this milestone (same method, do together): switch rehost to **demand-only**
+### 2. Full-scale seed (1k → 12.5M) — ~~needs batching work first~~ BATCHING DONE 2026-07-15
+**Done:** library is at **511.5k** and the batched fast-seed shipped (PR #2 — bulk inlined
+D1 INSERT, batched embeds, parquet `skip`; minutes per 250k). Floors re-probed at 61.5k,
+261.5k and 511.5k: ANN score compression plateaued, `FLOOR_SIM_MAX=0.84` holds. Further
+seeding toward 12.5M is optional — `projects/backfill/scripts/seed_to_target.sh <N>`,
+then re-probe the floor and run `reconcile_orphans` after each big batch.
+**Still parked** (do together when it matters): switch rehost to **demand-only**
 (drop the trickle query — don't mirror 12M unrequested images) and add the batch-size guard —
 `WORKER_BATCH_SIZE` > ~50 would overflow the trickle query's `NOT IN` under D1's
 100-bound-param cap; nothing enforces the ceiling today (default is 5, so no current risk).
