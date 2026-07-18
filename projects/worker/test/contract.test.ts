@@ -15,6 +15,28 @@ it("floor constants match contract.json", () => {
   expect(LIBRARY_FLOOR_SIM).toBe(contract.library_floor_sim);
 });
 
+it("wrangler.toml [vars] cannot override the contract-pinned floors", () => {
+  // numEnv() gives deployed env vars precedence over the code defaults, so a
+  // floor var in wrangler.toml silently overrides floor.ts/contract.json in
+  // every deploy (this is how the 92046d9 0.87->0.84 lowering never went live).
+  // Absent is fine (code default rules); present must match the contract.
+  const toml = readFileSync(join(__dirname, "../wrangler.toml"), "utf8");
+  const pins: [string, number][] = [
+    ["FLOOR_SIM_MAX", contract.floor_sim_max],
+    ["FLOOR_SIM_MIN", contract.floor_sim_min],
+    ["LIBRARY_FLOOR_SIM", contract.library_floor_sim],
+  ];
+  for (const [name, pinned] of pins) {
+    const m = toml.match(new RegExp(`^${name}\\s*=\\s*"([^"]*)"`, "m"));
+    if (m) {
+      expect(
+        Number(m[1]),
+        `wrangler.toml deploys ${name} = "${m[1]}", overriding the contract-pinned ${pinned}`,
+      ).toBe(pinned);
+    }
+  }
+});
+
 it("default cache tolerance matches contract.json", () => {
   expect(DEFAULT_CACHE_TOLERANCE).toBe(contract.default_cache_tolerance);
 });

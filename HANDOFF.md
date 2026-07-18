@@ -177,10 +177,13 @@ to `main` and pushed._
   Workers AI **mean-pools** (BGE ships CLS): `BgeEmbedder.from_pretrained`
   force-flips pooling and raises if it can't. Never swap the embedding stack
   without re-running the drift check.
-- **Floors tuned against the live pool**: `FLOOR_SIM_MAX=0.87` /
-  `FLOOR_SIM_MIN=0.75` (verbatim 1.00, paraphrase 0.87–0.91, related ~0.79,
-  unrelated ≤0.71). Pinned in `contract.json` + both runtimes; re-probe as the
-  pool grows.
+- **Floors tuned against the live pool**: `FLOOR_SIM_MAX=0.84` /
+  `FLOOR_SIM_MIN=0.75` (lowered from 0.87 on 2026-07-14 — ANN score compression
+  at scale; re-validated at 511k). Pinned in `contract.json` + both runtimes
+  ONLY — never set them in `wrangler.toml` `[vars]` or env templates: deployed
+  env vars silently override the pinned defaults (this kept prod on 0.87 until
+  2026-07-18; the worker contract test now guards it). Re-probe as the pool
+  grows.
 
 ## What wagmi.photos is
 

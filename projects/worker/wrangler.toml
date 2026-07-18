@@ -63,8 +63,9 @@ simple = { limit = 120, period = 60 }
 # lane and console-logs magic links. Set it only in .dev.vars for local dev
 # (see .dev.vars.example).
 EMAIL_FROM = "noreply@mail.suppers.ai"   # verified Resend sending address (domain: mail.suppers.ai)
-FLOOR_SIM_MAX = "0.87"
-FLOOR_SIM_MIN = "0.75"
+# Similarity floors are deliberately NOT set here: numEnv() would give them
+# precedence over the contract-pinned defaults in src/floor.ts (that is how the
+# 0.87->0.84 lowering silently never went live). contract.test.ts enforces this.
 IMAGE_PRICE_USD = "0.055"        # advertised cost_saved_usd per hit — keep in sync with common/config.py image_price_usd
 PUBLIC_SITE_URL = "https://wagmi.photos"           # canonical site origin (override per environment / .dev.vars)
 PUBLIC_API_BASE_URL = "https://api.wagmi.photos/v1"  # documented API base rendered into docs/examples

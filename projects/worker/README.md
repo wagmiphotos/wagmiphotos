@@ -10,7 +10,9 @@ There is no external embedding endpoint — all embeddings are computed in-worke
 
 ### Similarity Floor Configuration
 
-The similarity floor values are BGE-tuned placeholders and can be adjusted per deployment via environment variables:
-
-- `FLOOR_SIM_MAX`: Maximum similarity threshold (default: 0.90)
-- `FLOOR_SIM_MIN`: Minimum similarity threshold (default: 0.72)
+The similarity floors are pinned in the repo-root `contract.json` and mirrored
+as code defaults in `src/floor.ts` (`FLOOR_SIM_MAX=0.84`, `FLOOR_SIM_MIN=0.75`,
+`LIBRARY_FLOOR_SIM=0.60`). Env vars of the same names override the defaults
+(via `numEnv`) — that's for local experiments only. Never commit them to
+`wrangler.toml` `[vars]`: a committed var silently overrides the contract in
+every deploy, and `test/contract.test.ts` fails if one drifts.

@@ -22,9 +22,9 @@ embedding service or tunnel to run.
    B2_BUCKET=
    B2_REGION=us-west-004
    B2_PUBLIC_URL_BASE=
-   FLOOR_SIM_MAX=0.87
-   FLOOR_SIM_MIN=0.75
    ```
+   (Similarity floors are deliberately absent: the `contract.json`-pinned
+   defaults rule, and env values would silently override them.)
 
 3. `cd deploy/gmi && docker compose up -d --build`
    (first build downloads CPU torch + the BGE model weights — one time).

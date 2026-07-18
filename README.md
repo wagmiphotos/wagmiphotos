@@ -42,7 +42,7 @@
         the next identical/similar prompt is a HIT
 ```
 
-Similarity floors (`FLOOR_SIM_MAX=0.87` / `FLOOR_SIM_MIN=0.75`) and the default `cache_tolerance` (0.15) are pinned in the repo-root `contract.json`, which both the Worker and the backfill test suites assert against.
+Similarity floors (`FLOOR_SIM_MAX=0.84` / `FLOOR_SIM_MIN=0.75`) and the default `cache_tolerance` (0.15) are pinned in the repo-root `contract.json`, which both the Worker and the backfill test suites assert against.
 
 ### How the cache saves money
 
@@ -191,7 +191,7 @@ The backfill worker is a long-running process that drains the demand-ranked miss
   the `model` extra) to embed asset prompts/captions — no external embedding endpoint or tunnel required.
 - **Cloudflare credentials**: `CF_ACCOUNT_ID`, `CF_API_TOKEN`, `D1_DATABASE_ID`, `VECTORIZE_INDEX_PREFIX` +
   `VECTORIZE_SHARDS` (must match the Worker's shards, `wagmiphotos-bge-0/1/2`).
-- **Similarity floor**: Tune `FLOOR_SIM_MAX` and `FLOOR_SIM_MIN` against the seeded pool (default: 0.87 / 0.75).
+- **Similarity floor**: contract-pinned defaults 0.84 / 0.75; if you re-tune against the seeded pool, land the values in `contract.json` + the code defaults (never in deployed env vars, which silently override them).
 
 ---
 
