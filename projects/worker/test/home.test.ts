@@ -54,3 +54,51 @@ it("showcaseAssets: cached-only, like-ranked, newest tiebreak, collection/tombst
   const all = await assets.showcaseAssets(8);
   expect(all.map((r) => r.id)).toEqual(["hot", "warm", "plain_b", "plain_a"]);
 });
+
+import { handleHome, SHOWCASE_LIMIT, HOME_CACHE_SECONDS } from "../src/home";
+import { fakeServices } from "./fakes";
+import type { LibraryAssetRow } from "../src/types";
+
+const BASE = "https://cdn.example.com";
+const homeCfg = { assetBaseUrl: BASE };
+
+function libRow(over: Partial<LibraryAssetRow> = {}): LibraryAssetRow {
+  return { id: "a1", prompt: "a fox", source: "pd12m", source_id: null,
+    model_used: "flux", width: 10, height: 20, like_count: 0,
+    mime: "image/webp", source_url: null, locally_cached: 1, created_at: "2026-07-03 00:00:00", ...over };
+}
+
+it("home: returns image_count and the documented showcase shape, nothing internal", async () => {
+  const s = fakeServices();
+  (s as any)._libraryRows.push(libRow());
+  const res = await handleHome(s, homeCfg);
+  expect(res.status).toBe(200);
+  const j: any = await res.json();
+  expect(j.image_count).toBe(1);
+  expect(j.showcase).toHaveLength(1);
+  expect(j.showcase[0]).toEqual({
+    id: "a1", thumb_url: `${BASE}/assets/a1/thumb.webp`, medium_url: `${BASE}/assets/a1/medium.webp`,
+    prompt: "a fox", like_count: 0,
+  });
+});
+
+it("home: counts uncached rows but never showcases them", async () => {
+  const s = fakeServices();
+  (s as any)._libraryRows.push(libRow({ id: "cached", locally_cached: 1 }));
+  (s as any)._libraryRows.push(libRow({ id: "raw", locally_cached: 0 }));
+  const j: any = await (await handleHome(s, homeCfg)).json();
+  expect(j.image_count).toBe(2);
+  expect(j.showcase.map((x: any) => x.id)).toEqual(["cached"]);
+});
+
+it("home: caps the showcase at SHOWCASE_LIMIT", async () => {
+  const s = fakeServices();
+  for (let i = 0; i < SHOWCASE_LIMIT + 3; i++) (s as any)._libraryRows.push(libRow({ id: "a" + i }));
+  const j: any = await (await handleHome(s, homeCfg)).json();
+  expect(j.showcase).toHaveLength(SHOWCASE_LIMIT);
+});
+
+it("home: sends the daily public cache header", async () => {
+  const res = await handleHome(fakeServices(), homeCfg);
+  expect(res.headers.get("Cache-Control")).toBe(`public, max-age=${HOME_CACHE_SECONDS}`);
+});
