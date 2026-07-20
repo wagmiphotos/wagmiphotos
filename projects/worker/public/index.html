@@ -473,9 +473,22 @@
       font-size: 0.8125rem; color: var(--muted);
     }
     .coll-viewer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
-    .coll-tile { position: relative; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-    .coll-tile img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+    .coll-tile { position: relative; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease; }
+    .coll-tile:hover { border-color: var(--muted); box-shadow: 0 6px 18px rgba(28, 28, 27, 0.12); }
+    .coll-tile img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; transition: transform .2s ease; }
+    .coll-tile:hover img, .coll-tile:focus-visible img { transform: scale(1.04); }
     .coll-tile:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+    /* Hover "open" cue — mirrors the library card's View pill, icon-only for the denser grid. */
+    .coll-tile-overlay {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: rgba(28, 28, 27, 0.28); opacity: 0; transition: opacity .15s ease; pointer-events: none;
+    }
+    .coll-tile:hover .coll-tile-overlay, .coll-tile:focus-visible .coll-tile-overlay { opacity: 1; }
+    .coll-tile-overlay span {
+      display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
+      background: rgba(255, 255, 255, 0.95); color: var(--ink); border-radius: 999px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+    .coll-tile-overlay svg { width: 16px; height: 16px; }
     .tile-badge {
       position: absolute; top: 4px; left: 4px;
       background: rgba(0, 0, 0, 0.65); color: #fff;
@@ -512,8 +525,31 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      transition: border-color .15s ease, box-shadow .15s ease;
     }
-    .library-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--paper); }
+    .library-card:hover { border-color: var(--muted); box-shadow: 0 8px 24px rgba(28, 28, 27, 0.10); }
+    /* The thumbnail is the click target — opens the image-detail modal. */
+    .library-thumb-btn {
+      position: relative; display: block; width: 100%; padding: 0; border: 0; margin: 0;
+      background: var(--paper); cursor: pointer; overflow: hidden; line-height: 0;
+    }
+    .library-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--paper); transition: transform .2s ease; }
+    .library-thumb-btn:hover .library-thumb,
+    .library-thumb-btn:focus-visible .library-thumb { transform: scale(1.04); }
+    .library-thumb-btn:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
+    .library-thumb-overlay {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: rgba(28, 28, 27, 0.28); opacity: 0; transition: opacity .15s ease; pointer-events: none;
+    }
+    .library-thumb-overlay span {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255, 255, 255, 0.95); color: var(--ink);
+      font-size: 0.8125rem; font-weight: 600; line-height: 1;
+      padding: 7px 12px; border-radius: 999px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+    .library-thumb-overlay svg { width: 15px; height: 15px; }
+    .library-thumb-btn:hover .library-thumb-overlay,
+    .library-thumb-btn:focus-visible .library-thumb-overlay { opacity: 1; }
     .library-meta { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
     .library-actions { display: flex; align-items: center; gap: .5rem; margin-top: auto; flex-wrap: wrap; }
     .library-prompt {
@@ -526,14 +562,6 @@
       font-size: 0.6875rem; color: var(--muted); background: var(--paper);
       border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px;
     }
-    .library-download {
-      margin-top: auto; height: 38px; font-size: 0.8125rem; text-decoration: none;
-      display: inline-flex; align-items: center; justify-content: center;
-      background: var(--ink); color: #fff; border-radius: 8px;
-    }
-    .library-download:hover { background: var(--red); }
-    .library-original { display: inline-block; padding: 8px 0 2px; font-size: 0.8125rem; color: var(--muted); text-decoration: underline; }
-    .library-original:hover { color: var(--ink); }
     .library-status { text-align: center; color: var(--muted); padding: 40px 0; font-size: 0.9375rem; }
     .library-status a { color: var(--red); }
     .link-btn {
@@ -547,8 +575,9 @@
     .sort-btn { font: inherit; padding: .3rem .7rem; border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 999px; cursor: pointer; }
     .sort-btn.is-active { background: var(--red); color: #fff; border-color: var(--red); }
     .sort-btn:disabled { opacity: .45; cursor: not-allowed; }
-    .like-btn { display: inline-flex; align-items: center; gap: .3rem; border: none; background: transparent; color: var(--ink); cursor: pointer; font: inherit; padding: .2rem .4rem; }
-    .like-btn .heart { font-size: 1.05rem; line-height: 1; }
+    .like-btn { display: inline-flex; align-items: center; gap: .35rem; min-height: 40px; border: none; border-radius: 8px; background: transparent; color: var(--ink); cursor: pointer; font: inherit; padding: .4rem .55rem; margin-left: -.15rem; transition: background-color .15s ease; }
+    .like-btn:hover { background: var(--paper); }
+    .like-btn .heart { font-size: 1.1rem; line-height: 1; }
     .like-btn.is-liked .heart { color: var(--red); }
 
     /* anchored sections/docs clear the sticky navbar when deep-linked */
@@ -782,6 +811,11 @@
       /* pending-generation spinner: stop the rotation, keep a static ring so
          the tile still visibly reads as "in progress" */
       .tile-spinner { animation: none; border-top-color: var(--line); }
+      .modal-card { animation: none; }
+      .library-thumb, .coll-tile img { transition: none; }
+      .library-thumb-btn:hover .library-thumb,
+      .library-thumb-btn:focus-visible .library-thumb,
+      .coll-tile:hover img, .coll-tile:focus-visible img { transform: none; }
     }
 
     /* ============ Closest match (expectation setting) ============ */
@@ -2235,7 +2269,36 @@
       width: 100%; max-width: 440px;
       background: var(--card); border: 1px solid var(--line); border-radius: 16px;
       padding: 24px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+      animation: modalCardIn .18s ease-out;
     }
+    /* Runs each time a modal is shown (display:none → flex re-triggers the animation). */
+    @keyframes modalCardIn { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
+    /* The card is a focus container (focused on open for a11y), not a control —
+       the focus ring belongs on the buttons inside, which stay keyboard-focusable. */
+    .modal-card:focus, .modal-card:focus-visible { outline: none; }
+    /* Image-detail modal (shared by the library + collection viewers) */
+    .imgmodal-card { max-width: 640px; max-height: 92vh; overflow-y: auto; position: relative; }
+    .imgmodal-close {
+      position: absolute; top: 12px; right: 12px; z-index: 1;
+      width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+      border: none; border-radius: 999px; cursor: pointer;
+      background: rgba(255, 255, 255, 0.92); color: var(--ink); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+    }
+    .imgmodal-close:hover { background: #fff; color: var(--red); }
+    .imgmodal-img { width: 100%; max-height: 56vh; object-fit: contain; border-radius: 10px; margin-bottom: 12px; background: var(--paper); }
+    .imgmodal-meta { font-size: 0.8125rem; color: var(--muted); line-height: 1.7; }
+    .imgmodal-btn {
+      height: 44px; padding: 0 16px; border-radius: 9px; font: inherit; font-size: 0.875rem; font-weight: 600;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;
+      text-decoration: none; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+      transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+    }
+    .imgmodal-btn:hover { border-color: var(--muted); }
+    .imgmodal-btn svg { width: 16px; height: 16px; }
+    .imgmodal-btn.is-primary { background: var(--ink); border-color: var(--ink); color: #fff; }
+    .imgmodal-btn.is-primary:hover { background: var(--red); border-color: var(--red); }
+    .imgmodal-btn.is-danger { color: var(--danger); margin-right: auto; }
+    .imgmodal-btn.is-danger:hover { border-color: var(--danger); }
     .modal-title { font-family: var(--font-display); font-weight: 700; font-size: 1.125rem; color: var(--ink); }
     .modal-sub { font-size: 0.875rem; color: var(--muted); margin-top: 4px; }
     .modal-label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--ink-soft); margin: 18px 0 6px; }
@@ -3706,10 +3769,13 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
   <!-- Image detail modal -->
   <div id="image-modal" class="modal-overlay" hidden onclick="if(event.target===this)closeImageModal()">
-    <div class="modal-card" style="max-width:640px;" role="dialog" aria-modal="true" aria-labelledby="imgmodal-title" tabindex="-1">
+    <div class="modal-card imgmodal-card" role="dialog" aria-modal="true" aria-labelledby="imgmodal-title" tabindex="-1">
+      <button type="button" class="imgmodal-close" aria-label="Close" onclick="closeImageModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
       <h2 id="imgmodal-title" class="sr-only">Image details</h2>
-      <img id="imgmodal-img" alt="" style="width:100%;border-radius:10px;margin-bottom:12px;">
-      <div id="imgmodal-meta" style="font-size:0.8125rem;color:var(--muted);line-height:1.7;"></div>
+      <img id="imgmodal-img" class="imgmodal-img" alt="">
+      <div id="imgmodal-meta" class="imgmodal-meta"></div>
       <div class="modal-actions" id="imgmodal-actions"></div>
     </div>
   </div>
@@ -4265,27 +4331,64 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       }
     }
 
+    // Loaded images keyed by id — feeds the image-detail modal. Both the library
+    // grid and the public-collection viewer render through libraryCard, so
+    // registering here covers both without touching either loader.
+    const libraryImageStore = new Map();
+    const EXPAND_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>';
+
     function libraryCard(img) {
+      libraryImageStore.set(img.id, img);
       const thumb = img.thumb_url || img.medium_url || img.url;
       const tags = [img.model_used, img.source].filter(Boolean)
         .map(t => '<span class="library-tag">' + escapeHtml(t) + '</span>').join('');
-      const original = img.original_url
-        ? '<a class="library-original" href="' + escapeHtml(img.original_url) + '" target="_blank" rel="noopener">Original ↗</a>'
-        : '';
       const liked = img.liked ? ' is-liked' : '';
       const like = '<button type="button" class="like-btn' + liked + '" data-id="' + escapeHtml(img.id) +
-        '" aria-pressed="' + (img.liked ? 'true' : 'false') + '" onclick="toggleLike(this)">' +
-        '<span class="heart">' + (img.liked ? '♥' : '♡') + '</span>' +
+        '" aria-pressed="' + (img.liked ? 'true' : 'false') + '" aria-label="Like this image" onclick="toggleLike(this)">' +
+        '<span class="heart" aria-hidden="true">' + (img.liked ? '♥' : '♡') + '</span>' +
         '<span class="like-count">' + (img.like_count || 0) + '</span></button>';
+      const id = escapeHtml(img.id);
       return '<div class="library-card">' +
-        '<img class="library-thumb" loading="lazy" src="' + escapeHtml(thumb) + '" alt="' + escapeHtml(img.prompt) + '">' +
+        '<button type="button" class="library-thumb-btn" onclick="openLibraryImage(\'' + id + '\')" ' +
+          'aria-label="View details: ' + escapeHtml(img.prompt || 'image') + '">' +
+          '<img class="library-thumb" loading="lazy" src="' + escapeHtml(thumb) + '" alt="' + escapeHtml(img.prompt) + '">' +
+          '<span class="library-thumb-overlay" aria-hidden="true"><span>' + EXPAND_ICON + 'View</span></span>' +
+        '</button>' +
         '<div class="library-meta">' +
           '<p class="library-prompt" title="' + escapeHtml(img.prompt) + '">' + escapeHtml(img.prompt) + '</p>' +
           '<div class="library-tags">' + tags + '</div>' +
-          '<div class="library-actions">' + like +
-            '<a class="library-download" href="/v1/library/' + encodeURIComponent(img.id) + '/download">Download</a>' + original +
-          '</div>' +
+          '<div class="library-actions">' + like + '</div>' +
         '</div></div>';
+    }
+
+    // Image-detail modal for library / public-collection images (read-only: no delete).
+    function openLibraryImage(id) {
+      const img = libraryImageStore.get(id);
+      if (!img) return;
+      _imageModalReturnFocus = document.activeElement;
+      document.getElementById('imgmodal-title').textContent = img.prompt ? 'Image: ' + img.prompt : 'Image details';
+      const full = img.medium_url || img.url || img.thumb_url;
+      const imgEl = document.getElementById('imgmodal-img');
+      imgEl.src = full;
+      imgEl.alt = img.prompt || '';
+      const dims = (img.width && img.height) ? img.width + '×' + img.height : '—';
+      const served = img.serve_count != null ? img.serve_count + '×' : '—';
+      const tagline = [img.model_used, img.source].filter(Boolean).map(escapeHtml).join(' · ') || '—';
+      const likeCount = img.like_count || 0;
+      document.getElementById('imgmodal-meta').innerHTML =
+        '<div style="margin-bottom:8px;"><b style="color:var(--ink);">Prompt</b><br>' + escapeHtml(img.prompt || '') + '</div>' +
+        '<div>' + tagline + ' · ' + dims + '</div>' +
+        '<div>Served <b style="color:var(--ink);">' + served + '</b> by the API · ' +
+          likeCount + ' like' + (likeCount === 1 ? '' : 's') + '</div>';
+      const dl = '<a class="imgmodal-btn is-primary" href="/v1/library/' + encodeURIComponent(img.id) + '/download">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Download</a>';
+      const orig = img.original_url
+        ? '<a class="imgmodal-btn" href="' + escapeHtml(img.original_url) + '" target="_blank" rel="noopener">View original ↗</a>'
+        : '';
+      document.getElementById('imgmodal-actions').innerHTML = orig + dl;
+      const modal = document.getElementById('image-modal');
+      modal.hidden = false;
+      modal.querySelector('.modal-card').focus();
     }
 
     async function toggleLike(btn) {
@@ -4306,6 +4409,8 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         btn.setAttribute('aria-pressed', String(data.liked));
         btn.querySelector('.heart').textContent = data.liked ? '♥' : '♡';
         btn.querySelector('.like-count').textContent = data.like_count;
+        const stored = libraryImageStore.get(id);   // keep the modal's like count in sync
+        if (stored) { stored.liked = data.liked; stored.like_count = data.like_count; }
       } catch (_) {
         // leave the button as-is on failure
       } finally {
@@ -4500,7 +4605,9 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       if (!img) return;
       _imageModalReturnFocus = document.activeElement;
       document.getElementById('imgmodal-title').textContent = img.prompt ? `Image: ${img.prompt}` : 'Image details';
-      document.getElementById('imgmodal-img').src = img.medium_url || img.url || img.thumb_url;
+      const imgEl = document.getElementById('imgmodal-img');
+      imgEl.src = img.medium_url || img.url || img.thumb_url;
+      imgEl.alt = img.prompt || '';
       const dims = (img.width && img.height) ? `${img.width}×${img.height}` : '—';
       const served = img.serve_count != null ? `${img.serve_count}×` : '—';
       document.getElementById('imgmodal-meta').innerHTML = `
@@ -4508,11 +4615,10 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         <div>Served <b style="color:var(--ink);">${served}</b> by the API</div>
         <div>Model: ${escapeHtml(img.model_used || '—')} · ${dims}</div>
         <div>Created: ${escapeHtml(img.created_at || '—')}</div>`;
-      const dl = `<a class="btn-ghost" style="height:34px;display:inline-flex;align-items:center;padding:0 12px;text-decoration:none;" href="/v1/library/${encodeURIComponent(img.id)}/download">Download</a>`;
-      const orig = img.original_url ? `<a class="btn-ghost" style="height:34px;display:inline-flex;align-items:center;padding:0 12px;text-decoration:none;" href="${escapeHtml(img.original_url)}" target="_blank" rel="noopener">View original ↗</a>` : '';
-      const del = `<button type="button" class="btn-ghost" style="height:34px;padding:0 12px;color:var(--danger);" onclick="deleteFromImageModal('${escapeHtml(selectedCollId)}', '${escapeHtml(img.id)}')">Delete</button>`;
-      document.getElementById('imgmodal-actions').innerHTML = dl + orig + del +
-        `<button type="button" class="btn-ghost" style="height:34px;padding:0 12px;" onclick="closeImageModal()">Close</button>`;
+      const dl = `<a class="imgmodal-btn is-primary" href="/v1/library/${encodeURIComponent(img.id)}/download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Download</a>`;
+      const orig = img.original_url ? `<a class="imgmodal-btn" href="${escapeHtml(img.original_url)}" target="_blank" rel="noopener">View original ↗</a>` : '';
+      const del = `<button type="button" class="imgmodal-btn is-danger" onclick="deleteFromImageModal('${escapeHtml(selectedCollId)}', '${escapeHtml(img.id)}')">Delete</button>`;
+      document.getElementById('imgmodal-actions').innerHTML = del + orig + dl;
       const modal = document.getElementById('image-modal');
       modal.hidden = false;
       modal.querySelector('.modal-card').focus();
@@ -4953,6 +5059,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
              onclick="openImageModal('${imgId}')"
              onkeydown="if((event.key==='Enter'||event.key===' ')&&!event.target.closest('.tile-del')){event.preventDefault();openImageModal('${imgId}');}">
           <img src="${escapeHtml(thumb)}" alt="${escapeHtml(img.prompt)}" title="${escapeHtml(img.prompt)}">
+          <span class="coll-tile-overlay" aria-hidden="true"><span>${EXPAND_ICON}</span></span>
           ${serves}
           <button type="button" class="tile-del" aria-label="Delete image" title="Delete image" onclick="event.stopPropagation();deleteCollectionImage('${collId}', '${imgId}')">✕</button>
         </div>`;
