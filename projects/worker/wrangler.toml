@@ -58,6 +58,21 @@ type = "ratelimit"
 namespace_id = "1002"
 simple = { limit = 120, period = 60 }
 
+# Anonymous library search, keyed by CF-Connecting-IP. namespace_id must be
+# unique across the account's ratelimit namespaces.
+[[unsafe.bindings]]
+name = "RATE_LIMITER_SEARCH"
+type = "ratelimit"
+namespace_id = "1003"
+simple = { limit = 30, period = 60 }
+
+# Logged-in library search, keyed by userId — looser than anonymous.
+[[unsafe.bindings]]
+name = "RATE_LIMITER_SEARCH_USER"
+type = "ratelimit"
+namespace_id = "1004"
+simple = { limit = 60, period = 60 }
+
 [vars]
 # DEV_MODE must NEVER be set in production: it opens the unauthenticated dev API
 # lane and console-logs magic links. Set it only in .dev.vars for local dev

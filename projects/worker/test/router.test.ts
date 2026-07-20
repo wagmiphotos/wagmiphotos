@@ -158,14 +158,16 @@ it("generate: 401 when gated and no principal (master set, no creds)", async () 
   expect(res.status).toBe(401);
 });
 
-it("library: now gated -> 401 without a principal when master set", async () => {
-  const res = await worker.fetch(new Request("https://x/v1/library"), fakeEnv({ MASTER_API_KEY: "master" }), { waitUntil: () => {} } as any);
-  expect(res.status).toBe(401);
+it("library: open to anonymous even when master is set -> 200", async () => {
+  const res = await worker.fetch(new Request("https://x/v1/library"),
+    fakeEnv({ MASTER_API_KEY: "master" }), { waitUntil: () => {} } as any);
+  expect(res.status).toBe(200);
 });
 
-it("library download: now gated -> 401 without a principal when master set", async () => {
-  const res = await worker.fetch(new Request("https://x/v1/library/a1/download"), fakeEnv({ MASTER_API_KEY: "master" }), { waitUntil: () => {} } as any);
-  expect(res.status).toBe(401);
+it("library download: open to anonymous; unknown id -> 404 (not 401)", async () => {
+  const res = await worker.fetch(new Request("https://x/v1/library/a1/download"),
+    fakeEnv({ MASTER_API_KEY: "master" }), { waitUntil: () => {} } as any);
+  expect(res.status).toBe(404);
 });
 
 it("library: open in dev (no master) -> 200", async () => {
@@ -287,4 +289,28 @@ it("GET /v1/collections/:id/generations dispatches to the pending-list handler (
   expect(res.status).toBe(404);
   const body: any = await res.json();
   expect(body.error).toBe("unknown collection"); // handler ran; DB stub has no such collection
+});
+
+it("library: anonymous over the per-IP cap -> 429", async () => {
+  const res = await worker.fetch(new Request("https://x/v1/library"),
+    fakeEnv({ MASTER_API_KEY: "master", RATE_LIMITER_SEARCH: { limit: async () => ({ success: false }) } }),
+    { waitUntil: () => {} } as any);
+  expect(res.status).toBe(429);
+});
+
+it("like: POST/DELETE require a principal -> 401 when anonymous (master set)", async () => {
+  for (const method of ["POST", "DELETE"]) {
+    const res = await worker.fetch(new Request("https://x/v1/library/a1/like", { method }),
+      fakeEnv({ MASTER_API_KEY: "master" }), { waitUntil: () => {} } as any);
+    expect(res.status).toBe(401);
+  }
+});
+
+it("like: authenticated POST reaches the handler — 404 on unknown id, not 401", async () => {
+  // DEV_MODE=true yields a dev principal, so auth passes; the fakeEnv DB stub
+  // returns null from getAsset, so the handler 404s. A 401 here would mean auth
+  // failed — asserting 404 proves the authenticated like path is wired.
+  const res = await worker.fetch(new Request("https://x/v1/library/a1/like", { method: "POST" }),
+    fakeEnv(), { waitUntil: () => {} } as any);
+  expect(res.status).toBe(404);
 });

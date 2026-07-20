@@ -169,6 +169,7 @@ export interface StripeClient {
 export interface Services {
   embedder: Embedder; vectorize: VectorizeStore; assets: AssetStore; queries: QueryStore;
   keys: KeyStore; rateLimiter: RateLimiter; rateLimiterPaid: RateLimiter;
+  rateLimiterSearch: RateLimiter; rateLimiterSearchUser: RateLimiter;
   users: UserStore; sessions: SessionStore; loginTokens: LoginTokenStore;
   email: EmailSender; stripe: StripeClient; byok: ByokStore; collections: CollectionStore;
   generations: GenerationStore;
@@ -179,6 +180,8 @@ export interface Env {
   VECTORIZE_COLL?: VectorizeIndex;
   AI: Ai; RATE_LIMITER?: RateLimitBinding;
   RATE_LIMITER_PAID?: RateLimitBinding;
+  RATE_LIMITER_SEARCH?: RateLimitBinding;
+  RATE_LIMITER_SEARCH_USER?: RateLimitBinding;
   ASSETS: { fetch(request: Request): Promise<Response> };
   MASTER_API_KEY?: string;
   /** "true"/"1" opens dev-only lanes (dev API principal, console magic links). NEVER set in production. */

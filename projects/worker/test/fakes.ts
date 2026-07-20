@@ -94,6 +94,8 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
     },
     rateLimiter: { limit: async () => true },
     rateLimiterPaid: { limit: async () => true },
+    rateLimiterSearch: { limit: async () => true },
+    rateLimiterSearchUser: { limit: async () => true },
     users: {
       upsertByEmail: async (id, email) => ({ id, email }),
       getById: async () => ({ id: "usr_1", email: "a@b.co", created_at: "x", last_login: null, tos_version: null, tos_accepted_at: null, stripe_customer_id: null, stripe_subscription_id: null, plan_status: null, plan_current_period_end: null }),
