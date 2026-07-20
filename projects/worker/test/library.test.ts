@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import { handleLibrarySearch, handleLibraryDownload, assetFilename } from "../src/library";
+import { handleLikeAsset, handleUnlikeAsset } from "../src/library";
 import { fakeServices } from "./fakes";
 import type { LibraryAssetRow } from "../src/types";
 
@@ -8,7 +9,7 @@ const cfg = { floorSimMin: 0.72, assetBaseUrl: BASE };
 
 function libRow(over: Partial<LibraryAssetRow> = {}): LibraryAssetRow {
   return { id: "a1", prompt: "a fox", source: "pd12m", source_id: null,
-    model_used: "flux", width: 10, height: 20,
+    model_used: "flux", width: 10, height: 20, like_count: 0,
     mime: "image/webp", source_url: null, locally_cached: 1, created_at: "2026-07-03 00:00:00", ...over };
 }
 
@@ -20,7 +21,10 @@ it("search: defaults q='' limit 24 offset 0, fetches limit+1", async () => {
   expect(res.status).toBe(200);
   expect(j.images).toHaveLength(1);
   expect(j.has_more).toBe(false);
-  expect((s as any)._searchCalls[0]).toEqual({ q: "", limit: 25, offset: 0 });
+  // empty q now browses by likes (browseByLikes), not the LIKE scan; the
+  // limit+1/has_more math for that path is covered by the has_more test below,
+  // this asserts the LIKE scan (searchAssets) is untouched for the default case.
+  expect((s as any)._searchCalls).toHaveLength(0);
 });
 
 it("search: response projects to documented public shape, omits internal columns", async () => {
@@ -36,6 +40,7 @@ it("search: response projects to documented public shape, omits internal columns
     id: "a1", prompt: "a fox", thumb_url: `${BASE}/assets/a1/thumb.webp`, medium_url: `${BASE}/assets/a1/medium.webp`,
     url: `${BASE}/assets/a1/image.webp`, width: 10, height: 20, mime: "image/webp",
     model_used: "flux", source: "pd12m", created_at: "2026-07-03 00:00:00", original_url: null,
+    like_count: 0,
   });
 });
 
@@ -63,8 +68,15 @@ it("search: passes q and offset through, clamps numeric limit to 1..60", async (
   const s = fakeServices({ embedder: { textEmbed: async () => { throw new Error("offline"); } } });
   await handleLibrarySearch(new URL("https://x/v1/library?q=fox&limit=999&offset=48"), s, cfg);
   expect((s as any)._searchCalls[0]).toEqual({ q: "fox", limit: 61, offset: 48 });
-  await handleLibrarySearch(new URL("https://x/v1/library?limit=0"), s, cfg);
-  expect((s as any)._searchCalls[1]).toEqual({ q: "", limit: 2, offset: 0 });
+
+  // empty q now browses by likes (browseByLikes); its fake doesn't expose call
+  // args, so verify the limit=0 -> 1 clamp (fetch limit+1=2) via response shape.
+  (s as any)._libraryRows.push(libRow({ id: "p1" }), libRow({ id: "p2" }));
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?limit=0"), s, cfg);
+  const j: any = await res.json();
+  expect(j.images).toHaveLength(1);
+  expect(j.has_more).toBe(true);
+  expect((s as any)._searchCalls).toHaveLength(1); // still didn't touch searchAssets
 });
 
 it("search: q over 200 chars -> 400, q at the cap still searches", async () => {
@@ -156,7 +168,7 @@ it("falls back to LIKE search when getAssetsByIds throws (embedder+vectorize suc
   expect(body.images.map((i: any) => i.id)).toEqual(["like-hit"]);
 });
 
-it("empty q keeps the recency browse (vectorize and embedder never called)", async () => {
+it("empty q browses by likes (vectorize and embedder never called)", async () => {
   let vectorizeCalled = false;
   let embedderCalled = false;
   const s = fakeServices({
@@ -253,12 +265,16 @@ it("library scoped semantic: embeds query+theme and hits only the namespace", as
   expect(images[0].serve_count).toBeUndefined(); // public shape: no owner stats
 });
 
-it("library scoped browse/fallback: LIKE path filters by collection_id", async () => {
+it("library scoped browse: empty-q browseByLikes filters by collection_id", async () => {
   const s: any = fakeServices();
   s._collectionRows.set("col_abc", { id: "col_abc", owner_user_id: "u", name: "n", theme_prompt: "", created_at: "x", updated_at: "x" });
+  s._libraryRows.push({ ...libRow({ id: "in-coll" }), collection_id: "col_abc" });
+  s._libraryRows.push(libRow({ id: "not-in-coll" }));
   const res = await handleLibrarySearch(new URL("https://x/v1/library?collection=col_abc"), s, { floorSimMin: 0.75 });
   expect(res.status).toBe(200);
-  expect(s._searchCalls[0].collectionId).toBe("col_abc");
+  const j: any = await res.json();
+  expect(j.images.map((i: any) => i.id)).toEqual(["in-coll"]);
+  expect(s._searchCalls).toHaveLength(0); // empty q -> browseByLikes, not the LIKE scan
 });
 
 it("library scoped: bumps the collection's search_count; bump failure doesn't break the read", async () => {
@@ -275,4 +291,55 @@ it("library scoped: bumps the collection's search_count; bump failure doesn't br
   // unscoped reads never touch the counter
   await handleLibrarySearch(new URL("https://x/v1/library"), s, { floorSimMin: 0.75 });
   expect(s._searchCounts.get("col_abc")).toBe(2);
+});
+
+it("search: images carry like_count; liked only when a user is supplied", async () => {
+  const s = fakeServices();
+  (s as any)._libraryRows.push(libRow({ id: "a1" }));
+  (s as any)._likeCounts.set("a1", 3);
+
+  const anon: any = await (await handleLibrarySearch(new URL("https://x/v1/library"), s, cfg)).json();
+  expect(anon.images[0].like_count).toBe(3);
+  expect(anon.images[0]).not.toHaveProperty("liked");
+
+  const authed: any = await (await handleLibrarySearch(new URL("https://x/v1/library"), s, cfg, "usr_1")).json();
+  expect(authed.images[0]).toMatchObject({ like_count: 3, liked: false });
+  await s.assets.likeAsset("usr_1", "a1");
+  const after: any = await (await handleLibrarySearch(new URL("https://x/v1/library"), s, cfg, "usr_1")).json();
+  expect(after.images[0].liked).toBe(true);
+});
+
+it("search: empty q browses by likes (browseByLikes), not the recency LIKE scan", async () => {
+  const s = fakeServices();
+  for (const id of ["a", "b", "c"]) (s as any)._libraryRows.push(libRow({ id }));
+  (s as any)._likeCounts.set("c", 5);
+  const j: any = await (await handleLibrarySearch(new URL("https://x/v1/library"), s, cfg)).json();
+  expect(j.images[0].id).toBe("c");                       // most-liked first
+  expect((s as any)._searchCalls.length).toBe(0);          // did NOT use searchAssets
+});
+
+it("search: sort=liked reorders matches by like_count; sort=match keeps relevance", async () => {
+  const s = fakeServices();
+  // Vector-path hydration reads the `_assets` map (via getAssetsByIds), and vector
+  // hits come from `_matches` — mirror the existing "semantic search" tests.
+  (s as any)._matches.push({ id: "m2", score: 0.95 }, { id: "m1", score: 0.90 }); // m2 more relevant
+  (s as any)._assets.set("m1", libRow({ id: "m1" }));
+  (s as any)._assets.set("m2", libRow({ id: "m2" }));
+  (s as any)._likeCounts.set("m1", 10);                                            // but m1 more liked
+  const liked: any = await (await handleLibrarySearch(new URL("https://x/v1/library?q=fox&sort=liked"), s, cfg)).json();
+  expect(liked.images.map((i: any) => i.id)).toEqual(["m1", "m2"]);                // likes win
+  const match: any = await (await handleLibrarySearch(new URL("https://x/v1/library?q=fox&sort=match"), s, cfg)).json();
+  expect(match.images.map((i: any) => i.id)).toEqual(["m2", "m1"]);                // relevance preserved
+});
+
+it("like: 404 for unknown asset, then like -> unlike round-trips the count", async () => {
+  const s = fakeServices();
+  (s as any)._libraryRows.push(libRow({ id: "a1" }));
+  (s.assets as any).getAsset = async (id: string) => (s as any)._libraryRows.find((r: any) => r.id === id) ?? null;
+
+  expect((await handleLikeAsset("nope", "usr_1", s)).status).toBe(404);
+  const liked: any = await (await handleLikeAsset("a1", "usr_1", s)).json();
+  expect(liked).toEqual({ liked: true, like_count: 1 });
+  const unliked: any = await (await handleUnlikeAsset("a1", "usr_1", s)).json();
+  expect(unliked).toEqual({ liked: false, like_count: 0 });
 });

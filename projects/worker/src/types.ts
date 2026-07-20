@@ -4,6 +4,7 @@ export interface AssetRow {
   id: string; prompt: string; source: string; source_id: string | null;
   model_used: string | null; width: number | null; height: number | null;
   mime: string | null; source_url: string | null; locally_cached: number;
+  like_count: number;
 }
 export interface LibraryAssetRow extends AssetRow { created_at: string; }
 export interface CollectionRow {
@@ -58,6 +59,14 @@ export interface AssetStore {
   tombstoneByCollection(collectionId: string): Promise<string[]>;
   /** Fire-and-forget serve counter (hit/approximate generation returns only). */
   bumpServeCount(id: string): Promise<void>;
+  /** Idempotent like; returns the post-state like_count. */
+  likeAsset(userId: string, id: string): Promise<number>;
+  /** Idempotent unlike; returns the post-state like_count. */
+  unlikeAsset(userId: string, id: string): Promise<number>;
+  /** Subset of `ids` the user has liked (for the per-image `liked` flag). */
+  likedByUser(userId: string, ids: string[]): Promise<string[]>;
+  /** Likes-ranked browse page; unscoped excludes collection assets. */
+  browseByLikes(i: { limit: number; offset: number; collectionId?: string }): Promise<LibraryAssetRow[]>;
   /** Up to `per` newest live assets for each listed collection (browse-card previews). */
   previewsByCollections(collectionIds: string[], per: number): Promise<CollectionPreviewRow[]>;
 }
@@ -160,6 +169,7 @@ export interface StripeClient {
 export interface Services {
   embedder: Embedder; vectorize: VectorizeStore; assets: AssetStore; queries: QueryStore;
   keys: KeyStore; rateLimiter: RateLimiter; rateLimiterPaid: RateLimiter;
+  rateLimiterSearch: RateLimiter; rateLimiterSearchUser: RateLimiter;
   users: UserStore; sessions: SessionStore; loginTokens: LoginTokenStore;
   email: EmailSender; stripe: StripeClient; byok: ByokStore; collections: CollectionStore;
   generations: GenerationStore;
@@ -170,6 +180,8 @@ export interface Env {
   VECTORIZE_COLL?: VectorizeIndex;
   AI: Ai; RATE_LIMITER?: RateLimitBinding;
   RATE_LIMITER_PAID?: RateLimitBinding;
+  RATE_LIMITER_SEARCH?: RateLimitBinding;
+  RATE_LIMITER_SEARCH_USER?: RateLimitBinding;
   ASSETS: { fetch(request: Request): Promise<Response> };
   MASTER_API_KEY?: string;
   /** "true"/"1" opens dev-only lanes (dev API principal, console magic links). NEVER set in production. */

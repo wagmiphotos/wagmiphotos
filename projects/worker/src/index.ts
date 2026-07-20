@@ -3,13 +3,13 @@ import { makeD1Stores } from "./d1";
 import { makeVectorize } from "./vectorize";
 import { bgeTextEmbed } from "./embed";
 import { handleGenerate, handleKeygen, type GenBody } from "./handler";
-import { handleLibrarySearch, handleLibraryDownload } from "./library";
+import { handleLibrarySearch, handleLibraryDownload, handleLikeAsset, handleUnlikeAsset } from "./library";
 import { rewritePublicUrls } from "./rewrite";
 import { numEnv } from "./config";
 import { FLOOR_SIM_MAX, FLOOR_SIM_MIN, LIBRARY_FLOOR_SIM } from "./floor";
 import { makeEmailSender } from "./email";
 import { makeStripe } from "./stripe";
-import { resolveApiPrincipal, resolveSession } from "./session";
+import { resolveApiPrincipal, resolveSession, type Principal } from "./session";
 import { handleLoginRequest, handleVerify, handleMe, handleLogout, handleAcceptTos, handleListKeys, handleDeleteKey } from "./auth-routes";
 import { handleCheckout, handlePortal, handleStripeWebhook } from "./stripe-routes";
 import { isPaid } from "./entitlement";
@@ -38,10 +38,24 @@ function buildServices(env: Env): Services {
       return success;
     },
   };
+  const rateLimiterSearch: RateLimiter = {
+    async limit(key) {
+      if (!env.RATE_LIMITER_SEARCH) return true; // no binding in dev
+      const { success } = await env.RATE_LIMITER_SEARCH.limit({ key });
+      return success;
+    },
+  };
+  const rateLimiterSearchUser: RateLimiter = {
+    async limit(key) {
+      if (!env.RATE_LIMITER_SEARCH_USER) return true; // no binding in dev
+      const { success } = await env.RATE_LIMITER_SEARCH_USER.limit({ key });
+      return success;
+    },
+  };
   return {
     embedder: { textEmbed: (p) => bgeTextEmbed(p, env) },
     vectorize: makeVectorize([env.VECTORIZE_0, env.VECTORIZE_1, env.VECTORIZE_2], env.VECTORIZE_COLL),
-    assets, queries, keys, rateLimiter, rateLimiterPaid,
+    assets, queries, keys, rateLimiter, rateLimiterPaid, rateLimiterSearch, rateLimiterSearchUser,
     users, sessions, loginTokens, email: makeEmailSender(env), stripe: makeStripe(env), byok, collections, generations,
   };
 }
@@ -50,6 +64,19 @@ function genKey(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(24));
   const b64 = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   return `sc-${b64}`;
+}
+
+// Public library read access: anonymous is allowed but rate-limited per IP;
+// authenticated callers get the looser per-user limiter.
+async function libraryAccess(
+  request: Request, env: Env, services: Services
+): Promise<{ principal: Principal | null; ok: boolean }> {
+  const principal = await resolveApiPrincipal(request, env, services);
+  const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+  const ok = principal
+    ? await services.rateLimiterSearchUser.limit(`u:${principal.userId}`)
+    : await services.rateLimiterSearch.limit(`ip:${ip}`);
+  return { principal, ok };
 }
 
 // GitHub star count for the header badge. Cached at the edge ~10 min so we never
@@ -188,13 +215,15 @@ export default {
       }
 
       if (url.pathname === "/v1/library" && request.method === "GET") {
-        if (!(await resolveApiPrincipal(request, env, services))) return Response.json({ error: "login required" }, { status: 401 });
-        return await handleLibrarySearch(url, services, libraryCfg);
+        const { principal, ok } = await libraryAccess(request, env, services);
+        if (!ok) return Response.json({ error: "rate limited" }, { status: 429 });
+        return await handleLibrarySearch(url, services, libraryCfg, principal?.userId ?? null);
       }
 
       const dl = url.pathname.match(/^\/v1\/library\/([^/]+)\/download$/);
       if (dl && request.method === "GET") {
-        if (!(await resolveApiPrincipal(request, env, services))) return Response.json({ error: "login required" }, { status: 401 });
+        const { ok } = await libraryAccess(request, env, services);
+        if (!ok) return Response.json({ error: "rate limited" }, { status: 429 });
         let id: string;
         try {
           id = decodeURIComponent(dl[1]);
@@ -202,6 +231,17 @@ export default {
           return new Response("Not found", { status: 404 });
         }
         return await handleLibraryDownload(id, services, libraryCfg, (u) => fetch(u));
+      }
+
+      const likeM = url.pathname.match(/^\/v1\/library\/([^/]+)\/like$/);
+      if (likeM && (request.method === "POST" || request.method === "DELETE")) {
+        const principal = await resolveApiPrincipal(request, env, services);
+        if (!principal) return Response.json({ error: "login required" }, { status: 401 });
+        let id: string;
+        try { id = decodeURIComponent(likeM[1]); } catch { return new Response("Not found", { status: 404 }); }
+        return request.method === "POST"
+          ? await handleLikeAsset(id, principal.userId, services)
+          : await handleUnlikeAsset(id, principal.userId, services);
       }
 
       if (url.pathname === "/v1/keys/generate" && request.method === "POST") {
