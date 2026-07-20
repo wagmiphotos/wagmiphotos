@@ -812,7 +812,7 @@
          the tile still visibly reads as "in progress" */
       .tile-spinner { animation: none; border-top-color: var(--line); }
       .modal-card { animation: none; }
-      .library-thumb, .coll-tile img { transition: none; }
+      .library-thumb, .coll-tile img, .imgmodal-img { transition: none; }
       .library-thumb-btn:hover .library-thumb,
       .library-thumb-btn:focus-visible .library-thumb,
       .coll-tile:hover img, .coll-tile:focus-visible img { transform: none; }
@@ -2285,7 +2285,7 @@
       background: rgba(255, 255, 255, 0.92); color: var(--ink); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
     }
     .imgmodal-close:hover { background: #fff; color: var(--red); }
-    .imgmodal-img { width: 100%; max-height: 56vh; object-fit: contain; border-radius: 10px; margin-bottom: 12px; background: var(--paper); }
+    .imgmodal-img { width: 100%; max-height: 56vh; object-fit: contain; border-radius: 10px; margin-bottom: 12px; background: var(--paper); transition: opacity 0.18s ease; }
     .imgmodal-meta { font-size: 0.8125rem; color: var(--muted); line-height: 1.7; }
     .imgmodal-btn {
       height: 44px; padding: 0 16px; border-radius: 9px; font: inherit; font-size: 0.875rem; font-weight: 600;
@@ -4362,15 +4362,30 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     }
 
     // Image-detail modal for library / public-collection images (read-only: no delete).
+    // Swap the shared modal image without letting the previously-loaded frame
+    // linger while the new one downloads. Hide it instantly (no fade-out of the
+    // old image), then fade the new one in once it has actually loaded. Cached
+    // images and load errors both reveal immediately so it can't get stuck blank.
+    function setModalImage(src, alt) {
+      const imgEl = document.getElementById('imgmodal-img');
+      imgEl.style.transition = 'none';
+      imgEl.style.opacity = '0';
+      void imgEl.offsetWidth; // commit the hidden state before swapping src
+      imgEl.style.transition = '';
+      imgEl.alt = alt || '';
+      const reveal = () => { imgEl.style.opacity = '1'; };
+      imgEl.onload = reveal;
+      imgEl.onerror = reveal;
+      imgEl.src = src || '';
+      if (imgEl.complete && imgEl.naturalWidth > 0) reveal();
+    }
+
     function openLibraryImage(id) {
       const img = libraryImageStore.get(id);
       if (!img) return;
       _imageModalReturnFocus = document.activeElement;
       document.getElementById('imgmodal-title').textContent = img.prompt ? 'Image: ' + img.prompt : 'Image details';
-      const full = img.medium_url || img.url || img.thumb_url;
-      const imgEl = document.getElementById('imgmodal-img');
-      imgEl.src = full;
-      imgEl.alt = img.prompt || '';
+      setModalImage(img.medium_url || img.url || img.thumb_url, img.prompt || '');
       const dims = (img.width && img.height) ? img.width + '×' + img.height : '—';
       const served = img.serve_count != null ? img.serve_count + '×' : '—';
       const tagline = [img.model_used, img.source].filter(Boolean).map(escapeHtml).join(' · ') || '—';
@@ -4605,9 +4620,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       if (!img) return;
       _imageModalReturnFocus = document.activeElement;
       document.getElementById('imgmodal-title').textContent = img.prompt ? `Image: ${img.prompt}` : 'Image details';
-      const imgEl = document.getElementById('imgmodal-img');
-      imgEl.src = img.medium_url || img.url || img.thumb_url;
-      imgEl.alt = img.prompt || '';
+      setModalImage(img.medium_url || img.url || img.thumb_url, img.prompt || '');
       const dims = (img.width && img.height) ? `${img.width}×${img.height}` : '—';
       const served = img.serve_count != null ? `${img.serve_count}×` : '—';
       document.getElementById('imgmodal-meta').innerHTML = `
