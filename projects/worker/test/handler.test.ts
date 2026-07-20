@@ -9,7 +9,7 @@ const cfg = { floorSimMax: 0.35, floorSimMin: 0.18, imagePrice: 0.055, now: () =
 
 function asset(over: Partial<AssetRow> = {}): AssetRow {
   return { id: "a1", prompt: "p", source: "pd12m", source_id: "7",
-    model_used: "clip-vit-l-14", width: 10, height: 20,
+    model_used: "clip-vit-l-14", width: 10, height: 20, like_count: 0,
     mime: "image/webp", source_url: "https://ext/x.jpg", locally_cached: 1, ...over };
 }
 

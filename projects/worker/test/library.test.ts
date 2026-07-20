@@ -8,7 +8,7 @@ const cfg = { floorSimMin: 0.72, assetBaseUrl: BASE };
 
 function libRow(over: Partial<LibraryAssetRow> = {}): LibraryAssetRow {
   return { id: "a1", prompt: "a fox", source: "pd12m", source_id: null,
-    model_used: "flux", width: 10, height: 20,
+    model_used: "flux", width: 10, height: 20, like_count: 0,
     mime: "image/webp", source_url: null, locally_cached: 1, created_at: "2026-07-03 00:00:00", ...over };
 }
 

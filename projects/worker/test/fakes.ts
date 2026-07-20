@@ -19,6 +19,9 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   const serveCounts = new Map<string, number>();
   const searchCounts = new Map<string, number>();
   const tombstoned: string[] = [];
+  const likes = new Set<string>();           // `${userId} ${assetId}`
+  const likeCounts = new Map<string, number>();
+  const lk = (userId: string, id: string) => `${userId} ${id}`;
   const base: Services = {
     embedder: { textEmbed: async () => [0.1, 0.2, 0.3] },
     vectorize: {
@@ -30,10 +33,11 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
     },
     assets: {
       getAsset: async (id) => assets.get(id) ?? null,
-      searchAssets: async (i) => { searchCalls.push(i); return libraryRows.slice(i.offset, i.offset + i.limit); },
+      searchAssets: async (i) => { searchCalls.push(i); return libraryRows.slice(i.offset, i.offset + i.limit)
+        .map((r: any) => ({ ...r, like_count: likeCounts.get(r.id) ?? 0 })); },
       getAssetsByIds: async (ids) => ids.flatMap((id) => {
         const r = assets.get(id);
-        return r ? [r as LibraryAssetRow] : [];
+        return r ? [{ ...(r as any), like_count: likeCounts.get(id) ?? 0 } as LibraryAssetRow] : [];
       }),
       insertGenerated: async (a) => {
         generatedInserts.push(a);
@@ -42,6 +46,7 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
         const row = {
           id: a.id, prompt: a.prompt, source: "byok", source_id: null, model_used: a.modelUsed,
           width: a.width, height: a.height, mime: a.mime, source_url: a.sourceUrl, locally_cached: 0,
+          like_count: 0,
           collection_id: a.collectionId ?? null, created_at: "x",
         };
         assets.set(a.id, row);
@@ -64,6 +69,21 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
         collectionIds.flatMap((cid) =>
           libraryRows.filter((r: any) => r.collection_id === cid).slice(0, per)
             .map((r: any) => ({ collection_id: cid, id: r.id, prompt: r.prompt, source_url: r.source_url, locally_cached: r.locally_cached }))),
+      likeAsset: async (userId, id) => {
+        if (!likes.has(lk(userId, id))) { likes.add(lk(userId, id)); likeCounts.set(id, (likeCounts.get(id) ?? 0) + 1); }
+        return likeCounts.get(id) ?? 0;
+      },
+      unlikeAsset: async (userId, id) => {
+        if (likes.has(lk(userId, id))) { likes.delete(lk(userId, id)); likeCounts.set(id, Math.max(0, (likeCounts.get(id) ?? 0) - 1)); }
+        return likeCounts.get(id) ?? 0;
+      },
+      likedByUser: async (userId, ids) => ids.filter((id) => likes.has(lk(userId, id))),
+      browseByLikes: async ({ limit, offset, collectionId }) => {
+        const scope = libraryRows.filter((r: any) => collectionId ? r.collection_id === collectionId : (r.collection_id == null));
+        const sorted = [...scope].sort((a: any, b: any) =>
+          (likeCounts.get(b.id) ?? 0) - (likeCounts.get(a.id) ?? 0) || (b.locally_cached - a.locally_cached) || (a.id < b.id ? -1 : 1));
+        return sorted.slice(offset, offset + limit).map((r: any) => ({ ...r, like_count: likeCounts.get(r.id) ?? 0 }));
+      },
     },
     queries: { recordQuery: async (i) => { recorded.push(i); return i.generate; } },
     keys: {
@@ -192,5 +212,6 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
   (base as any)._serveCounts = serveCounts;
   (base as any)._searchCounts = searchCounts;
   (base as any)._tombstoned = tombstoned;
+  (base as any)._likeCounts = likeCounts;
   return { ...base, ...overrides };
 }
