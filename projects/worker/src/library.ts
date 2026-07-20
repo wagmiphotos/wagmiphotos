@@ -10,20 +10,24 @@ export const SEARCH_TOP_K = 100; // Vectorize topK cap without values/metadata
 // The documented public shape for a library image (spec §GET /v1/library).
 // source_id and locally_cached stay internal; source_url is deliberately
 // public as original_url (spec 2026-07-07-large-cap-original-url-design.md).
-// The URL fields are derived (Task 10 / migration 0007).
-function publicAsset(r: LibraryAssetRow, baseUrl: string | undefined) {
+// The URL fields are derived (Task 10 / migration 0007). like_count is always
+// present; liked is only attached when the request is authenticated.
+function publicAsset(r: LibraryAssetRow, baseUrl: string | undefined, liked?: boolean) {
   const u = assetUrls(r, baseUrl);
   return {
     id: r.id, prompt: r.prompt, thumb_url: u.thumb_url, medium_url: u.medium_url,
     url: u.url, width: r.width, height: r.height, mime: r.mime,
     model_used: r.model_used, source: r.source, created_at: r.created_at,
-    original_url: u.original_url,
+    original_url: u.original_url, like_count: r.like_count,
+    ...(liked === undefined ? {} : { liked }),
   };
 }
 
 const MAX_Q_LEN = 200;
 
-export async function handleLibrarySearch(url: URL, s: Services, cfg: LibrarySearchCfg): Promise<Response> {
+export async function handleLibrarySearch(
+  url: URL, s: Services, cfg: LibrarySearchCfg, userId?: string | null
+): Promise<Response> {
   const q = url.searchParams.get("q") ?? "";
   if (q.length > MAX_Q_LEN) {
     return Response.json({ error: `q must be at most ${MAX_Q_LEN} characters` }, { status: 400 });
@@ -46,6 +50,9 @@ export async function handleLibrarySearch(url: URL, s: Services, cfg: LibrarySea
     offset = n;
   }
 
+  const sortParam = url.searchParams.get("sort");
+  const sort: "match" | "liked" = sortParam === "match" || sortParam === "liked" ? sortParam : (q ? "match" : "liked");
+
   let coll: CollectionRow | null = null;
   const collectionId = url.searchParams.get("collection");
   if (collectionId) {
@@ -55,6 +62,14 @@ export async function handleLibrarySearch(url: URL, s: Services, cfg: LibrarySea
     try { await s.collections.bumpSearchCount(coll.id); } catch (e) { console.error("bumpSearchCount failed", e); }
   }
 
+  // Project rows to the public shape, attaching the per-user `liked` flag when authed.
+  const project = async (rows: LibraryAssetRow[], has_more: boolean): Promise<Response> => {
+    let likedSet: Set<string> | null = null;
+    if (userId) likedSet = new Set(await s.assets.likedByUser(userId, rows.map((r) => r.id)));
+    const images = rows.map((r) => publicAsset(r, cfg.assetBaseUrl, likedSet ? likedSet.has(r.id) : undefined));
+    return Response.json({ images, has_more });
+  };
+
   if (q) {
     try {
       const vec = await s.embedder.textEmbed(coll ? combinedPrompt(q, coll.theme_prompt) : q);
@@ -62,14 +77,18 @@ export async function handleLibrarySearch(url: URL, s: Services, cfg: LibrarySea
         ? await s.vectorize.queryNamespace(vec, coll.id, SEARCH_TOP_K)
         : await s.vectorize.query(vec, SEARCH_TOP_K);
       const relevant = matches.filter((m) => m.score >= cfg.floorSimMin);
+
+      if (sort === "liked") {
+        // Hydrate the whole relevant set, order by like_count, then paginate.
+        const rows = await s.assets.getAssetsByIds(relevant.map((m) => m.id));
+        rows.sort((a, b) => b.like_count - a.like_count || (a.id < b.id ? -1 : 1));
+        return await project(rows.slice(offset, offset + limit), rows.length > offset + limit);
+      }
       const page = relevant.slice(offset, offset + limit);
       const rows = await s.assets.getAssetsByIds(page.map((m) => m.id));
       const byId = new Map(rows.map((r) => [r.id, r]));
-      const images = page.flatMap((m) => {
-        const r = byId.get(m.id);
-        return r ? [publicAsset(r, cfg.assetBaseUrl)] : []; // orphan vector: skip
-      });
-      return Response.json({ images, has_more: relevant.length > offset + limit });
+      const ordered = page.flatMap((m) => (byId.has(m.id) ? [byId.get(m.id)!] : [])); // orphan vector: skip
+      return await project(ordered, relevant.length > offset + limit);
     } catch (e) {
       // Workers AI / Vectorize unavailable (offline dev) or transient failure:
       // degrade to the LIKE scan rather than 500ing the library page.
@@ -77,10 +96,21 @@ export async function handleLibrarySearch(url: URL, s: Services, cfg: LibrarySea
     }
   }
 
-  // browse (empty q) and fallback path: existing searchAssets LIKE + recency code
-  const rows = await s.assets.searchAssets({ q, limit: limit + 1, offset, ...(coll ? { collectionId: coll.id } : {}) });
-  const has_more = rows.length > limit;
-  return Response.json({ images: rows.slice(0, limit).map((r) => publicAsset(r, cfg.assetBaseUrl)), has_more });
+  // Empty q -> likes-ranked browse; q-present fallback -> LIKE scan (existing behavior).
+  const rows = q
+    ? await s.assets.searchAssets({ q, limit: limit + 1, offset, ...(coll ? { collectionId: coll.id } : {}) })
+    : await s.assets.browseByLikes({ limit: limit + 1, offset, ...(coll ? { collectionId: coll.id } : {}) });
+  return await project(rows.slice(0, limit), rows.length > limit);
+}
+
+export async function handleLikeAsset(id: string, userId: string, s: Services): Promise<Response> {
+  if (!(await s.assets.getAsset(id))) return Response.json({ error: "not found" }, { status: 404 });
+  return Response.json({ liked: true, like_count: await s.assets.likeAsset(userId, id) });
+}
+
+export async function handleUnlikeAsset(id: string, userId: string, s: Services): Promise<Response> {
+  if (!(await s.assets.getAsset(id))) return Response.json({ error: "not found" }, { status: 404 });
+  return Response.json({ liked: false, like_count: await s.assets.unlikeAsset(userId, id) });
 }
 
 const MIME_EXT: Record<string, string> = {
