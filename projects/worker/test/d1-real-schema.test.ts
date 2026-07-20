@@ -178,3 +178,25 @@ it("generations: countOpenByUser + listPendingByCollection are owner+status scop
   const ordered = await generations.listPendingByCollection("col_a", "usr_1", 20);
   expect(ordered.map((r) => r.id)).toEqual(["g2", "g1"]);
 });
+
+it("0020: like_count is trigger-maintained and INSERT OR IGNORE is idempotent", async () => {
+  const db = realDb();
+  seedUser(db, "usr_1");
+  seedUser(db, "usr_2");
+  const { assets } = makeD1Stores(db);
+  await assets.insertGenerated({ id: "lk1", prompt: "p", sourceUrl: "https://x/1.webp", mime: "image/webp",
+    width: 1, height: 1, modelUsed: "m", provider: "openai", priceUsd: 0.01, createdBy: "usr_1", collectionId: null });
+
+  const count = () => db._raw.prepare("SELECT like_count FROM assets WHERE id='lk1'").get().like_count;
+  expect(count()).toBe(0);
+  db._raw.exec("INSERT OR IGNORE INTO likes (user_id, asset_id) VALUES ('usr_1','lk1')");
+  expect(count()).toBe(1);
+  db._raw.exec("INSERT OR IGNORE INTO likes (user_id, asset_id) VALUES ('usr_1','lk1')"); // dup: no trigger
+  expect(count()).toBe(1);
+  db._raw.exec("INSERT OR IGNORE INTO likes (user_id, asset_id) VALUES ('usr_2','lk1')");
+  expect(count()).toBe(2);
+  db._raw.exec("DELETE FROM likes WHERE user_id='usr_1' AND asset_id='lk1'");
+  expect(count()).toBe(1);
+  db._raw.exec("DELETE FROM likes WHERE user_id='usr_1' AND asset_id='lk1'"); // absent: no trigger
+  expect(count()).toBe(1);
+});
