@@ -34,9 +34,10 @@ Public, no auth, **not** behind any rate limiter (edge cache absorbs traffic).
 }
 ```
 
-- `image_count`: `SELECT COUNT(*) FROM live_assets` (tombstone-aware view —
-  never the raw `assets` table).
-- `showcase`: up to 8 rows, **restricted to `locally_cached = 1`** so tiles
+- `image_count`: `SELECT COUNT(*) FROM live_assets WHERE collection_id IS NULL`
+  (tombstone-aware view, and collection assets are excluded — parity with the
+  rule that unscoped browse never surfaces collection assets).
+- `showcase`: up to 8 rows, **restricted to `locally_cached = 1 AND collection_id IS NULL`** so tiles
   always serve fast B2 thumbs, never hotlinked full-size originals
   (only ~1k of 511.5k assets are rehosted today; the bulk sweep is a separate
   workstream). Ordering: `like_count DESC`, then newest, filtered to cached
@@ -49,9 +50,12 @@ Public, no auth, **not** behind any rate limiter (edge cache absorbs traffic).
 
 ### Caching
 
-`Cache-Control: public, s-maxage=86400, stale-while-revalidate=86400`
-on the response. Consequences (accepted): D1 sees roughly one query per colo
-per day; newly liked images take up to a day to show on the homepage.
+`Cache-Control: public, max-age=86400` on the response, plus an explicit
+`caches.default` match/put in `index.ts` keyed on an internal URL — the same
+idiom as `/v1/meta/stars` (Workers do not auto-edge-cache handler responses;
+`stale-while-revalidate` is ignored by the Workers Cache API, so it is not
+used). Consequences (accepted): D1 sees roughly one query per colo per day;
+newly liked images take up to a day to show on the homepage.
 
 ## UI: `<section id="library-live">`
 
