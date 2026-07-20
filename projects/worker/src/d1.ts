@@ -9,7 +9,7 @@ import type {
 // Reads select FROM live_assets (migration 0008): the view owns the
 // dead_at IS NULL invariant, so dead assets are invisible to every read.
 const ASSET_COLS =
-  "id, prompt, source, source_id, model_used, width, height, mime, source_url, locally_cached";
+  "id, prompt, source, source_id, model_used, width, height, mime, source_url, locally_cached, like_count";
 
 function escapeLike(s: string): string {
   return s.replace(/[\\%_]/g, (c) => "\\" + c);
@@ -82,6 +82,33 @@ export function makeD1Stores(db: D1Database): {
     },
     async bumpServeCount(id) {
       await db.prepare("UPDATE assets SET serve_count = serve_count + 1 WHERE id = ?").bind(id).run();
+    },
+    async likeAsset(userId, id) {
+      await db.prepare("INSERT OR IGNORE INTO likes (user_id, asset_id) VALUES (?, ?)").bind(userId, id).run();
+      const row = await db.prepare("SELECT like_count FROM live_assets WHERE id = ?").bind(id).first<{ like_count: number }>();
+      return row?.like_count ?? 0;
+    },
+    async unlikeAsset(userId, id) {
+      await db.prepare("DELETE FROM likes WHERE user_id = ? AND asset_id = ?").bind(userId, id).run();
+      const row = await db.prepare("SELECT like_count FROM live_assets WHERE id = ?").bind(id).first<{ like_count: number }>();
+      return row?.like_count ?? 0;
+    },
+    async likedByUser(userId, ids) {
+      if (ids.length === 0) return [];
+      const marks = ids.map(() => "?").join(",");
+      const { results } = await db.prepare(
+        `SELECT asset_id FROM likes WHERE user_id = ? AND asset_id IN (${marks})`
+      ).bind(userId, ...ids).all<{ asset_id: string }>();
+      return (results ?? []).map((r) => r.asset_id);
+    },
+    async browseByLikes({ limit, offset, collectionId }) {
+      // Unscoped browse must never surface collection assets (parity with searchAssets).
+      const cond = collectionId ? "collection_id = ?" : "collection_id IS NULL";
+      const args: unknown[] = collectionId ? [collectionId] : [];
+      const { results } = await db.prepare(
+        `SELECT ${ASSET_COLS}, created_at FROM live_assets WHERE ${cond} ORDER BY like_count DESC, locally_cached DESC, id ASC LIMIT ? OFFSET ?`
+      ).bind(...args, limit, offset).all<LibraryAssetRow>();
+      return results ?? [];
     },
     async previewsByCollections(collectionIds, per) {
       if (!collectionIds.length) return [];
