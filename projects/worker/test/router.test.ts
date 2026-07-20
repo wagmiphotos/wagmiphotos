@@ -4,9 +4,19 @@ import worker from "../src/index";
 afterEach(() => vi.unstubAllGlobals());
 
 // Minimal fake env: DB stub used only by keygen/auth; VECTORIZE_* shards return no matches.
+// Statement exposes first/all/run both directly AND after .bind() — real D1 allows
+// calling them straight off prepare() when there are no placeholders (bind() is only
+// needed to supply args), and test/real-d1.ts's harness already relies on that same
+// bind-optional shape (bind() there just mutates and returns `this`).
 function fakeEnv(over: any = {}) {
+  const stmt: any = {
+    bind: () => stmt,
+    first: async () => null,
+    run: async () => ({ success: true }),
+    all: async () => ({ results: [] }),
+  };
   const db: any = {
-    prepare: () => ({ bind: () => ({ first: async () => null, run: async () => ({ success: true }), all: async () => ({ results: [] }) }) }),
+    prepare: () => stmt,
   };
   const vectorizeStub = { query: async () => ({ matches: [] }) };
   return {
@@ -104,6 +114,16 @@ it("stars: GitHub failure degrades to {stars: null}, still 200", async () => {
   expect(res.status).toBe(200);
   const j: any = await res.json();
   expect(j.stars).toBeNull();
+});
+
+it("home: GET returns {image_count, showcase} with a day-long cache header, POST is 404", async () => {
+  const res = await worker.fetch(new Request("https://x/v1/home"), fakeEnv(), { waitUntil: () => {} } as any);
+  expect(res.status).toBe(200);
+  const j: any = await res.json();
+  expect(j).toEqual({ image_count: 0, showcase: [] });
+  expect(res.headers.get("Cache-Control")).toBe("public, max-age=86400");
+  const post = await worker.fetch(new Request("https://x/v1/home", { method: "POST" }), fakeEnv(), { waitUntil: () => {} } as any);
+  expect(post.status).toBe(404);
 });
 
 it("generate: upstream throw (vectorize.query throws) -> 500 without internal detail", async () => {

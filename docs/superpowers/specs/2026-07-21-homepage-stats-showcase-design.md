@@ -71,10 +71,11 @@ Inserted in `projects/worker/public/index.html` between the hero section and
   (deep-linking into the image-detail modal is a possible later enhancement,
   out of scope here).
 - **CTA**: "Browse the library →" linking to `#/library`.
-- **Failure fallback**: if the `/v1/home` fetch fails, times out, or returns
-  an empty showcase, the headline renders static "500,000+ openly licensed
-  images" and the strip is hidden. The landing page never breaks or shows
-  spinners for this section.
+- **Failure fallback**: if the `/v1/home` fetch fails (network error, timeout,
+  or non-2xx), the headline renders static "500,000+ openly licensed images"
+  and the strip stays hidden. On success with an empty showcase, the live
+  count still animates in independently — only the strip stays hidden. The
+  landing page never breaks or shows spinners for this section.
 
 The SPA fetches `/v1/home` same-origin once when the landing view renders —
 no CORS changes.
