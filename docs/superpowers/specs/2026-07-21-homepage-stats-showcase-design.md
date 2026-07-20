@@ -86,7 +86,7 @@ no CORS changes.
   - showcase contains only `locally_cached = 1` assets,
   - like-ordering with newest-cached fallback,
   - tombstoned assets excluded from the count,
-  - `Cache-Control` header present with `s-maxage=86400`.
+  - `Cache-Control` header present with `max-age=86400`.
 - SPA behaviour verified manually (no DOM test harness exists; jsdom can't
   exercise image loading or scroll animation meaningfully).
 
