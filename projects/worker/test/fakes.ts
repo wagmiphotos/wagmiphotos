@@ -84,6 +84,17 @@ export function fakeServices(overrides: Partial<Services> = {}): Services {
           (likeCounts.get(b.id) ?? 0) - (likeCounts.get(a.id) ?? 0) || (b.locally_cached - a.locally_cached) || (a.id < b.id ? -1 : 1));
         return sorted.slice(offset, offset + limit).map((r: any) => ({ ...r, like_count: likeCounts.get(r.id) ?? 0 }));
       },
+      countLibraryAssets: async () =>
+        libraryRows.filter((r: any) => r.collection_id == null && !tombstoned.includes(r.id)).length,
+      showcaseAssets: async (limit) => {
+        const scope = libraryRows.filter((r: any) =>
+          r.collection_id == null && r.locally_cached === 1 && !tombstoned.includes(r.id));
+        const sorted = [...scope].sort((a: any, b: any) =>
+          (likeCounts.get(b.id) ?? 0) - (likeCounts.get(a.id) ?? 0) ||
+          String(b.created_at).localeCompare(String(a.created_at)) ||
+          (a.id < b.id ? -1 : 1));
+        return sorted.slice(0, limit).map((r: any) => ({ ...r, like_count: likeCounts.get(r.id) ?? 0 }));
+      },
     },
     queries: { recordQuery: async (i) => { recorded.push(i); return i.generate; } },
     keys: {

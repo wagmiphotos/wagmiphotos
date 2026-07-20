@@ -110,6 +110,18 @@ export function makeD1Stores(db: D1Database): {
       ).bind(...args, limit, offset).all<LibraryAssetRow>();
       return results ?? [];
     },
+    async countLibraryAssets() {
+      const row = await db.prepare(
+        "SELECT COUNT(*) AS n FROM live_assets WHERE collection_id IS NULL"
+      ).first<{ n: number }>();
+      return row?.n ?? 0;
+    },
+    async showcaseAssets(limit) {
+      const { results } = await db.prepare(
+        `SELECT ${ASSET_COLS}, created_at FROM live_assets WHERE collection_id IS NULL AND locally_cached = 1 ORDER BY like_count DESC, created_at DESC, id ASC LIMIT ?`
+      ).bind(limit).all<LibraryAssetRow>();
+      return results ?? [];
+    },
     async previewsByCollections(collectionIds, per) {
       if (!collectionIds.length) return [];
       const ph = collectionIds.map(() => "?").join(", ");

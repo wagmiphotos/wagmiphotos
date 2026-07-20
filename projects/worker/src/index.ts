@@ -3,6 +3,7 @@ import { makeD1Stores } from "./d1";
 import { makeVectorize } from "./vectorize";
 import { bgeTextEmbed } from "./embed";
 import { handleGenerate, handleKeygen, type GenBody } from "./handler";
+import { handleHome } from "./home";
 import { handleLibrarySearch, handleLibraryDownload, handleLikeAsset, handleUnlikeAsset } from "./library";
 import { rewritePublicUrls } from "./rewrite";
 import { numEnv } from "./config";
@@ -132,6 +133,21 @@ export default {
       if (url.pathname === "/v1/meta/stars") {
         if (request.method !== "GET") return new Response("Not found", { status: 404 });
         return await handleStars(env);
+      }
+
+      // Landing-page stats. Public + cached a day via the same Cache API
+      // idiom as /v1/meta/stars (Workers don't auto-cache handler responses).
+      if (url.pathname === "/v1/home") {
+        if (request.method !== "GET") return new Response("Not found", { status: 404 });
+        const cacheKey = new Request("https://wagmiphotos.internal/v1/home");
+        const cache = (globalThis as any).caches?.default;
+        if (cache) {
+          const hit = await cache.match(cacheKey);
+          if (hit) return hit;
+        }
+        const res = await handleHome(services, { assetBaseUrl: env.ASSET_BASE_URL });
+        if (cache && res.ok) await cache.put(cacheKey, res.clone());
+        return res;
       }
 
       if (url.pathname === "/v1/auth/login" && request.method === "POST")
