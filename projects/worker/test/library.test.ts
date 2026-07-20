@@ -168,7 +168,7 @@ it("falls back to LIKE search when getAssetsByIds throws (embedder+vectorize suc
   expect(body.images.map((i: any) => i.id)).toEqual(["like-hit"]);
 });
 
-it("empty q keeps the recency browse (vectorize and embedder never called)", async () => {
+it("empty q browses by likes (vectorize and embedder never called)", async () => {
   let vectorizeCalled = false;
   let embedderCalled = false;
   const s = fakeServices({
