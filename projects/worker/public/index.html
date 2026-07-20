@@ -515,6 +515,7 @@
     }
     .library-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--paper); }
     .library-meta { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    .library-actions { display: flex; align-items: center; gap: .5rem; margin-top: auto; flex-wrap: wrap; }
     .library-prompt {
       font-size: 0.8125rem; color: var(--ink); line-height: 1.35; margin: 0;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
@@ -4290,7 +4291,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
     async function toggleLike(btn) {
       if (!currentUser) {                                  // route logged-out users into the login flow
         sessionStorage.setItem('wagmi_return', location.hash || '#/library');
-        location.hash = '#/account';
+        location.hash = '#/login';
         return;
       }
       const id = btn.getAttribute('data-id');
