@@ -67,6 +67,11 @@ export interface AssetStore {
   likedByUser(userId: string, ids: string[]): Promise<string[]>;
   /** Likes-ranked browse page; unscoped excludes collection assets. */
   browseByLikes(i: { limit: number; offset: number; collectionId?: string }): Promise<LibraryAssetRow[]>;
+  /** Public library size for /v1/home — live, unscoped rows only. */
+  countLibraryAssets(): Promise<number>;
+  /** Homepage strip: top-liked rehosted (locally_cached=1) public rows,
+   *  newest-first tiebreak — tiles must always serve fast B2 thumbs. */
+  showcaseAssets(limit: number): Promise<LibraryAssetRow[]>;
   /** Up to `per` newest live assets for each listed collection (browse-card previews). */
   previewsByCollections(collectionIds: string[], per: number): Promise<CollectionPreviewRow[]>;
 }
