@@ -542,6 +542,13 @@
       text-decoration: underline; text-underline-offset: 2px;
     }
     .btn.library-more { display: block; width: auto; margin: 28px auto 0; background: var(--paper); border: 1px solid var(--line); color: var(--ink); padding: 0 24px; height: 40px; }
+    .library-sort { display: inline-flex; gap: .25rem; margin-left: .5rem; }
+    .sort-btn { font: inherit; padding: .3rem .7rem; border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 999px; cursor: pointer; }
+    .sort-btn.is-active { background: var(--red); color: #fff; border-color: var(--red); }
+    .sort-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .like-btn { display: inline-flex; align-items: center; gap: .3rem; border: none; background: transparent; color: var(--ink); cursor: pointer; font: inherit; padding: .2rem .4rem; }
+    .like-btn .heart { font-size: 1.05rem; line-height: 1; }
+    .like-btn.is-liked .heart { color: var(--red); }
 
     /* anchored sections/docs clear the sticky navbar when deep-linked */
     section[id], .docs-content [id] { scroll-margin-top: 84px; }
@@ -2883,6 +2890,10 @@
             <input id="library-search" class="input-field" type="search" placeholder="Search prompts, e.g. flamingo sunset…"
                    aria-label="Search prompts"
                    oninput="onLibraryInput(this.value)" onkeydown="onLibraryKeydown(event)">
+            <div class="library-sort" role="group" aria-label="Sort library">
+              <button type="button" id="lib-sort-liked" class="sort-btn is-active" aria-pressed="true" onclick="setLibrarySort('liked')">Most liked</button>
+              <button type="button" id="lib-sort-match" class="sort-btn" aria-pressed="false" disabled onclick="setLibrarySort('match')">Best match</button>
+            </div>
           </div>
 
           <div id="library-grid" class="library-grid"></div>
@@ -4179,10 +4190,13 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
     const LIB_PAGE_SIZE = 24;
     let libQuery = '', libOffset = 0, libLoaded = false, libSeq = 0, libDebounce = null;
+    let libSort = 'liked';               // 'liked' (default) | 'match'
+    let libUserPickedSort = false;       // did the user explicitly choose?
 
     function initLibrary() { if (!libLoaded) searchLibrary(''); }
 
     function onLibraryInput(value) {
+      if (!value.trim()) libUserPickedSort = false;
       clearTimeout(libDebounce);
       libDebounce = setTimeout(() => searchLibrary(value.trim()), 300);
     }
@@ -4190,7 +4204,33 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       if (e.key === 'Enter') { clearTimeout(libDebounce); searchLibrary(e.target.value.trim()); }
     }
 
-    function searchLibrary(q) { libQuery = q; libOffset = 0; loadLibrary(false); }
+    function setLibrarySort(sort) {
+      libSort = sort; libUserPickedSort = true;
+      document.getElementById('lib-sort-liked').classList.toggle('is-active', sort === 'liked');
+      document.getElementById('lib-sort-liked').setAttribute('aria-pressed', String(sort === 'liked'));
+      document.getElementById('lib-sort-match').classList.toggle('is-active', sort === 'match');
+      document.getElementById('lib-sort-match').setAttribute('aria-pressed', String(sort === 'match'));
+      searchLibrary(libQuery);
+    }
+
+    function searchLibrary(q) {
+      libQuery = q; libOffset = 0;
+      const matchBtn = document.getElementById('lib-sort-match');
+      if (matchBtn) matchBtn.disabled = !q;                // "Best match" only means something with a query
+      if (!libUserPickedSort) {                            // auto-default: match when searching, liked when browsing
+        libSort = q ? 'match' : 'liked';
+        setSortButtons();
+      } else if (!q && libSort === 'match') {              // no query -> match is meaningless, fall back
+        libSort = 'liked'; setSortButtons();
+      }
+      loadLibrary(false);
+    }
+    function setSortButtons() {
+      const liked = document.getElementById('lib-sort-liked'), match = document.getElementById('lib-sort-match');
+      if (!liked || !match) return;
+      liked.classList.toggle('is-active', libSort === 'liked'); liked.setAttribute('aria-pressed', String(libSort === 'liked'));
+      match.classList.toggle('is-active', libSort === 'match'); match.setAttribute('aria-pressed', String(libSort === 'match'));
+    }
     function loadMoreLibrary() { loadLibrary(true); }
 
     async function loadLibrary(append) {
@@ -4202,9 +4242,9 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       status.textContent = 'Loading…';
       status.style.display = 'block';
       try {
-        const params = new URLSearchParams({ limit: LIB_PAGE_SIZE, offset: libOffset });
+        const params = new URLSearchParams({ limit: LIB_PAGE_SIZE, offset: libOffset, sort: libSort });
         if (libQuery) params.set('q', libQuery);
-        const res = await fetch('/v1/library?' + params);
+        const res = await fetch('/v1/library?' + params, { credentials: 'same-origin' });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         if (seq !== libSeq) return; // superseded by a newer search
@@ -4231,13 +4271,45 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       const original = img.original_url
         ? '<a class="library-original" href="' + escapeHtml(img.original_url) + '" target="_blank" rel="noopener">Original ↗</a>'
         : '';
+      const liked = img.liked ? ' is-liked' : '';
+      const like = '<button type="button" class="like-btn' + liked + '" data-id="' + escapeHtml(img.id) +
+        '" aria-pressed="' + (img.liked ? 'true' : 'false') + '" onclick="toggleLike(this)">' +
+        '<span class="heart">' + (img.liked ? '♥' : '♡') + '</span>' +
+        '<span class="like-count">' + (img.like_count || 0) + '</span></button>';
       return '<div class="library-card">' +
         '<img class="library-thumb" loading="lazy" src="' + escapeHtml(thumb) + '" alt="' + escapeHtml(img.prompt) + '">' +
         '<div class="library-meta">' +
           '<p class="library-prompt" title="' + escapeHtml(img.prompt) + '">' + escapeHtml(img.prompt) + '</p>' +
           '<div class="library-tags">' + tags + '</div>' +
-          '<a class="library-download" href="/v1/library/' + encodeURIComponent(img.id) + '/download">Download</a>' + original +
+          '<div class="library-actions">' + like +
+            '<a class="library-download" href="/v1/library/' + encodeURIComponent(img.id) + '/download">Download</a>' + original +
+          '</div>' +
         '</div></div>';
+    }
+
+    async function toggleLike(btn) {
+      if (!currentUser) {                                  // route logged-out users into the login flow
+        sessionStorage.setItem('wagmi_return', location.hash || '#/library');
+        location.hash = '#/account';
+        return;
+      }
+      const id = btn.getAttribute('data-id');
+      const wasLiked = btn.getAttribute('aria-pressed') === 'true';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/v1/library/' + encodeURIComponent(id) + '/like',
+          { method: wasLiked ? 'DELETE' : 'POST', credentials: 'same-origin' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        btn.classList.toggle('is-liked', data.liked);
+        btn.setAttribute('aria-pressed', String(data.liked));
+        btn.querySelector('.heart').textContent = data.liked ? '♥' : '♡';
+        btn.querySelector('.like-count').textContent = data.like_count;
+      } catch (_) {
+        // leave the button as-is on failure
+      } finally {
+        btn.disabled = false;
+      }
     }
 
     // ---- Public collections browse ----
