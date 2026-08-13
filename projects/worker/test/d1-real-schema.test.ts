@@ -1,4 +1,7 @@
 import { it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { makeD1Stores } from "../src/d1";
 import { realDb } from "./real-d1";
 
@@ -199,6 +202,82 @@ it("0020: like_count is trigger-maintained and INSERT OR IGNORE is idempotent", 
   expect(count()).toBe(1);
   db._raw.exec("DELETE FROM likes WHERE user_id='usr_1' AND asset_id='lk1'"); // absent: no trigger
   expect(count()).toBe(1);
+});
+
+// The counter exists so the landing page never COUNT(*)s the whole library
+// (511k rows / ~11s per /v1/home cache miss before 0021). It is trigger-
+// maintained rather than app-maintained because the seed/backfill pipeline
+// writes `assets` directly with raw multi-row INSERTs (d1_client.py) and
+// tombstones with raw UPDATEs — only a trigger sees those.
+it("0021: library_assets counter is trigger-maintained through raw INSERT/UPDATE/DELETE", async () => {
+  const db = realDb();
+  seedUser(db, "usr_1");
+  const { collections } = makeD1Stores(db);
+  await collections.create({ id: "col_1", ownerUserId: "usr_1", name: "n", themePrompt: "" });
+
+  const counter = () => db._raw.prepare("SELECT value FROM counters WHERE name='library_assets'").get().value;
+  const truth = () =>
+    db._raw.prepare("SELECT COUNT(*) AS n FROM assets WHERE collection_id IS NULL AND dead_at IS NULL").get().n;
+  const both = (n: number) => { expect(counter()).toBe(n); expect(truth()).toBe(n); };
+
+  const raw = (id: string, coll: string | null = null) => db._raw.exec(
+    `INSERT INTO assets (id, prompt, source, collection_id) VALUES ('${id}', 'p', 'pd12m', ${coll ? `'${coll}'` : "NULL"})`
+  );
+
+  both(0);
+  raw("s1"); raw("s2");
+  both(2);
+  raw("c1", "col_1");                                            // collection asset: never counted
+  both(2);
+  db._raw.exec("UPDATE assets SET dead_at=datetime('now'), dead_reason='gone' WHERE id='s1'");
+  both(1);
+  db._raw.exec("UPDATE assets SET dead_at=datetime('now') WHERE id='s1'");  // re-tombstone: no double decrement
+  both(1);
+  db._raw.exec("UPDATE assets SET dead_at=datetime('now') WHERE id='c1'");  // scoped tombstone: no effect
+  both(1);
+  db._raw.exec("UPDATE assets SET serve_count = serve_count + 1 WHERE id='s2'"); // unrelated write
+  both(1);
+  db._raw.exec("UPDATE assets SET dead_at=NULL WHERE id='s1'");            // revival counts again
+  both(2);
+  db._raw.exec("DELETE FROM assets WHERE id='s1'");
+  both(1);
+});
+
+// Moving a row between the public library and a collection is the delta path
+// the AFTER UPDATE trigger's CASE arithmetic exists for.
+it("0021: moving a row in and out of a collection tracks the counter", async () => {
+  const db = realDb();
+  seedUser(db, "usr_1");
+  const { collections } = makeD1Stores(db);
+  await collections.create({ id: "col_1", ownerUserId: "usr_1", name: "n", themePrompt: "" });
+  const counter = () => db._raw.prepare("SELECT value FROM counters WHERE name='library_assets'").get().value;
+
+  db._raw.exec("INSERT INTO assets (id, prompt, source) VALUES ('mv', 'p', 'pd12m')");
+  expect(counter()).toBe(1);
+  db._raw.exec("UPDATE assets SET collection_id='col_1' WHERE id='mv'");
+  expect(counter()).toBe(0);
+  db._raw.exec("UPDATE assets SET collection_id=NULL WHERE id='mv'");
+  expect(counter()).toBe(1);
+});
+
+// SQLite fires the INSERT trigger but NOT the DELETE trigger for REPLACE
+// unless PRAGMA recursive_triggers is on, and it is off by default — so
+// `INSERT OR REPLACE INTO assets` inflates the counter. No writer does this
+// (the seeder uses plain INSERT; the worker uses INSERT/UPDATE), but the
+// drift is silent, so this pins both the hazard and the repair.
+it("0021: INSERT OR REPLACE drifts the counter, and the recount script repairs it", async () => {
+  const db = realDb();
+  const counter = () => db._raw.prepare("SELECT value FROM counters WHERE name='library_assets'").get().value;
+  const truth = () =>
+    db._raw.prepare("SELECT COUNT(*) AS n FROM assets WHERE collection_id IS NULL AND dead_at IS NULL").get().n;
+
+  for (let i = 0; i < 3; i++)
+    db._raw.exec("INSERT OR REPLACE INTO assets (id, prompt, source) VALUES ('dup', 'p', 'pd12m')");
+  expect(truth()).toBe(1);
+  expect(counter()).toBe(3); // documented hazard, not desired behaviour
+
+  db._raw.exec(readFileSync(join(fileURLToPath(new URL(".", import.meta.url)), "..", "scripts", "recount-library.sql"), "utf8"));
+  expect(counter()).toBe(truth());
 });
 
 it("0020 store: like/unlike round-trip, likedByUser, and browseByLikes ordering", async () => {

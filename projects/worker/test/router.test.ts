@@ -15,8 +15,12 @@ function fakeEnv(over: any = {}) {
     run: async () => ({ success: true }),
     all: async () => ({ results: [] }),
   };
+  // The counters row (migration 0021) must exist, else countLibraryAssets
+  // throws and /v1/home 500s. Serving 0 here keeps the empty-library
+  // expectation below honest: it comes from a real counter, not a fallback.
+  const countersStmt: any = { ...stmt, bind: () => countersStmt, first: async () => ({ n: 0 }) };
   const db: any = {
-    prepare: () => stmt,
+    prepare: (sql: string) => (/FROM counters/i.test(sql) ? countersStmt : stmt),
   };
   const vectorizeStub = { query: async () => ({ matches: [] }) };
   return {

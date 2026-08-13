@@ -34,9 +34,15 @@ Public, no auth, **not** behind any rate limiter (edge cache absorbs traffic).
 }
 ```
 
-- `image_count`: `SELECT COUNT(*) FROM live_assets WHERE collection_id IS NULL`
-  (tombstone-aware view, and collection assets are excluded — parity with the
-  rule that unscoped browse never surfaces collection assets).
+- `image_count`: read from `counters.library_assets`, a counter kept exact by
+  triggers on `assets` (migration 0021). It counts `collection_id IS NULL AND
+  dead_at IS NULL` — the same predicate the original
+  `SELECT COUNT(*) FROM live_assets WHERE collection_id IS NULL` used, so
+  tombstoned rows and collection assets are still excluded (parity with the
+  rule that unscoped browse never surfaces collection assets). The `COUNT(*)`
+  was replaced because it read all 511.5k rows (~11s) on every cache miss.
+  Because the value is maintained rather than derived, it can in principle
+  drift; `scripts/recount-library.sql` rebuilds it from the table.
 - `showcase`: up to 8 rows, **restricted to `locally_cached = 1 AND collection_id IS NULL`** so tiles
   always serve fast B2 thumbs, never hotlinked full-size originals
   (only ~1k of 511.5k assets are rehosted today; the bulk sweep is a separate
