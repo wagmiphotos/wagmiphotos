@@ -1,4 +1,7 @@
 import { it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { makeD1Stores } from "../src/d1";
 import { realDb } from "./real-d1";
 
@@ -238,6 +241,43 @@ it("0021: library_assets counter is trigger-maintained through raw INSERT/UPDATE
   both(2);
   db._raw.exec("DELETE FROM assets WHERE id='s1'");
   both(1);
+});
+
+// Moving a row between the public library and a collection is the delta path
+// the AFTER UPDATE trigger's CASE arithmetic exists for.
+it("0021: moving a row in and out of a collection tracks the counter", async () => {
+  const db = realDb();
+  seedUser(db, "usr_1");
+  const { collections } = makeD1Stores(db);
+  await collections.create({ id: "col_1", ownerUserId: "usr_1", name: "n", themePrompt: "" });
+  const counter = () => db._raw.prepare("SELECT value FROM counters WHERE name='library_assets'").get().value;
+
+  db._raw.exec("INSERT INTO assets (id, prompt, source) VALUES ('mv', 'p', 'pd12m')");
+  expect(counter()).toBe(1);
+  db._raw.exec("UPDATE assets SET collection_id='col_1' WHERE id='mv'");
+  expect(counter()).toBe(0);
+  db._raw.exec("UPDATE assets SET collection_id=NULL WHERE id='mv'");
+  expect(counter()).toBe(1);
+});
+
+// SQLite fires the INSERT trigger but NOT the DELETE trigger for REPLACE
+// unless PRAGMA recursive_triggers is on, and it is off by default — so
+// `INSERT OR REPLACE INTO assets` inflates the counter. No writer does this
+// (the seeder uses plain INSERT; the worker uses INSERT/UPDATE), but the
+// drift is silent, so this pins both the hazard and the repair.
+it("0021: INSERT OR REPLACE drifts the counter, and the recount script repairs it", async () => {
+  const db = realDb();
+  const counter = () => db._raw.prepare("SELECT value FROM counters WHERE name='library_assets'").get().value;
+  const truth = () =>
+    db._raw.prepare("SELECT COUNT(*) AS n FROM assets WHERE collection_id IS NULL AND dead_at IS NULL").get().n;
+
+  for (let i = 0; i < 3; i++)
+    db._raw.exec("INSERT OR REPLACE INTO assets (id, prompt, source) VALUES ('dup', 'p', 'pd12m')");
+  expect(truth()).toBe(1);
+  expect(counter()).toBe(3); // documented hazard, not desired behaviour
+
+  db._raw.exec(readFileSync(join(fileURLToPath(new URL(".", import.meta.url)), "..", "scripts", "recount-library.sql"), "utf8"));
+  expect(counter()).toBe(truth());
 });
 
 it("0020 store: like/unlike round-trip, likedByUser, and browseByLikes ordering", async () => {

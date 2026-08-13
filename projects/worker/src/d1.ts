@@ -117,12 +117,11 @@ export function makeD1Stores(db: D1Database): {
       const row = await db.prepare(
         "SELECT value AS n FROM counters WHERE name = 'library_assets'"
       ).first<{ n: number }>();
-      if (!row) {
-        // Only reachable if 0021 has not been applied. Report 0 rather than
-        // falling back to the scan this migration exists to remove.
-        console.error("counters.library_assets missing — is migration 0021 applied?");
-        return 0;
-      }
+      // A missing `counters` table throws out of .first(); a missing row lands
+      // here. Both mean 0021 is not in place, and both must fail loudly rather
+      // than degrade: index.ts caches any ok /v1/home response for a day per
+      // colo, so a substituted 0 would be pinned as the public library size.
+      if (!row) throw new Error("counters.library_assets row missing — is migration 0021 applied?");
       return row.n;
     },
     async showcaseAssets(limit) {

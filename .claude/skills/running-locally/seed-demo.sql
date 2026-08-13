@@ -6,7 +6,12 @@
 -- on a different one. locally_cached=0 so URLs are served as-is (derived,
 -- not rehosted); the SPA's thumb_url || medium_url || url fallback renders
 -- the grid straight from url = source_url.
-INSERT OR REPLACE INTO assets
+-- DELETE + INSERT rather than INSERT OR REPLACE: REPLACE fires the INSERT
+-- trigger but not the DELETE trigger (SQLite only fires the latter when
+-- PRAGMA recursive_triggers is on, which it is not), so re-running would
+-- inflate counters.library_assets (migration 0021) on every pass.
+DELETE FROM assets WHERE id IN ('demo-1', 'demo-2', 'demo-3', 'demo-4');
+INSERT INTO assets
   (id, prompt, source, source_url, model_used, width, height, mime, locally_cached)
 VALUES
   ('demo-1', 'A flamingo standing in shallow water at sunset', 'pd12m',

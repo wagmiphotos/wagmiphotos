@@ -79,6 +79,16 @@ it("countLibraryAssets reads a counter, never the assets table", async () => {
   expect(cap.sqls.join("\n")).not.toMatch(/FROM\s+(live_)?assets/i);
 });
 
+// index.ts caches any ok /v1/home response for a day per colo, so a degraded
+// count would be pinned as the public library size. Fail loudly instead: a
+// throw becomes a 500, which is not cached and is visible in logs.
+it("countLibraryAssets throws rather than reporting a degraded count", async () => {
+  const db = realDb();
+  db._raw.exec("DELETE FROM counters WHERE name = 'library_assets'");
+  const { assets } = makeD1Stores(db);
+  await expect(assets.countLibraryAssets()).rejects.toThrow(/0021/);
+});
+
 it("showcaseAssets is served in index order — no scan, no sort", async () => {
   const db = realDb();
   const cap = captureSql(db);
