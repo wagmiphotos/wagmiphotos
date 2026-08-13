@@ -3442,12 +3442,12 @@ console.<span class="tk-cmd">log</span>(img.data[<span class="tk-num">0</span>].
             <p style="font-size: 0.8125rem; color: var(--muted);">Illustrative cosine-similarity scores — in practice they land in a fairly narrow ~0.7–0.95 band. The generic prompt lands squarely on an existing prompt; the very specific one only finds a distant cousin.</p>
 
             <h2>A fixed floor decides hit vs. approximate</h2>
-            <p>The cosine-similarity floor a match must clear is fixed server-side (≈0.85, between 0.75 and 0.87) — it's not a request parameter, so there's no <code>cache_tolerance</code> to tune. The API always returns the closest match with its <code>similarity</code> score in <code>shared_cache</code>; threshold client-side if your use case needs something stricter.</p>
+            <p>The cosine-similarity floor a match must clear is fixed server-side (≈0.83, between 0.75 and 0.84) — it's not a request parameter, so there's no <code>cache_tolerance</code> to tune. The API always returns the closest match with its <code>similarity</code> score in <code>shared_cache</code>; threshold client-side if your use case needs something stricter.</p>
             <div class="match-scale-wrap">
               <div class="match-scale"></div>
               <div class="match-scale-labels">
-                <span><b>0.87</b> · strict end of the range</span>
-                <span>0.75 · loose end <b>— server floor sits at ≈0.85</b></span>
+                <span><b>0.84</b> · strict end of the range</span>
+                <span>0.75 · loose end <b>— server floor sits at ≈0.83</b></span>
               </div>
             </div>
             <p>At or above the floor you get a <code>hit</code>. Below it, the closest image is still served as <code>approximate</code> and the prompt is queued for demand-ranked background generation.</p>
