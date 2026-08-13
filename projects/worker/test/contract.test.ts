@@ -5,7 +5,7 @@ import { join } from "node:path";
 // pins its side in projects/common/tests/test_contract.py; a drift on either
 // side must fail tests.
 import contract from "../../../contract.json";
-import { FLOOR_SIM_MAX, FLOOR_SIM_MIN, LIBRARY_FLOOR_SIM } from "../src/floor";
+import { FLOOR_SIM_MAX, FLOOR_SIM_MIN, LIBRARY_FLOOR_SIM, similarityFloor } from "../src/floor";
 import { DEFAULT_CACHE_TOLERANCE } from "../src/handler";
 import { BGE_MODEL } from "../src/embed";
 
@@ -39,6 +39,37 @@ it("wrangler.toml [vars] cannot override the contract-pinned floors", () => {
 
 it("default cache tolerance matches contract.json", () => {
   expect(DEFAULT_CACHE_TOLERANCE).toBe(contract.default_cache_tolerance);
+});
+
+// The floors are pinned in code, wrangler.toml and contract.json — but the
+// numbers users actually read are hand-typed prose in the SPA docs page, and
+// that is what has drifted twice: the 0.87 purge missed this page, so it kept
+// advertising "≈0.85, between 0.75 and 0.87" long after the code moved to 0.84
+// (effective floor 0.83). Derive the expected values so the prose cannot go
+// stale silently again.
+it("SPA docs quote the contract-derived floors, not superseded ones", () => {
+  const html = readFileSync(join(__dirname, "../public/index.html"), "utf8");
+  const effective = Number(
+    similarityFloor(contract.default_cache_tolerance, contract.floor_sim_max, contract.floor_sim_min).toFixed(2),
+  );
+
+  const scale = html.match(/<div class="match-scale-labels">([\s\S]*?)<\/div>/);
+  expect(scale, 'SPA docs: <div class="match-scale-labels"> block not found').not.toBeNull();
+  const scaleNums = [...scale![1].matchAll(/\d\.\d+/g)].map((m) => Number(m[0]));
+  for (const [label, want] of [
+    ["strict end (floor_sim_max)", contract.floor_sim_max],
+    ["loose end (floor_sim_min)", contract.floor_sim_min],
+    ["effective server floor", effective],
+  ] as [string, number][]) {
+    expect(scaleNums, `SPA match scale is missing the ${label} value ${want}; it shows ${scaleNums.join(", ")}`)
+      .toContain(want);
+  }
+
+  const prose = html.match(/The cosine-similarity floor a match must clear[^<]*/);
+  expect(prose, "SPA docs: the fixed-floor paragraph was not found").not.toBeNull();
+  const proseNums = [...prose![0].matchAll(/\d\.\d+/g)].map((m) => Number(m[0]));
+  expect(proseNums, `SPA fixed-floor paragraph quotes ${proseNums.join(", ")}`)
+    .toEqual([effective, contract.floor_sim_min, contract.floor_sim_max]);
 });
 
 it("edge BGE model id matches contract.json (same embedding space as backfill)", () => {
