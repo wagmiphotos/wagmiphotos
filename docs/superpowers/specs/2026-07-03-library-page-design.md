@@ -59,6 +59,13 @@ Response `200`:
 
 `has_more` is computed by fetching `limit + 1` rows and trimming.
 
+`degraded: true` is present (and only present) when semantic search was
+unavailable and the server fell back to the likes-ranked browse. It changes the
+meaning of `images` from "matches for `q`" to "popular images", so a client that
+renders them as search results without checking it is misleading its user. Added
+2026-08-13 with the removal of the production `LIKE` fallback, which read the
+whole table on every search during an outage.
+
 ### `GET /v1/library/:id/download`
 
 Public, GET only. Proxies the full-size image so downloads work regardless of the

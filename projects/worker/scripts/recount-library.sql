@@ -15,20 +15,34 @@
 --
 -- BULK IMPORTS. SQLite triggers are per-ROW, not per-statement: a 200-row bulk
 -- INSERT fires the counter trigger 200 times, so a large import writes one
--- extra D1 row per asset (measured on 200k rows: triggers +8% wall clock, the
--- 0021 showcase index +23%, both +32%; ~0.66 us/row). That is fine for a
--- routine seed. For a very large import (millions of rows), drop the triggers,
--- load, then recount:
+-- extra D1 row per asset. Measured on 200k rows (batches of 200), against a
+-- 407ms baseline with neither present:
 --
---   DROP TRIGGER counters_assets_after_insert;
---   DROP TRIGGER counters_assets_after_update;
---   DROP TRIGGER counters_assets_after_delete;
+--   triggers only          439ms   +8%    +0.16 us/row
+--   showcase index only    502ms  +23%    +0.48 us/row
+--   both (as shipped)      539ms  +32%    +0.66 us/row
+--
+-- Note the index costs 3x what the triggers do: if you only drop one thing for
+-- a big load, drop idx_assets_showcase (at the cost of a slow /v1/home until
+-- it is recreated), not the triggers. Dropping the triggers additionally means
+-- the counter is wrong until the recount below runs.
+--
+-- For a very large import (millions of rows), drop both, load, then recount:
+--
+--   DROP TRIGGER IF EXISTS counters_assets_after_insert;
+--   DROP TRIGGER IF EXISTS counters_assets_after_update;
+--   DROP TRIGGER IF EXISTS counters_assets_after_delete;
+--   DROP INDEX   IF EXISTS idx_assets_showcase;
 --   -- ... run the import ...
---   -- re-create all three from migrations/0021_home_read_cost.sql, then:
---   npx wrangler d1 execute wagmiphotos --remote --file=scripts/recount-library.sql
+--   -- then re-apply 0021 directly (`migrations apply` will not re-run an
+--   -- already-recorded migration):
+--   npx wrangler d1 execute wagmiphotos --remote \
+--     --file=migrations/0021_home_read_cost.sql
 --
--- Dropping idx_assets_showcase for the load and recreating it afterwards saves
--- more than the triggers do, at the cost of a slow /v1/home until it is back.
+-- Every statement in 0021 is CREATE ... IF NOT EXISTS plus an ON CONFLICT
+-- upsert that recounts, so re-running it restores the index, the triggers AND
+-- the correct count in one step — this script is not needed in that flow. It
+-- exists to repair drift when the schema is already in place.
 UPDATE counters
    SET value = (SELECT COUNT(*) FROM assets WHERE collection_id IS NULL AND dead_at IS NULL)
  WHERE name = 'library_assets';

@@ -2982,7 +2982,7 @@
           </div>
 
           <div id="library-grid" class="library-grid"></div>
-          <div id="library-status" class="library-status" style="display: none;"></div>
+          <div id="library-status" class="library-status" role="status" aria-live="polite" style="display: none;"></div>
           <button id="library-more" class="btn library-more" style="display: none;" onclick="loadMoreLibrary()">Load more</button>
         </div>
 
@@ -3010,7 +3010,7 @@
                        onkeydown="if(event.key==='Enter'){clearTimeout(brwViewDebounce);loadBrowseViewer(this.value.trim());}">
               </div>
               <div id="browse-viewer-grid" class="library-grid" style="margin-top: 16px;"></div>
-              <div id="browse-viewer-status" class="library-status" style="display: none;"></div>
+              <div id="browse-viewer-status" class="library-status" role="status" aria-live="polite" style="display: none;"></div>
             </div>
           </div>
         </div>
@@ -4316,6 +4316,10 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
 
     const LIB_PAGE_SIZE = 24;
     let libQuery = '', libOffset = 0, libLoaded = false, libSeq = 0, libDebounce = null;
+    // Sticky for the current result set: once a page comes back degraded, the
+    // grid holds non-matching images, so the warning must persist even if a
+    // later page (after recovery) is fine. Reset on every fresh search.
+    let libDegraded = false;
     let libSort = 'liked';               // 'liked' (default) | 'match'
     let libUserPickedSort = false;       // did the user explicitly choose?
 
@@ -4364,7 +4368,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       const grid = document.getElementById('library-grid');
       const status = document.getElementById('library-status');
       const moreBtn = document.getElementById('library-more');
-      if (!append) { grid.innerHTML = ''; libOffset = 0; moreBtn.style.display = 'none'; }
+      if (!append) { grid.innerHTML = ''; libOffset = 0; moreBtn.style.display = 'none'; libDegraded = false; }
       status.textContent = 'Loading…';
       status.style.display = 'block';
       try {
@@ -4380,8 +4384,11 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         // `degraded` means semantic search was unavailable and the API returned
         // popular images instead of matches — say so rather than passing them
         // off as results for the query.
-        if (data.degraded && libQuery) {
-          status.textContent = 'Search is temporarily unavailable — showing popular images instead.';
+        if (data.degraded) libDegraded = true;
+        if (libDegraded && libQuery) {
+          status.textContent = grid.children.length
+            ? 'Search is temporarily unavailable — showing popular images instead.'
+            : 'Search is temporarily unavailable. Please try again shortly.';
           status.style.display = 'block';
         } else if (grid.children.length) {
           status.style.display = 'none';
@@ -4603,7 +4610,8 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
       brwViewDebounce = setTimeout(() => loadBrowseViewer(value.trim()), 300);
     }
 
-    // Same public search path API callers use — semantic ranking, LIKE fallback.
+    // Same public search path API callers use — semantic ranking, with a
+    // degraded likes-ranked browse when semantic search is unavailable.
     async function loadBrowseViewer(q) {
       if (!brwViewing) return;
       const seq = ++brwViewSeq;
@@ -4623,7 +4631,9 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         if (degraded && q) {
           // Semantic search unavailable — these are the collection's popular
           // images, not matches for q. Say so instead of implying otherwise.
-          status.textContent = 'Search is temporarily unavailable — showing this collection’s images instead.';
+          status.textContent = images.length
+            ? 'Search is temporarily unavailable — showing this collection’s images instead.'
+            : 'Search is temporarily unavailable. Please try again shortly.';
           status.style.display = 'block';
         } else if (!images.length) {
           status.textContent = q ? 'No images in this collection match “' + q + '”.' : 'This collection has no images yet.';
@@ -5167,7 +5177,7 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         }
         if (r.status === 401) { location.hash = '#/login'; return; }
         if (!r.ok) throw new Error('HTTP ' + r.status);
-        const { images } = await r.json();
+        const { images, degraded } = await r.json();
         if (seq !== collViewSeq) return;
         collViewerImages = images;   // module-scope: modal reads from memory, no fetch
         // re-attach to in-flight generations for this collection (survives refresh)
@@ -5191,13 +5201,20 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
           .map(([id, v]) => v._error
             ? { _error: true, _reason: v._error, _id: id, prompt: v.prompt }
             : { _pending: true, _id: id, prompt: v.prompt, startTime: v.startTime });
+        // Semantic search unavailable: `images` are the collection's popular
+        // images, NOT matches for the query — never present them as matches.
+        const degradedNote = (degraded && collViewQuery)
+          ? '<div class="muted" style="font-size:0.8125rem;margin-bottom:0.5rem;" role="status">Search is temporarily unavailable — showing this collection\u2019s images instead.</div>'
+          : '';
         if (!images.length && !pend.length) {
-          el.innerHTML = '<span style="font-size:0.8125rem;">' + (collViewQuery
-            ? 'No images in this collection match “' + escapeHtml(collViewQuery) + '”.'
-            : 'No images yet — generate one on the left.') + '</span>';
+          el.innerHTML = '<span style="font-size:0.8125rem;">' + (degraded && collViewQuery
+            ? 'Search is temporarily unavailable. Please try again shortly.'
+            : collViewQuery
+              ? 'No images in this collection match \u201C' + escapeHtml(collViewQuery) + '\u201D.'
+              : 'No images yet — generate one on the left.') + '</span>';
           return;
         }
-        el.innerHTML = '<div class="coll-viewer-grid">' + pend.map(collTile).join('') + images.map(collTile).join('') + '</div>';
+        el.innerHTML = degradedNote + '<div class="coll-viewer-grid">' + pend.map(collTile).join('') + images.map(collTile).join('') + '</div>';
       } catch {
         if (seq === collViewSeq) el.innerHTML = '<span style="font-size:0.75rem;">Could not load images.</span>';
       }

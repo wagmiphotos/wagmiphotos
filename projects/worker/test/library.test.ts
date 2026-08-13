@@ -155,6 +155,32 @@ it("prod: embedder failure degrades to the indexed browse, never the LIKE scan",
 
 // Offline dev has no Workers AI and no Vectorize at all, so the LIKE path is
 // the only way local search works — and the local table is a handful of rows.
+// The whole point of the fallback is that the library page never 500s. A D1
+// outage takes out the semantic path AND the degraded browse, so the fallback
+// must not assume its own query succeeds.
+it("prod: a D1 outage taking out the fallback too still returns 200, not 500", async () => {
+  const s = fakeServices();
+  (s as any)._matches.push({ id: "b", score: 0.95 });
+  s.assets.getAssetsByIds = async () => { throw new Error("D1 blip"); };
+  s.assets.browseByLikes = async () => { throw new Error("D1 blip"); };
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?q=cat"), s, { floorSimMin: 0.72 });
+  expect(res.status).toBe(200);
+  const body: any = await res.json();
+  expect(body.degraded).toBe(true);
+  expect(body.images).toEqual([]);
+  expect(body.has_more).toBe(false);
+});
+
+// Same invariant for an authed request: likedByUser runs inside project().
+it("prod: likedByUser failing during the degraded projection still returns 200", async () => {
+  const s = fakeServices({ embedder: { textEmbed: async () => { throw new Error("no AI"); } } });
+  (s as any)._libraryRows.push(libRow({ id: "popular" }));
+  s.assets.likedByUser = async () => { throw new Error("D1 blip"); };
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?q=cat"), s, { floorSimMin: 0.72 }, "usr_1");
+  expect(res.status).toBe(200);
+  expect((await res.json() as any).degraded).toBe(true);
+});
+
 it("dev: embedder failure still uses the LIKE scan", async () => {
   const s = fakeServices({ embedder: { textEmbed: async () => { throw new Error("no AI binding"); } } });
   (s as any)._libraryRows.push(libRow({ id: "like-hit" }));

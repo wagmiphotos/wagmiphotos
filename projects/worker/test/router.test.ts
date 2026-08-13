@@ -142,6 +142,26 @@ it("generate: upstream throw (vectorize.query throws) -> 500 without internal de
   errSpy.mockRestore();
 });
 
+// Pins the devMode wiring end to end. LibrarySearchCfg.devMode is optional, so
+// deleting or inverting index.ts's `devMode: isDevMode(env)` is silent at
+// compile time and invisible to library.test.ts (which builds the cfg by hand)
+// — the same shape as the incident where wrangler.toml [vars] silently
+// overrode the similarity floor in production.
+it("library: with DEV_MODE off, a failing semantic search degrades — never the LIKE scan", async () => {
+  // AI.run throws -> the embedder fails -> the fallback path is taken.
+  const env = fakeEnv({ AI: { run: async () => { throw new Error("no AI"); } }, DEV_MODE: undefined, MASTER_API_KEY: undefined });
+  const res = await worker.fetch(new Request("https://x/v1/library?q=cat"), env, { waitUntil: () => {} } as any);
+  expect(res.status).toBe(200);
+  expect((await res.json() as any).degraded).toBe(true);
+});
+
+it("library: with DEV_MODE on, the same failure still reaches the LIKE scan", async () => {
+  const env = fakeEnv({ AI: { run: async () => { throw new Error("no AI"); } }, DEV_MODE: "true" });
+  const res = await worker.fetch(new Request("https://x/v1/library?q=cat"), env, { waitUntil: () => {} } as any);
+  expect(res.status).toBe(200);
+  expect((await res.json() as any).degraded).toBeUndefined();
+});
+
 it("library: GET returns images/has_more, POST is 404", async () => {
   const res = await worker.fetch(new Request("https://x/v1/library"), fakeEnv(), { waitUntil: () => {} } as any);
   expect(res.status).toBe(200);
