@@ -103,6 +103,25 @@ Wizard: name, image URL, default tier (2 vCPU / 4 GB / 10 GiB ephemeral +
 - Progress metric: `SELECT COUNT(*) FROM live_assets WHERE locally_cached = 0`
   (trending to ~0). Completion = remaining count ≈ attempt-capped stragglers +
   404/410 tombstones; agent reports the straggler list for manual triage.
+- Cost of that metric, measured on prod 2026-08-13: **510,498 rows read,
+  873ms**. `idx_assets_rehostable` (0008) is partial on exactly
+  `locally_cached = 0 AND dead_at IS NULL`, so the plan is
+  `SCAN assets USING INDEX idx_assets_rehostable` — it walks only the
+  un-rehosted rows, never the full table. The read therefore shrinks as the
+  sweep progresses (~510k at start, ~50k at 90% done, ~0 at completion): it is
+  self-limiting, unlike the `/v1/home` `COUNT(*)` that migration 0021 removed,
+  which stayed at 511k forever.
+- The one hazard is the start of the sweep, when the count is most expensive
+  and the agent is most likely to be asked "status?" repeatedly: 20 asks in
+  the first hour is ~10M rows read. So have `sweep-status.sh` serve a cached
+  value (refresh at most every few minutes) rather than counting per ask. A
+  sweep-maintained `meta` row was considered and rejected — it trades a
+  monotonically-shrinking read for a new drift surface, since a crashed batch
+  leaves the row stale with nothing to reconcile it.
+- Counter upkeep during the sweep: each 404/410 tombstone is an
+  `UPDATE assets SET dead_at=...`, which fires the 0021 trigger and decrements
+  `counters.library_assets` — correct and wanted (a tombstoned asset leaves the
+  public count), and one extra row written per tombstone.
 - Restart-safe: D1 flags/attempts are the only state; a container restart or
   redeploy just resumes.
 - Homepage/library effects appear as thumbs immediately per-asset; the liked

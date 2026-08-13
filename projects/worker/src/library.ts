@@ -3,7 +3,8 @@ import { assetUrls } from "./asset-urls";
 import { combinedPrompt } from "./collections";
 
 export interface LibraryCfg { assetBaseUrl?: string; }
-export interface LibrarySearchCfg extends LibraryCfg { floorSimMin: number; }
+// devMode gates the LIKE fallback below — see the catch in handleLibrarySearch.
+export interface LibrarySearchCfg extends LibraryCfg { floorSimMin: number; devMode?: boolean; }
 
 export const SEARCH_TOP_K = 100; // Vectorize topK cap without values/metadata
 
@@ -62,12 +63,20 @@ export async function handleLibrarySearch(
     try { await s.collections.bumpSearchCount(coll.id); } catch (e) { console.error("bumpSearchCount failed", e); }
   }
 
+  // The likes-ranked browse, used by both the empty-q path and the degraded
+  // fallback — one definition so the two can never diverge on scoping/paging.
+  const browse = () =>
+    s.assets.browseByLikes({ limit: limit + 1, offset, ...(coll ? { collectionId: coll.id } : {}) });
+
   // Project rows to the public shape, attaching the per-user `liked` flag when authed.
-  const project = async (rows: LibraryAssetRow[], has_more: boolean): Promise<Response> => {
+  // `degraded` marks a response whose rows do NOT answer the caller's query
+  // (semantic search was unavailable), so the client can say so rather than
+  // presenting popular images as search results.
+  const project = async (rows: LibraryAssetRow[], has_more: boolean, degraded = false): Promise<Response> => {
     let likedSet: Set<string> | null = null;
     if (userId) likedSet = new Set(await s.assets.likedByUser(userId, rows.map((r) => r.id)));
     const images = rows.map((r) => publicAsset(r, cfg.assetBaseUrl, likedSet ? likedSet.has(r.id) : undefined));
-    return Response.json({ images, has_more });
+    return Response.json({ images, has_more, ...(degraded ? { degraded: true } : {}) });
   };
 
   if (q) {
@@ -90,16 +99,39 @@ export async function handleLibrarySearch(
       const ordered = page.flatMap((m) => (byId.has(m.id) ? [byId.get(m.id)!] : [])); // orphan vector: skip
       return await project(ordered, relevant.length > offset + limit);
     } catch (e) {
-      // Workers AI / Vectorize unavailable (offline dev) or transient failure:
-      // degrade to the LIKE scan rather than 500ing the library page.
-      console.warn("semantic library search failed; falling back to LIKE", e);
+      // console.error, not warn: a permanent defect in the semantic path lands
+      // here too, and the degraded state is now user-visible and open-ended.
+      console.error("semantic library search failed", e);
+      // The LIKE scan is not an acceptable production fallback: `prompt LIKE
+      // '%x%'` cannot use an index, and ORDER BY created_at forces every match
+      // to be found before sorting, so it reads the entire table (measured:
+      // 512,140 rows / 3.8s at 511.5k assets) on EVERY search for as long as
+      // the outage lasts — turning a Workers AI blip into a D1 cost incident.
+      // Serve the indexed likes-ranked browse instead and flag it, keeping the
+      // original intent of never 500ing the library page.
+      // Dev keeps the LIKE path: offline there is no Workers AI or Vectorize
+      // at all, so it is the only way local search works, over a tiny table.
+      if (!cfg.devMode) {
+        // The outage that broke the semantic path may be D1 itself, which also
+        // breaks this browse and project()'s likedByUser. Hold the never-500
+        // invariant: an empty degraded page still lets the client say why.
+        try {
+          const rows = await browse();
+          return await project(rows.slice(0, limit), rows.length > limit, true);
+        } catch (e2) {
+          console.error("degraded library browse failed too", e2);
+          return Response.json({ images: [], has_more: false, degraded: true });
+        }
+      }
+      console.warn("dev mode: falling back to the LIKE scan");
     }
   }
 
-  // Empty q -> likes-ranked browse; q-present fallback -> LIKE scan (existing behavior).
+  // Empty q -> likes-ranked browse; q-present here is the DEV-ONLY LIKE scan
+  // (production returned a degraded browse from the catch above).
   const rows = q
     ? await s.assets.searchAssets({ q, limit: limit + 1, offset, ...(coll ? { collectionId: coll.id } : {}) })
-    : await s.assets.browseByLikes({ limit: limit + 1, offset, ...(coll ? { collectionId: coll.id } : {}) });
+    : await browse();
   return await project(rows.slice(0, limit), rows.length > limit);
 }
 
