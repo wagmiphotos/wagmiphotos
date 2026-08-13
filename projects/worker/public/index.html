@@ -4377,7 +4377,13 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         libLoaded = true;
         libOffset += data.images.length;
         grid.insertAdjacentHTML('beforeend', data.images.map(libraryCard).join(''));
-        if (grid.children.length) {
+        // `degraded` means semantic search was unavailable and the API returned
+        // popular images instead of matches — say so rather than passing them
+        // off as results for the query.
+        if (data.degraded && libQuery) {
+          status.textContent = 'Search is temporarily unavailable — showing popular images instead.';
+          status.style.display = 'block';
+        } else if (grid.children.length) {
           status.style.display = 'none';
         } else {
           status.textContent = libQuery ? 'No images match “' + libQuery + '”.' : 'The library is empty.';
@@ -4612,13 +4618,19 @@ curl -X POST https://api.wagmi.photos/v1/images/generations \
         const res = await fetch('/v1/library?' + params, { credentials: 'same-origin' });
         if (res.status === 401) { location.hash = '#/login'; return; }
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        const { images } = await res.json();
+        const { images, degraded } = await res.json();
         if (seq !== brwViewSeq) return;
-        if (!images.length) {
+        if (degraded && q) {
+          // Semantic search unavailable — these are the collection's popular
+          // images, not matches for q. Say so instead of implying otherwise.
+          status.textContent = 'Search is temporarily unavailable — showing this collection’s images instead.';
+          status.style.display = 'block';
+        } else if (!images.length) {
           status.textContent = q ? 'No images in this collection match “' + q + '”.' : 'This collection has no images yet.';
           return;
+        } else {
+          status.style.display = 'none';
         }
-        status.style.display = 'none';
         grid.innerHTML = images.map(libraryCard).join('');
       } catch {
         if (seq === brwViewSeq) { status.textContent = 'Could not load this collection.'; status.style.display = 'block'; }

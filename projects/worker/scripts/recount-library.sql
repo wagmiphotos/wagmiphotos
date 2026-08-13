@@ -12,6 +12,23 @@
 -- Costs one full scan of assets (~511k rows) — that is the read this migration
 -- exists to remove from the request path, so keep it an operator action and
 -- never wire it into a handler or the cron.
+--
+-- BULK IMPORTS. SQLite triggers are per-ROW, not per-statement: a 200-row bulk
+-- INSERT fires the counter trigger 200 times, so a large import writes one
+-- extra D1 row per asset (measured on 200k rows: triggers +8% wall clock, the
+-- 0021 showcase index +23%, both +32%; ~0.66 us/row). That is fine for a
+-- routine seed. For a very large import (millions of rows), drop the triggers,
+-- load, then recount:
+--
+--   DROP TRIGGER counters_assets_after_insert;
+--   DROP TRIGGER counters_assets_after_update;
+--   DROP TRIGGER counters_assets_after_delete;
+--   -- ... run the import ...
+--   -- re-create all three from migrations/0021_home_read_cost.sql, then:
+--   npx wrangler d1 execute wagmiphotos --remote --file=scripts/recount-library.sql
+--
+-- Dropping idx_assets_showcase for the load and recreating it afterwards saves
+-- more than the triggers do, at the cost of a slow /v1/home until it is back.
 UPDATE counters
    SET value = (SELECT COUNT(*) FROM assets WHERE collection_id IS NULL AND dead_at IS NULL)
  WHERE name = 'library_assets';

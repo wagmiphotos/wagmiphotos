@@ -100,9 +100,23 @@ Wizard: name, image URL, default tier (2 vCPU / 4 GB / 10 GiB ephemeral +
 
 ### Sweep operation
 
-- Progress metric: `SELECT COUNT(*) FROM live_assets WHERE locally_cached = 0`
-  (trending to ~0). Completion = remaining count ≈ attempt-capped stragglers +
-  404/410 tombstones; agent reports the straggler list for manual triage.
+- Progress metric: **not** `SELECT COUNT(*) FROM live_assets WHERE locally_cached = 0`.
+  No index can answer that predicate (`idx_assets_rehostable` is partial on
+  `locally_cached = 0 AND dead_at IS NULL` and would be walked end to end), so
+  it reads ~510k rows per call — and `sweep-status.sh` is wired to a Telegram
+  agent that runs it every time someone asks "status?", uncached and ad hoc.
+  That is the exact pattern migration 0021 removed from `/v1/home` (see
+  `scripts/recount-library.sql` and the 0021 header for the measurements).
+  Instead: the sweep already knows how many assets it has rehosted, so have it
+  maintain its own progress row (`meta`, key `rehost_progress`, written once
+  per batch) and have `sweep-status.sh` read that single row. Take the true
+  remaining count at most once at sweep start, not per status query.
+  Completion = remaining count ≈ attempt-capped stragglers + 404/410
+  tombstones; agent reports the straggler list for manual triage.
+- Counter upkeep during the sweep: each 404/410 tombstone is an
+  `UPDATE assets SET dead_at=...`, which fires the 0021 trigger and decrements
+  `counters.library_assets` — correct and wanted (a tombstoned asset leaves the
+  public count), and one extra row written per tombstone.
 - Restart-safe: D1 flags/attempts are the only state; a container restart or
   redeploy just resumes.
 - Homepage/library effects appear as thumbs immediately per-asset; the liked

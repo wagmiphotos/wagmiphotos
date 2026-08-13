@@ -64,15 +64,16 @@ it("search: has_more true when a full extra row exists, images trimmed to limit"
 
 it("search: passes q and offset through, clamps numeric limit to 1..60", async () => {
   // non-empty q now goes through the semantic path first; force the fallback
-  // so this still exercises the LIKE call's limit/offset math.
+  // under devMode (prod degrades to browseByLikes instead) so this still
+  // exercises the LIKE call's limit/offset math.
   const s = fakeServices({ embedder: { textEmbed: async () => { throw new Error("offline"); } } });
-  await handleLibrarySearch(new URL("https://x/v1/library?q=fox&limit=999&offset=48"), s, cfg);
+  await handleLibrarySearch(new URL("https://x/v1/library?q=fox&limit=999&offset=48"), s, { ...cfg, devMode: true });
   expect((s as any)._searchCalls[0]).toEqual({ q: "fox", limit: 61, offset: 48 });
 
   // empty q now browses by likes (browseByLikes); its fake doesn't expose call
   // args, so verify the limit=0 -> 1 clamp (fetch limit+1=2) via response shape.
   (s as any)._libraryRows.push(libRow({ id: "p1" }), libRow({ id: "p2" }));
-  const res = await handleLibrarySearch(new URL("https://x/v1/library?limit=0"), s, cfg);
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?limit=0"), s, { ...cfg, devMode: true });
   const j: any = await res.json();
   expect(j.images).toHaveLength(1);
   expect(j.has_more).toBe(true);
@@ -80,13 +81,14 @@ it("search: passes q and offset through, clamps numeric limit to 1..60", async (
 });
 
 it("search: q over 200 chars -> 400, q at the cap still searches", async () => {
-  // force the LIKE fallback (see note above) so the at-cap case still reaches searchAssets.
+  // force the LIKE fallback under devMode (see note above) so the at-cap case still reaches searchAssets.
   const s = fakeServices({ embedder: { textEmbed: async () => { throw new Error("offline"); } } });
+  const devCfg = { ...cfg, devMode: true };
   const tooLong = await handleLibrarySearch(new URL("https://x/v1/library?q=" + "a".repeat(201)), s, cfg);
   expect(tooLong.status).toBe(400);
   expect(typeof (await tooLong.json() as any).error).toBe("string");
   expect((s as any)._searchCalls).toHaveLength(0);
-  const atCap = await handleLibrarySearch(new URL("https://x/v1/library?q=" + "a".repeat(200)), s, cfg);
+  const atCap = await handleLibrarySearch(new URL("https://x/v1/library?q=" + "a".repeat(200)), s, devCfg);
   expect(atCap.status).toBe(200);
   expect((s as any)._searchCalls[0].q).toHaveLength(200);
 });
@@ -136,36 +138,56 @@ it("semantic search: ids missing from D1 are skipped (orphan vectors)", async ()
   expect(body.images.map((i: any) => i.id)).toEqual(["has-row"]);
 });
 
-it("falls back to LIKE search when the embedder throws", async () => {
+// In production a semantic-search failure must NOT fall through to the LIKE
+// scan: `prompt LIKE '%x%'` cannot use an index and the ORDER BY forces every
+// match to be found before sorting, so it reads the whole table (measured:
+// 512,140 rows / 3.8s) on every search for as long as the outage lasts.
+it("prod: embedder failure degrades to the indexed browse, never the LIKE scan", async () => {
+  const s = fakeServices({ embedder: { textEmbed: async () => { throw new Error("no AI binding"); } } });
+  (s as any)._libraryRows.push(libRow({ id: "popular" }));
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?q=cat"), s, { floorSimMin: 0.72 });
+  expect(res.status).toBe(200);
+  const body: any = await res.json();
+  expect((s as any)._searchCalls).toEqual([]);              // no LIKE scan
+  expect(body.degraded).toBe(true);                          // results are not for the query
+  expect(body.images.map((i: any) => i.id)).toEqual(["popular"]);
+});
+
+// Offline dev has no Workers AI and no Vectorize at all, so the LIKE path is
+// the only way local search works — and the local table is a handful of rows.
+it("dev: embedder failure still uses the LIKE scan", async () => {
   const s = fakeServices({ embedder: { textEmbed: async () => { throw new Error("no AI binding"); } } });
   (s as any)._libraryRows.push(libRow({ id: "like-hit" }));
-  const res = await handleLibrarySearch(new URL("https://x/v1/library?q=cat"), s, { floorSimMin: 0.72 });
+  const res = await handleLibrarySearch(new URL("https://x/v1/library?q=cat"), s, { floorSimMin: 0.72, devMode: true });
   expect(res.status).toBe(200);
   const body: any = await res.json();
   expect((s as any)._searchCalls[0]).toEqual({ q: "cat", limit: 25, offset: 0 });
+  expect(body.degraded).toBeUndefined();
   expect(body.images.map((i: any) => i.id)).toEqual(["like-hit"]);
 });
 
-it("falls back to LIKE search when vectorize.query throws", async () => {
+it("prod: vectorize failure degrades to the indexed browse", async () => {
   const s = fakeServices({ vectorize: { query: async () => { throw new Error("index unavailable"); }, upsert: async () => {}, queryNamespace: async () => [], upsertNamespace: async () => {}, deleteByIds: async () => {} } });
-  (s as any)._libraryRows.push(libRow({ id: "like-hit" }));
+  (s as any)._libraryRows.push(libRow({ id: "popular" }));
   const res = await handleLibrarySearch(new URL("https://x/v1/library?q=cat"), s, { floorSimMin: 0.72 });
   expect(res.status).toBe(200);
   const body: any = await res.json();
-  expect((s as any)._searchCalls[0]).toEqual({ q: "cat", limit: 25, offset: 0 });
-  expect(body.images.map((i: any) => i.id)).toEqual(["like-hit"]);
+  expect((s as any)._searchCalls).toEqual([]);
+  expect(body.degraded).toBe(true);
+  expect(body.images.map((i: any) => i.id)).toEqual(["popular"]);
 });
 
-it("falls back to LIKE search when getAssetsByIds throws (embedder+vectorize succeed)", async () => {
+it("prod: hydration failure degrades to the indexed browse", async () => {
   const s = fakeServices();
   (s as any)._matches.push({ id: "b", score: 0.95 }); // above floor, so hydration is reached
   s.assets.getAssetsByIds = async () => { throw new Error("D1 blip"); };
-  (s as any)._libraryRows.push(libRow({ id: "like-hit" }));
+  (s as any)._libraryRows.push(libRow({ id: "popular" }));
   const res = await handleLibrarySearch(new URL("https://x/v1/library?q=cat"), s, { floorSimMin: 0.72 });
   expect(res.status).toBe(200);
   const body: any = await res.json();
-  expect((s as any)._searchCalls[0]).toEqual({ q: "cat", limit: 25, offset: 0 });
-  expect(body.images.map((i: any) => i.id)).toEqual(["like-hit"]);
+  expect((s as any)._searchCalls).toEqual([]);
+  expect(body.degraded).toBe(true);
+  expect(body.images.map((i: any) => i.id)).toEqual(["popular"]);
 });
 
 it("empty q browses by likes (vectorize and embedder never called)", async () => {

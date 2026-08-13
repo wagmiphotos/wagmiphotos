@@ -6,7 +6,7 @@ import { handleGenerate, handleKeygen, type GenBody } from "./handler";
 import { handleHome } from "./home";
 import { handleLibrarySearch, handleLibraryDownload, handleLikeAsset, handleUnlikeAsset } from "./library";
 import { rewritePublicUrls } from "./rewrite";
-import { numEnv } from "./config";
+import { numEnv, isDevMode } from "./config";
 import { FLOOR_SIM_MAX, FLOOR_SIM_MIN, LIBRARY_FLOOR_SIM } from "./floor";
 import { makeEmailSender } from "./email";
 import { makeStripe } from "./stripe";
@@ -182,7 +182,11 @@ export default {
         if (request.method === "DELETE") return await handleDeleteByok(request, env, services);
       }
 
-      const libraryCfg = { floorSimMin: numEnv(env.LIBRARY_FLOOR_SIM, LIBRARY_FLOOR_SIM), assetBaseUrl: env.ASSET_BASE_URL };
+      const libraryCfg = {
+        floorSimMin: numEnv(env.LIBRARY_FLOOR_SIM, LIBRARY_FLOOR_SIM),
+        assetBaseUrl: env.ASSET_BASE_URL,
+        devMode: isDevMode(env),
+      };
 
       const collModCfg: CollModCfg = { kek: env.BYOK_KEK, moderationKey: env.OPENAI_API_KEY };
       if (url.pathname === "/v1/collections") {
