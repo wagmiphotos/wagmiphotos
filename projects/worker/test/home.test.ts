@@ -55,6 +55,43 @@ it("showcaseAssets: cached-only, like-ranked, newest tiebreak, collection/tombst
   expect(all.map((r) => r.id)).toEqual(["hot", "warm", "plain_b", "plain_a"]);
 });
 
+// --- read cost -------------------------------------------------------------
+// Both /v1/home queries used to scan the entire assets table: 511,510 rows for
+// the COUNT(*) and 512,513 rows to return 8 showcase tiles, ~1.02M rows per
+// cache miss. These pin the cost, not the shape (shape is covered above).
+
+// Run a store method against the real schema, returning the SQL it prepared.
+function captureSql(db: any): { sqls: string[]; db: any } {
+  const sqls: string[] = [];
+  return { sqls, db: { ...db, prepare(sql: string) { sqls.push(sql); return db.prepare(sql); } } };
+}
+
+const planOf = (db: any, sql: string, args: unknown[]) =>
+  db._raw.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...args).map((r: any) => r.detail).join("\n");
+
+it("countLibraryAssets reads a counter, never the assets table", async () => {
+  const db = realDb();
+  const cap = captureSql(db);
+  const { assets } = makeD1Stores(cap.db);
+  await assets.countLibraryAssets();
+  // Must read neither `assets` nor `live_assets` (the counter row's *name* is
+  // allowed to contain the word, hence anchoring on the FROM clause).
+  expect(cap.sqls.join("\n")).not.toMatch(/FROM\s+(live_)?assets/i);
+});
+
+it("showcaseAssets is served in index order — no scan, no sort", async () => {
+  const db = realDb();
+  const cap = captureSql(db);
+  const { assets } = makeD1Stores(cap.db);
+  await assets.showcaseAssets(8);
+  const plan = planOf(db, cap.sqls[0], [8]);
+  // A TEMP B-TREE means SQLite materialised and sorted every matching row
+  // before taking 8 — that is the 512k-row read this fix removes. An
+  // index-ordered walk (reported as SCAN ... USING INDEX) stops at LIMIT.
+  expect(plan).not.toMatch(/TEMP B-TREE/);
+  expect(plan).toMatch(/USING (COVERING )?INDEX idx_assets_showcase/);
+});
+
 import { handleHome, SHOWCASE_LIMIT, HOME_CACHE_SECONDS } from "../src/home";
 import { fakeServices } from "./fakes";
 import type { LibraryAssetRow } from "../src/types";

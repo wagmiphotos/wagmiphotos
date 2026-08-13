@@ -110,11 +110,20 @@ export function makeD1Stores(db: D1Database): {
       ).bind(...args, limit, offset).all<LibraryAssetRow>();
       return results ?? [];
     },
+    // Migration 0021: a trigger-maintained counter, not COUNT(*). The live
+    // count is the same predicate (collection_id IS NULL AND dead_at IS NULL),
+    // but reads one row instead of the whole 511k-row table.
     async countLibraryAssets() {
       const row = await db.prepare(
-        "SELECT COUNT(*) AS n FROM live_assets WHERE collection_id IS NULL"
+        "SELECT value AS n FROM counters WHERE name = 'library_assets'"
       ).first<{ n: number }>();
-      return row?.n ?? 0;
+      if (!row) {
+        // Only reachable if 0021 has not been applied. Report 0 rather than
+        // falling back to the scan this migration exists to remove.
+        console.error("counters.library_assets missing — is migration 0021 applied?");
+        return 0;
+      }
+      return row.n;
     },
     async showcaseAssets(limit) {
       const { results } = await db.prepare(

@@ -201,6 +201,45 @@ it("0020: like_count is trigger-maintained and INSERT OR IGNORE is idempotent", 
   expect(count()).toBe(1);
 });
 
+// The counter exists so the landing page never COUNT(*)s the whole library
+// (511k rows / ~11s per /v1/home cache miss before 0021). It is trigger-
+// maintained rather than app-maintained because the seed/backfill pipeline
+// writes `assets` directly with raw multi-row INSERTs (d1_client.py) and
+// tombstones with raw UPDATEs — only a trigger sees those.
+it("0021: library_assets counter is trigger-maintained through raw INSERT/UPDATE/DELETE", async () => {
+  const db = realDb();
+  seedUser(db, "usr_1");
+  const { collections } = makeD1Stores(db);
+  await collections.create({ id: "col_1", ownerUserId: "usr_1", name: "n", themePrompt: "" });
+
+  const counter = () => db._raw.prepare("SELECT value FROM counters WHERE name='library_assets'").get().value;
+  const truth = () =>
+    db._raw.prepare("SELECT COUNT(*) AS n FROM assets WHERE collection_id IS NULL AND dead_at IS NULL").get().n;
+  const both = (n: number) => { expect(counter()).toBe(n); expect(truth()).toBe(n); };
+
+  const raw = (id: string, coll: string | null = null) => db._raw.exec(
+    `INSERT INTO assets (id, prompt, source, collection_id) VALUES ('${id}', 'p', 'pd12m', ${coll ? `'${coll}'` : "NULL"})`
+  );
+
+  both(0);
+  raw("s1"); raw("s2");
+  both(2);
+  raw("c1", "col_1");                                            // collection asset: never counted
+  both(2);
+  db._raw.exec("UPDATE assets SET dead_at=datetime('now'), dead_reason='gone' WHERE id='s1'");
+  both(1);
+  db._raw.exec("UPDATE assets SET dead_at=datetime('now') WHERE id='s1'");  // re-tombstone: no double decrement
+  both(1);
+  db._raw.exec("UPDATE assets SET dead_at=datetime('now') WHERE id='c1'");  // scoped tombstone: no effect
+  both(1);
+  db._raw.exec("UPDATE assets SET serve_count = serve_count + 1 WHERE id='s2'"); // unrelated write
+  both(1);
+  db._raw.exec("UPDATE assets SET dead_at=NULL WHERE id='s1'");            // revival counts again
+  both(2);
+  db._raw.exec("DELETE FROM assets WHERE id='s1'");
+  both(1);
+});
+
 it("0020 store: like/unlike round-trip, likedByUser, and browseByLikes ordering", async () => {
   const db = realDb();
   seedUser(db, "usr_1");
