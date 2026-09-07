@@ -1,0 +1,10 @@
+# Customize this repository's building on https://reporoad.suppers.chatgpt.site
+version: 1
+style: townhouse
+color: "#96624c"
+roof: gable
+signText: wagmiphotos
+garden: true
+support:
+  sponsor: true
+  helpWanted: false
